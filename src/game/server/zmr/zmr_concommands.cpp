@@ -300,6 +300,36 @@ void ZM_VoiceMenu( const CCommand &args )
 
 static ConCommand zm_cmd_voicemenu( "zm_cmd_voicemenu", ZM_VoiceMenu );
 
+/*
+    Rat it up!  
+*/
+static ConVar zm_sv_ratmode( "zm_sv_ratmode", "0", 0, "Enable rat mode? (zm_ratmode)" );
+void ZM_RatMode( const CCommand& args )
+{
+    if ( !zm_sv_ratmode.GetBool() )
+    {
+        return;
+    }
+
+    CZMPlayer* pPlayer = ToZMPlayer( UTIL_GetCommandClient() );
+    
+    if ( !pPlayer ) return;
+
+    if ( pPlayer->GetTeamNumber() != ZMTEAM_SPECTATOR || pPlayer->IsRat() )
+    {
+        return;
+    }
+
+    // ZMRTODO: Change this for a better check.
+    if ( UTIL_PointContents( pPlayer->GetAbsOrigin() ) & CONTENTS_SOLID )
+    {
+        return;
+    }
+
+    pPlayer->StartRatMode();
+}
+
+static ConCommand zm_ratmode( "zm_ratmode", ZM_RatMode, "Turn into a rat." );
 
 /*
     Mirror legacy cvars to the new ones.
