@@ -72,9 +72,7 @@ void CZMDiscordSystem::PostInit()
 {
     InitDiscord();
 
-
     UpdateGameStartTime();
-    PresenceEmpty();
 }
 
 void CZMDiscordSystem::LevelInitPostEntity()
@@ -91,6 +89,9 @@ void CZMDiscordSystem::LevelShutdownPostEntity()
 
 void CZMDiscordSystem::Update( float frametime )
 {
+    // Discord not available.
+    if ( !m_pDiscordCore ) return;
+
     m_pDiscordCore->RunCallbacks();
 
     if ( m_flNextDiscordUpdateTime <= gpGlobals->realtime )
