@@ -1,7 +1,14 @@
 #include "cbase.h"
+
 #include <ctime>
 
-#include <discordrpc/discord_rpc.h>
+#ifdef WIN32
+#define _WINREG_
+#undef ReadConsoleInput
+#undef INVALID_HANDLE_VALUE
+#undef GetCommandLine
+#endif
+#include <discord/discord.h>
 
 
 #include "c_zmr_player_resource.h"
@@ -10,10 +17,7 @@
 #include "tier0/memdbgon.h"
 
 
-
-#define DISCORD_APP_ID          "551073398789505065"
-
-
+static const discord::ClientId DISCORD_APP_ID = 551073398789505065;
 
 class CZMDiscordSystem : public CAutoGameSystemPerFrame
 {
@@ -23,60 +27,31 @@ public:
 
 
     virtual void PostInit() OVERRIDE;
-    virtual void Shutdown() OVERRIDE;
 
     virtual void LevelInitPostEntity() OVERRIDE;
     virtual void LevelShutdownPostEntity() OVERRIDE;
 
     virtual void Update( float frametime ) OVERRIDE;
 
-
+private:
     void PresenceEmpty();
     void PresenceInGame();
     void UpdateGameStartTime();
     void InitDiscord();
 
-    bool IsConnected() const { return m_bConnected; }
-
-
-    static void SetDisconnected();
-    static void SetConnected();
-
-private:
     int GetPlayerCount() const;
 
     static bool IsInGame();
 
 
     float m_flNextDiscordUpdateTime;
-
     int m_nLastPlayerCount;
-
     uint64_t m_GameStartTime;
 
-    bool m_bConnected;
+    discord::Core* m_pDiscordCore;
 };
 
 static CZMDiscordSystem g_ZMDiscordSystem;
-
-
-static void Discord_Event_Ready( const DiscordUser* request )
-{
-    CZMDiscordSystem::SetConnected();
-}
-
-static void Discord_Event_Disconnected( int errorCode, const char* message )
-{
-    CZMDiscordSystem::SetDisconnected();
-}
-
-static void Discord_Event_Error( int errorCode, const char* message )
-{
-    Assert( 0 );
-    DevWarning( "Discord error (%i): %s", errorCode, message );
-}
-
-
 
 //
 //
@@ -86,7 +61,7 @@ CZMDiscordSystem::CZMDiscordSystem() : CAutoGameSystemPerFrame( "ZMDiscordSystem
     m_flNextDiscordUpdateTime = 0.0f;
     m_nLastPlayerCount = -1;
 
-    m_bConnected = false;
+    m_pDiscordCore = nullptr;
 }
 
 CZMDiscordSystem::~CZMDiscordSystem()
@@ -102,40 +77,32 @@ void CZMDiscordSystem::PostInit()
     PresenceEmpty();
 }
 
-void CZMDiscordSystem::Shutdown()
-{
-    Discord_Shutdown();
-}
-
 void CZMDiscordSystem::LevelInitPostEntity()
 {
     m_nLastPlayerCount = -1;
     m_flNextDiscordUpdateTime = 0.0f;
-
-    Update( 0.0f );
 }
 
 void CZMDiscordSystem::LevelShutdownPostEntity()
 {
     m_nLastPlayerCount = -1;
-
-    PresenceEmpty();
+    m_flNextDiscordUpdateTime = 0.0f;
 }
 
 void CZMDiscordSystem::Update( float frametime )
 {
-    Discord_RunCallbacks();
+    m_pDiscordCore->RunCallbacks();
 
     if ( m_flNextDiscordUpdateTime <= gpGlobals->realtime )
     {
-        if ( IsConnected() )
+        if ( IsInGame() )
         {
-            if ( IsInGame() )
-                PresenceInGame();
-            else
-                PresenceEmpty();
+            PresenceInGame();
         }
-
+        else
+        {
+            PresenceEmpty();
+        }
 
         m_flNextDiscordUpdateTime = gpGlobals->realtime + 0.2f;
     }
@@ -161,22 +128,6 @@ bool CZMDiscordSystem::IsInGame()
     return engine->IsInGame() && !engine->IsLevelMainMenuBackground();
 }
 
-void CZMDiscordSystem::SetDisconnected()
-{
-    g_ZMDiscordSystem.m_bConnected = false;
-
-    g_ZMDiscordSystem.m_nLastPlayerCount = -1;
-    g_ZMDiscordSystem.m_flNextDiscordUpdateTime = 0.0f;
-}
-
-void CZMDiscordSystem::SetConnected()
-{
-    g_ZMDiscordSystem.m_bConnected = true;
-
-    g_ZMDiscordSystem.m_nLastPlayerCount = -1;
-    g_ZMDiscordSystem.m_flNextDiscordUpdateTime = 0.0f;
-}
-
 void CZMDiscordSystem::PresenceEmpty()
 {
     // Don't bother updating again.
@@ -184,13 +135,11 @@ void CZMDiscordSystem::PresenceEmpty()
         return;
 
 
-    DiscordRichPresence p = { 0 };
-    p.startTimestamp = m_GameStartTime;
-    p.largeImageKey = "zmrmain";
-    
-
-    Discord_UpdatePresence( &p );
-
+    discord::Activity activity {};
+    activity.SetState( "In Menu" );
+    activity.GetAssets().SetLargeImage( "zmrmain" );
+    activity.GetTimestamps().SetStart( m_GameStartTime );
+    m_pDiscordCore->ActivityManager().UpdateActivity( activity, []( discord::Result result ) {} );
 
     m_nLastPlayerCount = 0;
 }
@@ -225,14 +174,12 @@ void CZMDiscordSystem::PresenceInGame()
         nPlayers,
         nMaxPlayers );
 
-
-    DiscordRichPresence p = { 0 };
-
-    p.details = details;
-    p.startTimestamp = m_GameStartTime;
-    p.largeImageKey = "zmrmain";
-    Discord_UpdatePresence( &p );
-
+    discord::Activity activity {};
+    activity.SetState( "Playing" );
+    activity.SetDetails( details );
+    activity.GetAssets().SetLargeImage( "zmrmain" );
+    activity.GetTimestamps().SetStart( m_GameStartTime );
+    m_pDiscordCore->ActivityManager().UpdateActivity( activity, []( discord::Result result ) {} );
 
     m_nLastPlayerCount = nPlayers;
 }
@@ -247,11 +194,8 @@ void CZMDiscordSystem::UpdateGameStartTime()
 
 void CZMDiscordSystem::InitDiscord()
 {
-    DiscordEventHandlers hndlrs = { 0 };
-    hndlrs.ready = Discord_Event_Ready;
-    hndlrs.disconnected = Discord_Event_Disconnected;
-    hndlrs.errored = Discord_Event_Error;
-
-
-    Discord_Initialize( DISCORD_APP_ID, &hndlrs, 1, nullptr );
+    auto result = discord::Core::Create( DISCORD_APP_ID, DiscordCreateFlags_NoRequireDiscord, &m_pDiscordCore );
+    if ( result != discord::Result::Ok ) {
+        Warning( "Failed to init Discord rich presence. Returned result %i.\n", result );
+    }
 }
