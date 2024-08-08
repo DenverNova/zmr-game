@@ -92,9 +92,12 @@ void CZMBaseThrowableWeapon::ItemPostFrame()
     }
 
     //
-    // Check weapon idle anims.
+    // Check weapon idle anims unless holding for throw or thrown.
     //
+    if ( GetThrowState() < THROWSTATE_READYTOTHROW )
+    {
     WeaponIdle();
+    }
 }
 
 bool CZMBaseThrowableWeapon::Deploy()
