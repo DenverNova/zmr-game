@@ -2,6 +2,7 @@
 
 #include "zmr_player.h"
 #include "zmr_gamerules.h"
+#include "weapons/zmr_weaponconfig.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -293,25 +294,13 @@ void ZM_GibZombies( const CCommand &args )
 
 static ConCommand zm_gibzombies( "zm_gibzombies", ZM_GibZombies );
 
-/*
-    Create zombie at crosshair.
-*/
-static int zm_zombie_create_completion( const char* partial, char commands[ COMMAND_COMPLETION_MAXITEMS ][ COMMAND_COMPLETION_ITEM_LENGTH ] )
+
+static int AutoCompletion( const char* partial, const char** completions, int numCompletions, char commands[COMMAND_COMPLETION_MAXITEMS][COMMAND_COMPLETION_ITEM_LENGTH] )
 {
-    // Autocomplete zombie classnames.
-    const char* completions[] = {
-        "npc_zombie",
-        "npc_fastzombie",
-        "npc_poisonzombie",
-        "npc_dragzombie",
-        "npc_burnzombie"
-    };
-
-
     char cmd[128];
     Q_strncpy( cmd, partial, sizeof( cmd ) );
 
-    
+
     // Skip the command part to compare the argument.
     auto* pszArg = Q_strstr( cmd, " " );
     if ( pszArg )
@@ -326,7 +315,7 @@ static int zm_zombie_create_completion( const char* partial, char commands[ COMM
 
 
     int cmds = 0;
-    for ( int i = 0; i < ARRAYSIZE( completions ); i++ )
+    for ( int i = 0; i < numCompletions; i++ )
     {
         if ( !pszArg || Q_strstr( completions[i], pszArg ) == completions[i] )
         {
@@ -335,6 +324,25 @@ static int zm_zombie_create_completion( const char* partial, char commands[ COMM
     }
 
     return cmds;
+}
+
+
+/*
+    Create zombie at crosshair.
+*/
+static int ZM_Zombie_Create_Completion( const char* partial, char commands[ COMMAND_COMPLETION_MAXITEMS ][ COMMAND_COMPLETION_ITEM_LENGTH ] )
+{
+    // Autocomplete zombie classnames.
+    const char* completions[] = {
+        "npc_zombie",
+        "npc_fastzombie",
+        "npc_poisonzombie",
+        "npc_dragzombie",
+        "npc_burnzombie"
+    };
+
+
+    return AutoCompletion( partial, completions, ARRAYSIZE( completions ), commands );
 }
 
 static void ZM_Zombie_Create( const CCommand& args )
@@ -390,5 +398,41 @@ static void ZM_Zombie_Create( const CCommand& args )
 
 #define ZOMBIECREATE_DESC "Creates a zombie at your crosshair. Takes a zombie classname."
 
-static ConCommand zm_zombie_create( "zm_zombie_create", ZM_Zombie_Create, ZOMBIECREATE_DESC, 0, zm_zombie_create_completion );
-static ConCommand npc_create( "npc_create", ZM_Zombie_Create, ZOMBIECREATE_DESC, 0, zm_zombie_create_completion );
+static ConCommand zm_zombie_create( "zm_zombie_create", ZM_Zombie_Create, ZOMBIECREATE_DESC, 0, ZM_Zombie_Create_Completion );
+static ConCommand npc_create( "npc_create", ZM_Zombie_Create, ZOMBIECREATE_DESC, 0, ZM_Zombie_Create_Completion );
+
+
+/*
+    Give weapon
+*/
+static int ZM_Give_Completion( const char* partial, char commands[COMMAND_COMPLETION_MAXITEMS][COMMAND_COMPLETION_ITEM_LENGTH] )
+{
+    // Autocomplete weapon classnames.
+    const char* weapons[32];
+    int numWeapons = ZMWeaponConfig::GetWeaponConfigSystem()->GetWeaponClassnames( weapons, ARRAYSIZE( weapons ) );
+
+    return AutoCompletion( partial, weapons, numWeapons, commands );
+}
+
+static void ZM_Give( const CCommand& args )
+{
+    auto* pPlayer = ToZMPlayer( UTIL_GetCommandClient() );
+    if ( !pPlayer || args.ArgC() != 2 )
+    {
+        return;
+    }
+
+    char weapon[32];
+    Q_strncpy( weapon, args[1], sizeof( weapon ) );
+    Q_strlower( weapon );
+
+    if ( Q_strstr( weapon, "weapon_" ) != weapon )
+    {
+        return;
+    }
+
+
+    pPlayer->GiveNamedItem( weapon );
+}
+
+static ConCommand give( "give", ZM_Give, "Give weapon to player.\n\tArguments: <weapon_zm_name>", FCVAR_CHEAT, ZM_Give_Completion );

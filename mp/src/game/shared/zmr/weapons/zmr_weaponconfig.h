@@ -279,6 +279,8 @@ namespace ZMWeaponConfig
 
         acttable_t* GetActivityList( const char* szAnimName, int& nActivityCount ) const;
 
+        int GetWeaponClassnames( const char** pszWeaponNames, int nMaxWeapons );
+
     protected:
         void RegisterBaseConfig( WeaponConfigSlot_t slot, CreateWeaponConfigFn fn );
         

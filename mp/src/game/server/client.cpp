@@ -854,6 +854,7 @@ CON_COMMAND( say_team, "Display player message to team" )
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
+#ifndef ZMR
 CON_COMMAND( give, "Give item to player.\n\tArguments: <item_name>" )
 {
 	CBasePlayer *pPlayer = ToBasePlayer( UTIL_GetCommandClient() ); 
@@ -894,6 +895,7 @@ CON_COMMAND( give, "Give item to player.\n\tArguments: <item_name>" )
 		pPlayer->GiveNamedItem( STRING(iszItem) );
 	}
 }
+#endif
 
 
 //------------------------------------------------------------------------------

@@ -991,3 +991,20 @@ CZMBaseWeaponConfig* CZMWeaponConfigSystem::LoadCustomConfigFromFile( WeaponConf
 
     return pConfig;
 }
+
+int CZMWeaponConfigSystem::GetWeaponClassnames( const char** pszWeaponNames, int nMaxWeapons )
+{
+    if ( nMaxWeapons < 1 )
+    {
+        return 0;
+    }
+
+
+    int n = Min( nMaxWeapons, (int) ARRAYSIZE( m_ConfigRegisters ) );
+    for ( int i = 0; i < n; i++ )
+    {
+        pszWeaponNames[i] = m_ConfigRegisters[i].pszWeaponName;
+    }
+
+    return n;
+}
