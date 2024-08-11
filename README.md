@@ -8,9 +8,11 @@ You can read it [here](https://github.com/zm-reborn/zmr-game/blob/master/LICENSE
 
 ### Windows
 1. Download [Visual Studio 2022](https://visualstudio.microsoft.com/vs/)
-2. Download components: **MSVC v143** and **Windows SDK 10.0** (10.0.20348.0 tested).
-3. Run `src/creategameprojects.bat`.
-4. You now have a solution file `src/zmr-games.sln`
+2. Install `Desktop development with C++` workload.
+    * The required components are: **MSVC v143** and **Windows SDK 10.0** (10.0.20348.0 tested)
+3. Run `src/fix_vcxproj.bat` with Admininistrator privileges.
+4. Run `creategameprojects.bat` in `src`-folder.
+5. You now have a solution file `src/zmr-games.sln`
 
 ### Linux
 
@@ -50,8 +52,6 @@ Yes.
 
 Open project settings and make sure `Platform Toolset` is `v143` and `Windows SDK Version` is `10.0 (latest installed version)` or lower.
 If it says one of them is missing, you need to download them from Visual Studio Installer (Tools -> Get Tools and Features)
-
-Running `src/fix_vcxproj.bat` might also help.
 
 ### Other problems
 
