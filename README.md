@@ -9,8 +9,8 @@ You can read it [here](https://github.com/zm-reborn/zmr-game/blob/master/LICENSE
 ### Windows
 1. Download [Visual Studio 2022](https://visualstudio.microsoft.com/vs/)
 2. Download components: **MSVC v143** and **Windows SDK 10.0** (10.0.20348.0 tested).
-3. Run `mp/src/creategameprojects.bat`.
-4. You now have a solution file `mp/src/zmr-games.sln`
+3. Run `src/creategameprojects.bat`.
+4. You now have a solution file `src/zmr-games.sln`
 
 ### Linux
 
@@ -19,15 +19,15 @@ Follow [this tutorial](https://developer.valvesoftware.com/wiki/Source_SDK_2013)
 ## Running
 
 - Requires Source SDK Base 2013 Multiplayer to be downloaded from Steam. (In the Tools-page)
-- Make sure you have cloned the game-folder submodule (`mp/game/zombie_master_reborn`).
+- Make sure you have cloned the game-folder submodule (`game/zombie_master_reborn`).
 
 
-You can create a symbolic link of `mp/game/zombie_master_reborn` in your `<Steam>/steamapps/common/Source SDK Base 2013 Multiplayer`-folder and then run `hl2.exe` with arguments `-game zombie_master_reborn`
+You can create a symbolic link of `game/zombie_master_reborn` in your `<Steam>/steamapps/common/Source SDK Base 2013 Multiplayer`-folder and then run `hl2.exe` with arguments `-game zombie_master_reborn`
 
 Or you can use the script below.
 
 ### Windows Script
-Run `zmr_dev_setup.ps1` inside `mp/game/zombie_master_reborn`. There should now be a `zmr_dev.bat`-batch file in your `Source SDK Base 2013 Multiplayer`-folder which you can run to start the mod.
+Run `zmr_dev_setup.ps1` inside `game/zombie_master_reborn`. There should now be a `zmr_dev.bat`-batch file in your `Source SDK Base 2013 Multiplayer`-folder which you can run to start the mod.
 
 ### Linux
 
@@ -36,7 +36,7 @@ Start hl2 with the Steam runtime.
 
 ## Final Build
 
-Turning on the conditional `ZMR_FINAL` in `mp/src/vpc_scripts/default.vgc` will enable FMOD sound engine and Discord RPC. FMOD headers need to be placed in `public/fmod/` (they cannot be distributed here).
+Turning on the conditional `ZMR_FINAL` in `src/vpc_scripts/default.vgc` will enable FMOD sound engine and Discord RPC. FMOD headers need to be placed in `public/fmod/` (they cannot be distributed here).
 
 You'll also need a copy of the binaries to run the game. (discord-rpc.dll & fmod.dll)
 
@@ -51,7 +51,7 @@ Yes.
 Open project settings and make sure `Platform Toolset` is `v143` and `Windows SDK Version` is `10.0 (latest installed version)` or lower.
 If it says one of them is missing, you need to download them from Visual Studio Installer (Tools -> Get Tools and Features)
 
-Running `mp/src/fix_vcxproj.bat` might also help.
+Running `src/fix_vcxproj.bat` might also help.
 
 ### Other problems
 

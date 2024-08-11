@@ -7,7 +7,7 @@ on:
     - dev
     - hotfix*
     paths:
-    - mp/src/**
+    - src/**
     - forcebuild.txt
     - .github/workflows/*
 
@@ -33,7 +33,7 @@ jobs:
       run: cat build/steam-runtime-install.txt | sudo /valve/steam-runtime/setup.sh
     - name: Create make file
       run: |
-        cd mp/src
+        cd src
         ./creategameprojects
     - name: Make
       run: cat build/make-game-script.txt | sudo /valve/steam-runtime/shell-i386.sh
@@ -42,14 +42,14 @@ jobs:
       with:
         name: linux-artifact
         path: |
-          mp/game/zombie_master_reborn/bin/client.sp
-          mp/game/zombie_master_reborn/bin/client.so.dbg
-          mp/game/zombie_master_reborn/bin/game_shader_dx9.so
-          mp/game/zombie_master_reborn/bin/game_shader_dx9.so.dbg
-          mp/game/zombie_master_reborn/bin/server.so
-          mp/game/zombie_master_reborn/bin/server.so.dbg
-          mp/game/zombie_master_reborn/bin/server_srv.so
-          mp/game/zombie_master_reborn/bin/server_srv.so.dbg
+          game/zombie_master_reborn/bin/client.sp
+          game/zombie_master_reborn/bin/client.so.dbg
+          game/zombie_master_reborn/bin/game_shader_dx9.so
+          game/zombie_master_reborn/bin/game_shader_dx9.so.dbg
+          game/zombie_master_reborn/bin/server.so
+          game/zombie_master_reborn/bin/server.so.dbg
+          game/zombie_master_reborn/bin/server_srv.so
+          game/zombie_master_reborn/bin/server_srv.so.dbg
         if-no-files-found: error
 
   build-windows:
@@ -62,28 +62,28 @@ jobs:
       uses: microsoft/setup-msbuild@v1.1
     - name: Run fix_vcxproj.bat
       run: |
-        cd mp/src
+        cd src
         ./fix_vcxproj.bat
     - name: Run creategameprojects.bat
       run: |
-        cd mp/src
+        cd src
         ./creategameprojects.bat
     - name: Fix solution
       shell: cmd
       run: |
-        cd mp/src
+        cd src
         COPY zmr-games.sln+sln_fix.txt zmr-games.sln /b
     - name: Build
-      run: msbuild mp/src/zmr-games.sln -property:Configuration=Release
+      run: msbuild src/zmr-games.sln -property:Configuration=Release
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3
       with:
         name: windows-artifact
         path: |
-          mp/game/zombie_master_reborn/bin/client.dll
-          mp/game/zombie_master_reborn/bin/client.pdb
-          mp/game/zombie_master_reborn/bin/game_shader_dx9.dll
-          mp/game/zombie_master_reborn/bin/game_shader_dx9.pdb
-          mp/game/zombie_master_reborn/bin/server.dll
-          mp/game/zombie_master_reborn/bin/server.pdb
+          game/zombie_master_reborn/bin/client.dll
+          game/zombie_master_reborn/bin/client.pdb
+          game/zombie_master_reborn/bin/game_shader_dx9.dll
+          game/zombie_master_reborn/bin/game_shader_dx9.pdb
+          game/zombie_master_reborn/bin/server.dll
+          game/zombie_master_reborn/bin/server.pdb
         if-no-files-found: error

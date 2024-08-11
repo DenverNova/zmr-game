@@ -60,16 +60,16 @@ Debug*/
 # Tool (vbsp/vvis/vrad) compilation output
 *.dll
 *.exe
-mp/src/materialsystem/stdshaders/filestocopy.txt
-mp/src/materialsystem/stdshaders/uniquefilestocopy.txt
-mp/src/materialsystem/stdshaders/shaders
-mp/src/materialsystem/stdshaders/fxctmp9_tmp
-mp/src/materialsystem/stdshaders/vcslist.txt
-mp/src/materialsystem/stdshaders/makefile.*
-mp/src/materialsystem/stdshaders/filelistgen.txt
-mp/src/materialsystem/stdshaders/filelist.txt
-mp/src/materialsystem/stdshaders/inclist.txt
+src/materialsystem/stdshaders/filestocopy.txt
+src/materialsystem/stdshaders/uniquefilestocopy.txt
+src/materialsystem/stdshaders/shaders
+src/materialsystem/stdshaders/fxctmp9_tmp
+src/materialsystem/stdshaders/vcslist.txt
+src/materialsystem/stdshaders/makefile.*
+src/materialsystem/stdshaders/filelistgen.txt
+src/materialsystem/stdshaders/filelist.txt
+src/materialsystem/stdshaders/inclist.txt
 *.VC.*
 *.FileListAbsolute.txt
 .vs
-mp/src/public/fmod/
+src/public/fmod/
