@@ -1,2 +1,2 @@
 cd src
-make -f zmr-games.mak
+make -j $(nproc) -f zmr-games.mak
