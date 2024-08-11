@@ -1,2 +1,2 @@
-cd mp/src
+cd src
 make -f zmr-games.mak
