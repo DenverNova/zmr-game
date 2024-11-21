@@ -442,13 +442,13 @@ ConVar zm_cl_bob_lag_impact_approachsmooth( "zm_cl_bob_lag_impact_approachsmooth
 
 ConVar zm_cl_bob_lag_impact_air_angle( "zm_cl_bob_lag_impact_air_angle", "4" );
 ConVar zm_cl_bob_lag_impact_air_move( "zm_cl_bob_lag_impact_air_move", "1" );
-ConVar zm_cl_bob_lag_impact_air_vel_rate( "zm_cl_bob_lag_impact_air_vel_rate", "0.1" );
+ConVar zm_cl_bob_lag_impact_air_vel_rate( "zm_cl_bob_lag_impact_air_vel_rate", "0.05" );
 ConVar zm_cl_bob_lag_impact_air_vel_max( "zm_cl_bob_lag_impact_air_vel_max", "300" );
 
 ConVar zm_cl_bob_lag_impact_ground_angle( "zm_cl_bob_lag_impact_ground_angle", "5" );
 ConVar zm_cl_bob_lag_impact_ground_move( "zm_cl_bob_lag_impact_ground_move", "1" );
 
-ConVar zm_cl_bob_lag_impact_rate( "zm_cl_bob_lag_impact_rate", "0.1" );
+ConVar zm_cl_bob_lag_impact_rate( "zm_cl_bob_lag_impact_rate", "0.05" );
 
 bool C_ZMViewModel::PerformImpactLag( Vector& vecPos, QAngle& ang, const Vector& origPos )
 {
