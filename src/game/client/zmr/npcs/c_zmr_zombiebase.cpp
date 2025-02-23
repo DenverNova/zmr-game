@@ -276,7 +276,7 @@ int C_ZMBaseZombie::DrawModelAndEffects( int flags )
         pos += maxs.z * delta;
 
         const Vector4D plane( down.x, down.y, down.z, down.Dot( pos ) );
-        pRenderContext->EnableClipping( true );
+        bool bPrevClipping = pRenderContext->EnableClipping( true );
         pRenderContext->PushCustomClipPlane( plane.Base() );
     
         // Color it a bit.
@@ -296,7 +296,7 @@ int C_ZMBaseZombie::DrawModelAndEffects( int flags )
 
 
         pRenderContext->PopCustomClipPlane();
-        pRenderContext->EnableClipping( false );
+        pRenderContext->EnableClipping( bPrevClipping );
 
         
         render->SetBlend( 1.0f );
