@@ -305,7 +305,7 @@ static int AutoCompletion( const char* partial, const char** completions, int nu
     auto* pszArg = Q_strstr( cmd, " " );
     if ( pszArg )
     {
-        *pszArg = NULL;
+        *pszArg = '\0';
 
         ++pszArg;
 

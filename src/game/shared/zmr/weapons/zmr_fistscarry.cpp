@@ -1086,7 +1086,7 @@ bool CZMWeaponHands::CanPickupObject( CBaseEntity* pEnt ) const
     // Can't be picked up if there are npcs/players on it.
     // However, do allow if our targetname is something.
     // This should stop players from standing on top of objective items.
-    if ( STRING( pEnt->GetEntityName() )[0] == NULL )
+    if ( STRING( pEnt->GetEntityName() )[0] == '\0' )
     {
         auto* pMe = const_cast<CZMWeaponHands*>( this );
 
@@ -1207,7 +1207,7 @@ void PlayerPickupObject( CBasePlayer *pPlayer, CBaseEntity *pObject )
 //#ifndef CLIENT_DLL
 //    
 //    //Don't pick up if we don't have a phys object.
-//    if ( pObject->VPhysicsGetObject() == NULL )
+//    if ( pObject->VPhysicsGetObject() == nullptr )
 //         return;
 //
 //    CPlayerPickupController *pController = (CPlayerPickupController *)CBaseEntity::Create( "player_pickup", pObject->GetAbsOrigin(), vec3_angle, pPlayer );

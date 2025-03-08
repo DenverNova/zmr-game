@@ -469,7 +469,7 @@ void CZMPistolCrosshair::Draw()
 CZMMaterialCrosshair::CZMMaterialCrosshair()
 {
     m_nTexMat0Id = 0;
-    *m_szTexture = NULL;
+    *m_szTexture = '\0';
 }
 
 void CZMMaterialCrosshair::LoadValues( KeyValues* kv )
@@ -500,7 +500,7 @@ void CZMMaterialCrosshair::Draw()
 
     float offset = GetOffsetFromCenter();
 
-    bool bHasTexture = *m_szTexture != NULL;
+    bool bHasTexture = *m_szTexture != '\0';
 
     if ( bHasTexture )
     {
@@ -526,7 +526,7 @@ void CZMMaterialCrosshair::Draw()
 
 
     /*
-    if ( m_hFont == NULL )
+    if ( m_hFont == INVALID_FONT )
     {
         m_hFont = scheme()->GetIScheme( scheme()->GetScheme( "ClientScheme" ) )->GetFont( "ZMCrosshairSmall", false );
 

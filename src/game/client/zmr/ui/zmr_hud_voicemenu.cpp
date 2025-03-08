@@ -63,7 +63,7 @@ struct ZMVoiceMenuData_t
     ZMVoiceMenuData_t( const char* localization, int index )
     {
         Q_strncpy( m_szLocalization, localization, sizeof( m_szLocalization ) );
-        m_wszCachedTxt[0] = NULL;
+        m_wszCachedTxt[0] = L'\0';
         m_iIndex = index;
     }
 
@@ -527,7 +527,7 @@ void CZMHudVoiceMenu::Paint()
         vy = sin( dir );
 
 
-        if ( pData->m_wszCachedTxt[0] == NULL )
+        if ( pData->m_wszCachedTxt[0] == L'\0' )
         {
             Q_wcsncpy( pData->m_wszCachedTxt, g_pVGuiLocalize->Find( pData->m_szLocalization ), sizeof( pData->m_wszCachedTxt ) );
         }

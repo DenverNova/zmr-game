@@ -332,7 +332,7 @@ void CZMBanshee::HandleAnimEvent( animevent_t* pEvent )
     ||  pEvent->event == AE_ZOMBIE_ATTACK_LEFT)
     {
         Vector right;
-        AngleVectors( GetLocalAngles(), NULL, &right, NULL );
+        AngleVectors( GetLocalAngles(), nullptr, &right, nullptr );
         right = right * -50;
         QAngle viewpunch( -3, -5, -3 );
 

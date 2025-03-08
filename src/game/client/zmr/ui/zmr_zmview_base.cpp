@@ -175,7 +175,7 @@ CZMViewBase::CZMViewBase( const char* pElementName ) : CHudElement( pElementName
 
 
     m_hCursorFont = vgui::scheme()->GetIScheme( GetScheme() )->GetFont( "ZMCursorFont" );
-    m_wszHiddenSpawnTxt[0] = NULL;
+    m_wszHiddenSpawnTxt[0] = L'\0';
 }
 
 CZMViewBase::~CZMViewBase()
@@ -434,7 +434,7 @@ void CZMViewBase::Paint()
 
         mx += 16;
 
-        if ( m_wszHiddenSpawnTxt[0] != NULL )
+        if ( m_wszHiddenSpawnTxt[0] != L'\0' )
         {
             surface()->DrawSetTextPos( mx, my );
             surface()->DrawSetTextColor( m_HiddenSpawnTxtColor );
@@ -1069,7 +1069,7 @@ void CZMViewBase::UpdateHiddenSpawnSpot( int mx, int my )
     m_flLastHiddenSpawnUpdate = gpGlobals->curtime;
 
 
-    m_wszHiddenSpawnTxt[0] = NULL;
+    m_wszHiddenSpawnTxt[0] = L'\0';
 
 
     trace_t tr;

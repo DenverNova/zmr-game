@@ -104,7 +104,7 @@ bool ZMLegacyObjPanel::LoadObjectivesFromFile( const char* mapname, char* buffer
     k = fixedname;
     while ( (k = strchr( k, '.' )) != nullptr ) { c = k; ++k; }
 
-    if ( c ) *c = NULL;
+    if ( c ) *c = '\0';
 
 
     Q_snprintf( path, sizeof( path ), "maps/%s.txt", fixedname );
@@ -137,7 +137,7 @@ bool ZMLegacyObjPanel::LoadObjectivesFromFile( const char* mapname, char* buffer
     filesystem->Read( buffer, flen, file );
     filesystem->Close( file );
 
-    buffer[flen] = NULL;
+    buffer[flen] = '\0';
 
     return true;
 }

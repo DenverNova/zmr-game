@@ -453,10 +453,10 @@ bool CZMMapItemSystem::ShouldAffectEntity( CEntityMapData& entData, char* buffer
 
     // We don't want to touch entities that may be part of some map logic.
 
-    if ( entData.ExtractValue( "targetname", buffer ) && buffer[0] != NULL )
+    if ( entData.ExtractValue( "targetname", buffer ) && buffer[0] != '\0' )
         return false;
 
-    if ( entData.ExtractValue( "parent", buffer ) && buffer[0] != NULL )
+    if ( entData.ExtractValue( "parent", buffer ) && buffer[0] != '\0' )
         return false;
 
 
@@ -500,7 +500,7 @@ CZMMapItemActionReplace::CZMMapItemActionReplace()
 
 
     m_fFlag = 0;
-    m_szClassname[0] = NULL;
+    m_szClassname[0] = '\0';
 
 
     m_flRangeCheck = 0.0f;
@@ -632,11 +632,11 @@ bool CZMMapItemActionReplace::AffectsItem( ItemEntData_t& itemEntData, ItemSpawn
 bool CZMMapItemActionReplace::Replace( ItemEntData_t& itemEntData )
 {
     char classname[64];
-    classname[0] = NULL;
+    classname[0] = '\0';
 
 
     // Do the actual edit
-    if ( m_szClassname[0] != NULL )
+    if ( m_szClassname[0] != '\0' )
     {
         // Specific item classname
         Q_strncpy( classname, m_szClassname, sizeof( classname ) );
@@ -799,7 +799,7 @@ bool CZMMapItemActionReplace::ParseReplaceFilter( KeyValues* kv )
 
 
     char buffer[256];
-    buffer[0] = NULL;
+    buffer[0] = '\0';
     
     const char* rangefilter = kv->GetString( "filter_range" );
     if ( *rangefilter )
@@ -877,7 +877,7 @@ ItemEntData_t* ItemEntData_t::Create( const char* pszEntData )
 
 
 
-    if ( !entData.ExtractValue( "classname", token ) || token[0] == NULL )
+    if ( !entData.ExtractValue( "classname", token ) || token[0] == '\0' )
         return nullptr;
 
 
@@ -893,7 +893,7 @@ ItemEntData_t* ItemEntData_t::Create( const char* pszEntData )
         return nullptr;
 
 
-    if ( !entData.ExtractValue( "origin", token ) || token[0] == NULL )
+    if ( !entData.ExtractValue( "origin", token ) || token[0] == '\0' )
         return nullptr;
 
 

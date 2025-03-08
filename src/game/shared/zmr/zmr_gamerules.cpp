@@ -1392,9 +1392,9 @@ bool CZMRules::IsSpawnPointValid( CBaseEntity* pSpot, CBasePlayer* pPlayer )
     return trace.fraction == 1.0f;
 
     /*
-    CBaseEntity *pEnt = NULL;
+    CBaseEntity *pEnt = nullptr;
 
-    for ( CEntitySphereQuery sphere( pSpot->GetAbsOrigin(), 128 ); (pEnt = sphere.GetCurrentEntity()) != NULL; sphere.NextEntity() )
+    for ( CEntitySphereQuery sphere( pSpot->GetAbsOrigin(), 128 ); (pEnt = sphere.GetCurrentEntity()) != nullptr; sphere.NextEntity() )
     {
         // if ent is a client, don't spawn on 'em
         if ( pEnt->IsPlayer() && pEnt != pPlayer )

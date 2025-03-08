@@ -363,7 +363,7 @@ void CZMBaseWeaponConfig::IconToKv( KeyValues* kv, CHudTexture* icon )
 {
     char c[2];
     c[0] = icon->cCharacterInFont;
-    c[1] = NULL;
+    c[1] = '\0';
 
     kv->SetString( "character", c );
     kv->SetString( "font", icon->szTextureFile );

@@ -254,7 +254,7 @@ void CZMProjectileMolotov::Detonate()
 
     if ( pThrower )
     {
-        RadiusDamage( CTakeDamageInfo( this, pThrower, 40.0f, DMG_BURN ), GetAbsOrigin(), 128.0f, CLASS_NONE, NULL );
+        RadiusDamage( CTakeDamageInfo( this, pThrower, 40.0f, DMG_BURN ), GetAbsOrigin(), 128.0f, CLASS_NONE, nullptr );
     }
 
 

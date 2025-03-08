@@ -1188,7 +1188,7 @@ NPCR::QueryResult_t CZMBaseZombie::ShouldTouch( CBaseEntity* pEnt ) const
 
             bool bClassMatch = pMe->ClassMatches( pFuncBrush->m_iszExcludedClass );
             // Have a name? Try comparing that also.
-            bool bNameMatch = STRING( pMe->GetEntityName() )[0] != NULL && pMe->NameMatches( pFuncBrush->m_iszExcludedClass );
+            bool bNameMatch = STRING( pMe->GetEntityName() )[0] != '\0' && pMe->NameMatches( pFuncBrush->m_iszExcludedClass );
             
 
             bMatches = bClassMatch || bNameMatch;

@@ -42,12 +42,12 @@ public:
 
     void Reset()
     {
-        m_szRenderText[0] = NULL;
-        m_szTexts[0] = NULL;
-        m_szFormat[0] = NULL;
+        m_szRenderText[0] = L'\0';
+        m_szTexts[0] = '\0';
+        m_szFormat[0] = '\0';
 
         m_iArgType = OBJARGTYPE_NONE;
-        m_szArg[0] = NULL;
+        m_szArg[0] = '\0';
         m_flArg = 0.0f;
         m_flTimerEnd = 0.0f;
         m_Color = COLOR_WHITE;
@@ -67,9 +67,9 @@ public:
 
     void UpdateRenderText()
     {
-        if ( m_szTexts[0] == NULL )
+        if ( m_szTexts[0] == '\0' )
         {
-            m_szRenderText[0] = NULL;
+            m_szRenderText[0] = L'\0';
             return;
         }
 
@@ -230,7 +230,7 @@ public:
 
     bool Paint( HFont font, int x, int &y )
     {
-        if ( m_szRenderText[0] == NULL )
+        if ( m_szRenderText[0] == L'\0' )
             return false;
 
         if ( m_nAlpha > 0 )
@@ -252,7 +252,7 @@ public:
 
     bool IsEmpty()
     {
-        return m_szRenderText[0] == NULL;
+        return m_szRenderText[0] == L'\0';
     }
 
     bool IsHidden()
@@ -262,7 +262,7 @@ public:
 
     bool HasNextText()
     {
-        return m_szTexts[0] != NULL;
+        return m_szTexts[0] != '\0';
     }
 
 private:
@@ -553,7 +553,7 @@ void CZMHudObjectives::MsgFunc_ZMObjDisplay( bf_read& msg )
     {
         ObjArgType_t argtype = OBJARGTYPE_NONE;
         float num = 0.0f;
-        arg[0] = NULL;
+        arg[0] = '\0';
 
 
         bool bString = msg.ReadByte() == 1 ? true : false;
@@ -590,7 +590,7 @@ void CZMHudObjectives::MsgFunc_ZMObjUpdate( bf_read& msg )
     for ( int i = 0; i < NUM_OBJ_LINES; i++ )
     {
         float num = 0.0f;
-        buffer[0] = NULL;
+        buffer[0] = '\0';
 
 
         bool bComplete = msg.ReadByte() == 1 ? true : false;
@@ -627,7 +627,7 @@ void CZMHudObjectives::MsgFunc_ZMObjUpdateLine( bf_read& msg )
 
     ObjArgType_t argtype = OBJARGTYPE_NONE;
     float num = 0.0f;
-    arg[0] = NULL;
+    arg[0] = '\0';
 
 
     bool bString = msg.ReadByte() == 1 ? true : false;

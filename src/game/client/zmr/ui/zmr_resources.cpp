@@ -97,7 +97,7 @@ CZMResourceHud::~CZMResourceHud()
         if ( m_pIcons[i] )
         {
             delete m_pIcons[i];
-            m_pIcons[i] = NULL;
+            m_pIcons[i] = nullptr;
         }
     }*/
 }
@@ -176,7 +176,7 @@ void CZMResourceHud::Paint()
 
 
     static wchar_t text[32];
-    text[0] = NULL;
+    text[0] = L'\0';
 
     int w, h;
 

@@ -217,7 +217,7 @@ void CZMHudTooltip::Paint()
 {
     if ( m_flAlphaMult <= 0.0f ) return;
 
-    if ( !m_pTextImage->GetUText() || m_pTextImage->GetUText()[0] == NULL )
+    if ( !m_pTextImage->GetUText() || m_pTextImage->GetUText()[0] == L'\0' )
         return;
 
 #define PADDING_SIDES       6
@@ -354,7 +354,7 @@ int CZMHudTooltip::SetMessageByName( const char* name, bool force )
 
 
     char buffer[512];
-    buffer[0] = NULL;
+    buffer[0] = '\0';
 
     tip->FormatMessage( buffer, sizeof( buffer ) );
 

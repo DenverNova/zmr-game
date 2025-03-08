@@ -878,7 +878,7 @@ float CZMPlayerAnimState::GetCurrentMaxGroundSpeed()
 {
     CStudioHdr *pStudioHdr = m_pZMPlayer->GetModelPtr();
 
-    if ( pStudioHdr == NULL )
+    if ( pStudioHdr == nullptr )
         return 1.0f;
 
 //	float prevX = GetBasePlayer()->GetPoseParameter( m_PoseParameterData.m_iMoveX );

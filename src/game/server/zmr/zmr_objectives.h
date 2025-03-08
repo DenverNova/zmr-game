@@ -10,10 +10,10 @@ class CObjLine
 public:
     inline void Reset()
     {
-        m_szTexts[0] = NULL;
+        m_szTexts[0] = '\0';
         m_iTextArgType = OBJARGTYPE_NONE;
         m_flTextArgNum = 0.0f;
-        m_szTextArg[0] = NULL;
+        m_szTextArg[0] = '\0';
         m_bComplete = false;
         m_flTimerEnd = 0.0f;
     }
@@ -143,4 +143,3 @@ private:
 
     bool m_bDisplay;
 };
-

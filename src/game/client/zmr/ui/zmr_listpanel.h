@@ -201,7 +201,7 @@ public:
 
     void    Clear();
 
-    int     AddSection( const char* name, vgui::HFont defaultfont = NULL, int nDefItemHeight = 0 );
+    int     AddSection( const char* name, vgui::HFont defaultfont = vgui::INVALID_FONT, int nDefItemHeight = 0 );
 
     int     GetSectionByName( const char* name ) const;
     void    ClearRows( int section );

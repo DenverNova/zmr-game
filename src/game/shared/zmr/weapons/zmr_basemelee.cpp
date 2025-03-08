@@ -241,7 +241,7 @@ void CZMBaseMeleeWeapon::Hit( trace_t& traceHit, Activity nHitActivity )
     if ( pHitEntity )
     {
         Vector hitDirection;
-        pPlayer->EyeVectors( &hitDirection, NULL, NULL );
+        pPlayer->EyeVectors( &hitDirection, nullptr, nullptr );
         VectorNormalize( hitDirection );
 
 #ifdef CLIENT_DLL
@@ -491,4 +491,3 @@ bool CZMBaseMeleeWeapon::OnFireEvent( C_BaseViewModel* pViewModel, const Vector&
     return false;
 }
 #endif
-

@@ -267,7 +267,7 @@ bool CZMTeamKeysConfig::ParseConfig( const char* cfg, zmkeydatalist_t& list )
 
 
     char buf[512];
-    buf[511] = NULL;
+    buf[511] = '\0';
 
     char temp[32];
     char keyname[32];
@@ -275,14 +275,14 @@ bool CZMTeamKeysConfig::ParseConfig( const char* cfg, zmkeydatalist_t& list )
 
     while ( filesystem->ReadLine( buf, sizeof( buf ) - 1, hndl ) != nullptr )
     {
-        if ( buf[0] == NULL )
+        if ( buf[0] == '\0' )
             continue;
         if ( buf[0] == '/' )
             continue;
 
 
-        keyname[0] = NULL;
-        key.cmd[0] = NULL;
+        keyname[0] = '\0';
+        key.cmd[0] = '\0';
 
         const char* data = buf;
 
@@ -302,7 +302,7 @@ bool CZMTeamKeysConfig::ParseConfig( const char* cfg, zmkeydatalist_t& list )
 
 
         data = engine->ParseFile( data, key.cmd, sizeof( key.cmd ) );
-        if ( key.cmd[0] == NULL )
+        if ( key.cmd[0] == '\0' )
             continue;
 
 

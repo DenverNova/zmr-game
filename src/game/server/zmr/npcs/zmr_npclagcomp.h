@@ -89,10 +89,10 @@ public:
 
 
     CUtlFixedLinkedList<LagRecordNPC>* GetLagTrack() { return m_LagTrack; }
-    LagRecordNPC*   GetLagRestoreData() { if ( m_RestoreData != NULL ) return m_RestoreData; else return new LagRecordNPC(); }
-    LagRecordNPC*   GetLagChangeData() { if ( m_ChangeData != NULL ) return m_ChangeData; else return new LagRecordNPC(); }
-    void            SetLagRestoreData(LagRecordNPC* l) { if ( m_RestoreData != NULL ) delete m_RestoreData; m_RestoreData = l; }
-    void            SetLagChangeData(LagRecordNPC* l) { if ( m_ChangeData != NULL ) delete m_ChangeData; m_ChangeData = l; }
+    LagRecordNPC*   GetLagRestoreData() { if ( m_RestoreData != nullptr ) return m_RestoreData; else return new LagRecordNPC(); }
+    LagRecordNPC*   GetLagChangeData() { if ( m_ChangeData != nullptr ) return m_ChangeData; else return new LagRecordNPC(); }
+    void            SetLagRestoreData(LagRecordNPC* l) { if ( m_RestoreData != nullptr ) delete m_RestoreData; m_RestoreData = l; }
+    void            SetLagChangeData(LagRecordNPC* l) { if ( m_ChangeData != nullptr ) delete m_ChangeData; m_ChangeData = l; }
     void            FlagForLagCompensation( bool tempValue ) { m_bFlaggedForLagCompensation = tempValue; }
     bool            IsLagFlagged() { return m_bFlaggedForLagCompensation; }
     

@@ -177,14 +177,14 @@ void CZMHudTargetID::BuildTargetIdString( C_BasePlayer* pPlayer )
 {
     if ( !pPlayer )
     {
-        m_wszTargetIdStr[0] = NULL;
+        m_wszTargetIdStr[0] = L'\0';
         return;
     }
     
 
 
     wchar_t wszPlayerName[MAX_PLAYER_NAME_LENGTH];
-    wszPlayerName[0] = NULL;
+    wszPlayerName[0] = L'\0';
 
 
 
@@ -231,7 +231,7 @@ void CZMHudTargetID::PaintTargetId( C_BasePlayer* pPlayer )
     if ( !pPlayer )
         return;
 
-    if ( m_wszTargetIdStr[0] == NULL )
+    if ( m_wszTargetIdStr[0] == L'\0' )
         return;
 
 

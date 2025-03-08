@@ -100,9 +100,6 @@ void CZMHudAmmo::Init( void )
     m_iAmmo		= -1;
     m_iAmmo2	= -1;
     
-    //m_iconPrimaryAmmo = NULL;
-
-
     SetPaintBackgroundEnabled( false );
 }
 
@@ -114,7 +111,7 @@ void CZMHudAmmo::Reset()
 {
     //BaseClass::Reset();
 
-    m_hCurrentActiveWeapon = NULL;
+    m_hCurrentActiveWeapon = nullptr;
     m_iAmmo = 0;
     m_iAmmo2 = 0;
 

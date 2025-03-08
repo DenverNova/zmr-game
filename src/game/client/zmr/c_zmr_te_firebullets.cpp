@@ -50,8 +50,8 @@ public:
     {
         C_BaseEntity *pEntity = EntityFromEntityHandle( pServerEntity );
         if( pEntity &&
-            ( ( dynamic_cast<C_BaseViewModel *>( pEntity ) != NULL ) ||
-            ( dynamic_cast<C_BasePlayer *>( pEntity ) != NULL ) ) )
+            ( ( dynamic_cast<C_BaseViewModel *>( pEntity ) != nullptr ) ||
+            ( dynamic_cast<C_BasePlayer *>( pEntity ) != nullptr ) ) )
         {
             return false;
         }
@@ -145,7 +145,7 @@ void C_ZMTEFireBullets::ThirdpersonMuzzleflash( C_BaseCombatWeapon* pWpn )
     // Here for now, we should probably use the world model animations to dispatch this.
     //
     char effect[64];
-    effect[0] = NULL;
+    effect[0] = '\0';
 
     switch ( zm_cl_muzzleflash_thirdperson_type.GetInt() )
     {
@@ -172,7 +172,7 @@ void C_ZMTEFireBullets::ThirdpersonMuzzleflash( C_BaseCombatWeapon* pWpn )
     }
 
 
-    if ( effect[0] != NULL )
+    if ( effect[0] != '\0' )
     {
         char options[64];
         Q_snprintf( options, sizeof( options ), "%s muzzle", effect );

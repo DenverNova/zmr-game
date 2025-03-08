@@ -284,12 +284,12 @@ void C_ZMPlayer::CalculateIKLocks( float currentTime )
 
         case IK_ATTACHMENT:
             {
-                C_BaseEntity *pEntity = NULL;
+                C_BaseEntity *pEntity = nullptr;
                 float flDist = pTarget->est.radius;
 
                 // FIXME: make entity finding sticky!
                 // FIXME: what should the radius check be?
-                for ( CEntitySphereQuery sphere( pTarget->est.pos, 64 ); ( pEntity = sphere.GetCurrentEntity() ) != NULL; sphere.NextEntity() )
+                for ( CEntitySphereQuery sphere( pTarget->est.pos, 64 ); ( pEntity = sphere.GetCurrentEntity() ) != nullptr; sphere.NextEntity() )
                 {
                     C_BaseAnimating* pAnim = pEntity->GetBaseAnimating();
                     if ( !pAnim )
@@ -582,7 +582,7 @@ int C_ZMPlayer::DrawModelAndEffects( int flags )
         };
 
         g_pStudioRender->SetAmbientLightColors( lightlvl );
-        g_pStudioRender->SetLocalLights( 0, NULL );
+        g_pStudioRender->SetLocalLights( 0, nullptr );
 
         render->SetColorModulation( clr.Base() );
         modelrender->SuppressEngineLighting( true );

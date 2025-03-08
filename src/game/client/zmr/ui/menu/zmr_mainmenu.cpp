@@ -72,7 +72,7 @@ bool CZMMainMenu::s_bWasInGame = false;
 CZMMainMenu::CZMMainMenu( VPANEL parent ) : BaseClass( nullptr, "ZMMainMenu" )
 {
     m_iBottomStripChildIndex = -1;
-    m_szBottomStrip[0] = NULL;
+    m_szBottomStrip[0] = '\0';
     m_bInLoadingScreen = false;
 
     m_pVideoMaterial = nullptr;
@@ -563,7 +563,7 @@ void CZMMainMenu::ApplySchemeSettings( IScheme* pScheme )
     }
     
 
-    if ( m_szBottomStrip[0] != NULL )
+    if ( m_szBottomStrip[0] != '\0' )
     {
         m_iBottomStripChildIndex = FindChildIndexByName( m_szBottomStrip );
     }

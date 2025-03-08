@@ -146,7 +146,7 @@ CZMBaseWeapon::CZMBaseWeapon()
 #ifdef GAME_DLL
     m_sScriptFileName = MAKE_STRING( "" );
 #else
-    m_sScriptFileName[0] = NULL;
+    m_sScriptFileName[0] = '\0';
 #endif
 }
 
@@ -949,7 +949,7 @@ float CZMBaseWeapon::GetFirstInstanceOfAnimEventTime( int iSeq, int iAnimEvent, 
     {
         if ( pevent[i].event == iAnimEvent )
         {
-            if ( bReturnOption && pevent[i].pszOptions()[0] != NULL )
+            if ( bReturnOption && pevent[i].pszOptions()[0] != '\0' )
                 return atof( pevent[i].pszOptions() );
             return pevent[i].cycle * me->SequenceDuration( hdr, iSeq );
         }
@@ -1224,7 +1224,7 @@ void CZMBaseWeapon::AssignWeaponConfigSlot()
         STRING( m_sScriptFileName.Get() );
 #endif
 
-    if ( customscript[0] != NULL )
+    if ( customscript[0] != '\0' )
     {
         WeaponConfigSlot_t slot = GetWeaponConfigSystem()->RegisterCustomWeapon( GetConfigSlot(), customscript );
 
@@ -1245,7 +1245,7 @@ void CZMBaseWeapon::Precache()
 
 	// Get the ammo indexes for the ammo's specified in the data file
     const char* pszPrimAmmo = GetWeaponConfig()->pszAmmoName;
-	if ( pszPrimAmmo && pszPrimAmmo[0] != NULL )
+	if ( pszPrimAmmo && pszPrimAmmo[0] != '\0' )
 	{
 		m_iPrimaryAmmoType = GetWeaponConfig()->GetPrimaryAmmoIndex();
 		if (m_iPrimaryAmmoType == -1)
@@ -1287,7 +1287,7 @@ void CZMBaseWeapon::Precache()
 
     // Make sure we precache all models.
     // It's possible to only precache the override model and the default one is left out.
-    if ( GetWeaponConfig()->pszModel_View[0] != NULL )
+    if ( GetWeaponConfig()->pszModel_View[0] != '\0' )
     {
 #ifdef CLIENT_DLL
         if ( GetWeaponConfig()->bOverriddenViewmodel )
@@ -1301,7 +1301,7 @@ void CZMBaseWeapon::Precache()
     }
 
 #ifdef GAME_DLL
-    if ( GetWeaponConfig()->pszModel_World[0] != NULL )
+    if ( GetWeaponConfig()->pszModel_World[0] != '\0' )
     {
         m_iWorldModelIndex = PrecacheModel( GetWeaponConfig()->pszModel_World );
     }
@@ -1740,7 +1740,7 @@ void CZMBaseWeapon::DoMachineGunKick( float dampEasy, float maxVerticleKickAngle
     //Get the view kick
     CZMPlayer *pPlayer = GetPlayerOwner();
 
-    if ( pPlayer == NULL ) return;
+    if ( pPlayer == nullptr ) return;
 
 
     #define	KICK_MIN_X			0.2f // Degrees

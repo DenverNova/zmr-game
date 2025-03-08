@@ -362,7 +362,7 @@ void ZMClientUtil::SelectZombies( const CUtlVector<C_ZMBaseZombie*>& vZombies, b
 
     do
     {
-        cmdbuffer[0] = NULL;
+        cmdbuffer[0] = '\0';
 
 
         for ( ; i < count; i++ )

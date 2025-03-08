@@ -64,7 +64,7 @@ void CZMVoiceLines::LevelInitPreEntity()
     //int len = m_vLines.Count();
     //for ( int i = 0; i < len; i++ )
     //{
-    //    if ( m_vLines[i]->m_szSoundBase[0] != NULL )
+    //    if ( m_vLines[i]->m_szSoundBase[0] != '\0' )
     //    {
     //        char line[256];
 
@@ -155,7 +155,7 @@ void CZMVoiceLines::FireGameEvent( IGameEvent* pEvent )
 
 
         // Play the sound
-        if ( pLine->m_szSoundBase[0] != NULL && !zm_cl_voiceline_disablesound.GetBool() && !bIsMuted )
+        if ( pLine->m_szSoundBase[0] != '\0' && !zm_cl_voiceline_disablesound.GetBool() && !bIsMuted )
         {
             const char* gender = IsFemale( pPlayer ) ? "Female" : "Male";
 
@@ -185,7 +185,7 @@ void CZMVoiceLines::FireGameEvent( IGameEvent* pEvent )
 
         
         // Print chat message
-        if ( pLine->m_szChatMsg[0] != NULL && !bDisableChat )
+        if ( pLine->m_szChatMsg[0] != '\0' && !bDisableChat )
         {
             // We'll have to convert ansi -> unicode -> ansi to get localization to work :(
             wchar_t buf[512];

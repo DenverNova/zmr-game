@@ -94,8 +94,8 @@ CZMHudDeathNotice::CZMHudDeathNotice( const char* pElementName ) :
 {
     SetParent( g_pClientMode->GetViewport() );
 
-    m_iconD_headshot = NULL;
-    m_iconD_skull = NULL;
+    m_iconD_headshot = nullptr;
+    m_iconD_skull = nullptr;
 
     SetHiddenBits( HIDEHUD_MISCSTATUS );
 }
@@ -316,7 +316,7 @@ void CZMHudDeathNotice::FireGameEvent( IGameEvent* event )
         killer_name = "";
 
 
-        if ( fullkilledwith[0] != NULL )
+        if ( fullkilledwith[0] != '\0' )
         {
             // ZMRTODO: Put this somewhere else.
             if ( Q_strcmp( &fullkilledwith[6], "zombie" ) == 0 ) killer_name = "Shambler";
@@ -326,7 +326,7 @@ void CZMHudDeathNotice::FireGameEvent( IGameEvent* event )
             else if ( Q_strcmp( &fullkilledwith[6], "burnzombie" ) == 0 ) killer_name = "Immolator";
 
 
-            if ( killer_name[0] != NULL )
+            if ( killer_name[0] != '\0' )
             {
                 iKillerTeam = ZMTEAM_ZM;
             }
@@ -339,7 +339,7 @@ void CZMHudDeathNotice::FireGameEvent( IGameEvent* event )
 
 
 
-    bool bAloneDeath = ( killer == victim || (!killer && killer_name[0] == NULL) );
+    bool bAloneDeath = ( killer == victim || (!killer && killer_name[0] == '\0') );
 
 
     // Make a new death notice
@@ -385,7 +385,7 @@ void CZMHudDeathNotice::FireGameEvent( IGameEvent* event )
     {
         Q_snprintf( szMsg, sizeof( szMsg ), "%s killed %s", killer_name, victim_name );
 
-        if ( fullkilledwith[0] != NULL && iKillerTeam != ZMTEAM_ZM )
+        if ( fullkilledwith[0] != '\0' && iKillerTeam != ZMTEAM_ZM )
         {
             Q_strncat( szMsg, VarArgs( " with %s.\n", &fullkilledwith[6] ), sizeof( szMsg ), COPY_ALL_CHARACTERS );
         }

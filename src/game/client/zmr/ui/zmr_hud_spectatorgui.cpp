@@ -289,7 +289,7 @@ bool CZMHudSpectatorUI::UpdateTargetText()
     }
     else
     {
-        buffer[0] = NULL;
+        buffer[0] = L'\0';
     }
     
     m_pInfoLabel->SetText( buffer );

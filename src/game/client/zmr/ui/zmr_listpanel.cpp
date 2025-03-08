@@ -30,7 +30,7 @@ CZMListRow::CZMListRow( CZMListSection* parent, int itemId, KeyValues* kv ) : vg
     m_nItemHeight = parent->GetDefaultItemHeight();
     m_nItemBottomMargin = ITEM_DEFAULT_BOTTOMMARGIN;
     m_nItemWidth = -1;
-    m_hItemFont = NULL;
+    m_hItemFont = INVALID_FONT;
     m_ItemColor = COLOR_WHITE;
 
 
@@ -212,12 +212,12 @@ void CZMListRow::ColumnDataLabel( int column, Label* pLabel )
         clr = GetFgColor();
 
     HFont usefont = GetSection()->GetDefaultFont();
-    if ( GetItemFont() > NULL )
+    if ( GetItemFont() != INVALID_FONT )
         usefont = GetItemFont();
 
 
 
-    if ( usefont > NULL )
+    if ( usefont != INVALID_FONT )
         pLabel->SetFont( usefont );
 
     pLabel->SetFgColor( clr );
@@ -439,7 +439,7 @@ CZMListSection::CZMListSection( CZMListPanel* parent, const char* name ) : BaseC
 
     m_nTopMargin = 0;
     m_nBottomMargin = 0;
-    m_hDefaultFont = NULL;
+    m_hDefaultFont = INVALID_FONT;
     m_nDefaultItemHeight = ITEM_DEFAULT_HEIGHT;
 
     m_pSortFunc = nullptr;

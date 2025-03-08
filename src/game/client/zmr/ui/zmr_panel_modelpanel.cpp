@@ -61,7 +61,7 @@ void CZMModelPanel::DeleteModelData( void )
 #endif
 
         m_hModel->Remove();
-        m_hModel = NULL;
+        m_hModel = nullptr;
         m_flFrameDistance = 0;
     }
 
@@ -167,7 +167,7 @@ void CZMModelPanel::SetupModel( void )
 
             if ( pAnim->m_pPoseParameters )
             {
-                for ( KeyValues *pData = pAnim->m_pPoseParameters->GetFirstSubKey(); pData != NULL; pData = pData->GetNextKey() )
+                for ( KeyValues *pData = pAnim->m_pPoseParameters->GetFirstSubKey(); pData != nullptr; pData = pData->GetNextKey() )
                 {
                     const char *pName = pData->GetName();
                     float flValue = pData->GetFloat();
@@ -315,7 +315,7 @@ void CZMModelPanel::Paint()
     };
 
     g_pStudioRender->SetAmbientLightColors( white );
-    g_pStudioRender->SetLocalLights( 0, NULL );
+    g_pStudioRender->SetLocalLights( 0, nullptr );
 
     if ( m_pModelInfo->m_bUseSpotlight )
     {
@@ -326,7 +326,7 @@ void CZMModelPanel::Paint()
     }
 
     Frustum dummyFrustum;
-    render->Push3DView( view, 0, NULL, dummyFrustum );
+    render->Push3DView( view, 0, nullptr, dummyFrustum );
 
     modelrender->SuppressEngineLighting( true );
     float color[3] = { 1.0f, 1.0f, 1.0f };
@@ -346,7 +346,7 @@ void CZMModelPanel::Paint()
     
     render->PopView( dummyFrustum );
 #ifndef ZMR // ZMRCHANGE: Don't use cubemaps, they fuck up map's own cubemaps. No reason to use them anyway.
-    pRenderContext->BindLocalCubemap( NULL );
+    pRenderContext->BindLocalCubemap( nullptr );
 #endif
     /*
     vgui::surface()->DrawSetColor( Color(0,0,0,255) );

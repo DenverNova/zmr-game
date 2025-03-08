@@ -29,13 +29,13 @@ void CObjLine::WriteArg() const
 
 void CObjLine::WriteDisplayUserMsg() const
 {
-    WRITE_BYTE( ( m_szTexts[0] != NULL ) ? 1 : 0 );
+    WRITE_BYTE( ( m_szTexts[0] != '\0' ) ? 1 : 0 );
 
     WRITE_BYTE( m_iTextArgType );
 
     WriteArg();
 
-    if ( m_szTexts[0] != NULL )
+    if ( m_szTexts[0] != '\0' )
         WRITE_STRING( m_szTexts );
 }
 
@@ -52,7 +52,7 @@ void CObjLine::ParseArg( const char* psz )
     if ( !psz || !*psz )
     {
         m_flTextArgNum = 0.0f;
-        m_szTextArg[0] = NULL;
+        m_szTextArg[0] = '\0';
         m_iTextArgType = OBJARGTYPE_NONE;
         return;
     }

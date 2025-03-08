@@ -176,7 +176,7 @@ void CZMTip::FormatMessage( char* buffer, int len ) const
 
     for ( int i = 0; i < nParams; i++ )
     {
-        szParam[0] = NULL;
+        szParam[0] = '\0';
 
         zmtip_param_t* param = m_vParams[i];
 
@@ -291,7 +291,7 @@ void CZMTip::AddParam( const char* invalue )
     if ( !del ) return;
 
 
-    *del = NULL;
+    *del = '\0';
 
     char* paramvalue = del + 1;
 

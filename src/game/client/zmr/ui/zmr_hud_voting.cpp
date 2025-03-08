@@ -85,9 +85,9 @@ CZMHudVote::CZMHudVote( const char *pElementName ) : CHudElement( pElementName )
     m_bDrawVote = false;
     m_flVoteDraw = 0.0f;
     
-    m_szDisplay[0] = NULL;
-    m_szHowto[0] = NULL;
-    m_szVote[0] = NULL;
+    m_szDisplay[0] = L'\0';
+    m_szHowto[0] = L'\0';
+    m_szVote[0] = L'\0';
 
     m_pszMyVote = nullptr;
     m_pszReason = nullptr;
@@ -240,7 +240,7 @@ void CZMHudVote::Paint()
     }
 
 
-    if ( m_szDisplay[0] != NULL )
+    if ( m_szDisplay[0] != L'\0' )
     {
         surface()->GetTextSize( m_hVoteFont, m_szDisplay, w, h );
 
@@ -248,14 +248,14 @@ void CZMHudVote::Paint()
     }
 
 
-    if ( m_szHowto[0] != NULL )
+    if ( m_szHowto[0] != L'\0' )
     {
         surface()->GetTextSize( m_hTextFont, m_szHowto, w, h );
         PaintString( m_hTextFont, m_VoteColor, GetWide() / 2.0f - w / 2.0f, 60, m_szHowto );
     }
 
 
-    if ( m_szVote[0] != NULL )
+    if ( m_szVote[0] != L'\0' )
     {
         surface()->GetTextSize( m_hTextFont, m_szVote, w, h );
 
@@ -322,7 +322,7 @@ void CZMHudVote::MsgFunc_VoteStart( bf_read& msg )
 
     g_pClientMode->GetViewportAnimationController()->StartAnimationSequence( "ZMVoteStart" );
 
-    m_szVote[0] = NULL;
+    m_szVote[0] = L'\0';
     m_pszMyVote = nullptr;
     m_pszReason = nullptr;
     m_bDrawVote = true;

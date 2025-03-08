@@ -78,8 +78,8 @@ void CZMHudCenterText::Reset()
     // IMPORTANT!!! Animation variables must be reset here.
     // All animations are removed on Reset.
     // If there are still animations going, they'll be frozen.
-    m_szBig[0] = NULL;
-    m_szSmall[0] = NULL;
+    m_szBig[0] = L'\0';
+    m_szSmall[0] = L'\0';
     m_flShowSmall = 0.0f;
     m_flNextHide = 0.0f;
     m_flSmallAlpha = 0.0f;
@@ -145,13 +145,13 @@ void CZMHudCenterText::Paint()
     int w, h;
     surface()->GetTextSize( m_hBigFont, m_szBig, w, h_big );
 
-    if ( m_szBig[0] != NULL )
+    if ( m_szBig[0] != L'\0' )
     {
         m_Color[3] = m_flBigAlpha;
         PaintString( m_hBigFont, m_hBigShadowFont, m_Color, GetWide() / 2.0f - w / 2.0f, m_flBigPosY, m_szBig );
     }
 
-    if ( m_szSmall[0] != NULL )
+    if ( m_szSmall[0] != L'\0' )
     {
         surface()->GetTextSize( m_hSmallFont, m_szSmall, w, h );
 
@@ -179,11 +179,11 @@ void CZMHudCenterText::ShowRoundStart( const char* insmalltxt )
 
     wchar_t txt[128];
     wchar_t smalltxt[128];
-    txt[0] = NULL;
-    smalltxt[0] = NULL;
+    txt[0] = L'\0';
+    smalltxt[0] = L'\0';
 
     wchar_t wround[64];
-    wround[0] = NULL;
+    wround[0] = L'\0';
     if ( pRules )
     {
         // This is just silly...
@@ -242,8 +242,8 @@ void CZMHudCenterText::ShowText( const char* bigtxt, const char* smalltxt, float
     wchar_t big[256];
     wchar_t small[256];
 
-    big[0] = NULL;
-    small[0] = NULL;
+    big[0] = L'\0';
+    small[0] = L'\0';
 
     if ( bigtxt )
     {
@@ -257,7 +257,7 @@ void CZMHudCenterText::ShowText( const char* bigtxt, const char* smalltxt, float
             }
         }
 
-        if ( big[0] == NULL )
+        if ( big[0] == L'\0' )
             g_pVGuiLocalize->ConvertANSIToUnicode( bigtxt, big, sizeof( big ) );
     }
     
@@ -273,7 +273,7 @@ void CZMHudCenterText::ShowText( const char* bigtxt, const char* smalltxt, float
             }
         }
 
-        if ( small[0] == NULL)
+        if ( small[0] == L'\0' )
             g_pVGuiLocalize->ConvertANSIToUnicode( smalltxt, small, sizeof( small ) );
     }
     
@@ -324,4 +324,3 @@ void CZMHudCenterText::MsgFunc_ZMCenterText( bf_read& msg )
 
     ShowText( big, small );
 }
-

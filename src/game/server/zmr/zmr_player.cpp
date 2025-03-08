@@ -1534,7 +1534,7 @@ void CZMPlayer::Event_Killed( const CTakeDamageInfo &info )
     {
         if ( m_hRagdoll )
         {
-            m_hRagdoll->GetBaseAnimating()->Dissolve( NULL, gpGlobals->curtime, false, ENTITY_DISSOLVE_NORMAL );
+            m_hRagdoll->GetBaseAnimating()->Dissolve( nullptr, gpGlobals->curtime, false, ENTITY_DISSOLVE_NORMAL );
         }
     }
 

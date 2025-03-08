@@ -240,7 +240,7 @@ int C_ZMBaseZombie::DrawModelAndEffects( int flags )
         };
 
         g_pStudioRender->SetAmbientLightColors( lightlvl );
-        g_pStudioRender->SetLocalLights( 0, NULL );
+        g_pStudioRender->SetLocalLights( 0, nullptr );
 
         render->SetColorModulation( clr.Base() );
         modelrender->SuppressEngineLighting( true );

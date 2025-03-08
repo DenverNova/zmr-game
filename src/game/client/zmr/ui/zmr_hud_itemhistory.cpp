@@ -25,7 +25,7 @@ DECLARE_HUD_MESSAGE( CZMHudItemHistory, ZMAmmoPickup );
 
 CZMHudItemHistory::CZMHudItemHistory( const char* pszElementName ) : CHudElement( pszElementName ), BaseClass( g_pClientMode->GetViewport(), pszElementName )
 {
-    m_wszAmmoFullMsg[0] = NULL;
+    m_wszAmmoFullMsg[0] = L'\0';
     m_bNeedsDraw = false;
     m_iCurrentHistorySlot = 0;
 

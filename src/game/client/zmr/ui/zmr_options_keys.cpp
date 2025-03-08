@@ -226,7 +226,7 @@ void CZMOptionsSubKeys::ParseKeys()
 
 
     char buf[512];
-    buf[511] = NULL;
+    buf[511] = '\0';
 
     int sectionIndex = 0;
     char desc[512];
@@ -240,13 +240,13 @@ void CZMOptionsSubKeys::ParseKeys()
 
 		data = engine->ParseFile( data, token, sizeof( token ) );
 		// Done.
-		if ( token[0] == NULL )  
+		if ( token[0] == '\0' )  
 			continue;
 
 		Q_strncpy( binding, token, sizeof( binding ) );
 
 		data = engine->ParseFile( data, token, sizeof( token ) );
-		if ( token[0] == NULL )
+		if ( token[0] == '\0' )
             continue;
 
         // Skip '======' rows

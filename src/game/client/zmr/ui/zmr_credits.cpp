@@ -83,7 +83,7 @@ CZMCreditsMenu::CZMCreditsMenu( vgui::VPANEL parent ) : BaseClass( nullptr, "ZMC
         unsigned int size = filesystem->Size( hndl );
 
         char* buf = new char[size];
-        buf[size-1] = NULL;
+        buf[size-1] = '\0';
 
         filesystem->Read( buf, size-1, hndl );
 

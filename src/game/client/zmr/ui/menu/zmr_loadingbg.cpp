@@ -211,7 +211,7 @@ void CZMLoadingPanel::FireGameEvent( IGameEvent* pEvent )
 
 
             char* buffer = new char[4096];
-            buffer[0] = NULL;
+            buffer[0] = '\0';
             ZMLegacyObjPanel::LoadObjectivesFromFile( mapname, buffer, 4096 );
 
             // Don't display html.

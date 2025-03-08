@@ -66,7 +66,7 @@ void CZMWeb::Callback_Version( HTTPRequestCompleted_t* pResult, bool bIOFailure 
     {
         uint8* data = new uint8[pResult->m_unBodySize + 1];
         STEAMAPI_CONTEXT->SteamHTTP()->GetHTTPResponseBodyData( pResult->m_hRequest, data, pResult->m_unBodySize );
-        data[pResult->m_unBodySize] = NULL;
+        data[pResult->m_unBodySize] = 0;
 
         ParseVersion( reinterpret_cast<char*>( data ) );
 

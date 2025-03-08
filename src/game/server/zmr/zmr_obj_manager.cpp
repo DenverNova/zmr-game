@@ -345,7 +345,7 @@ bool CZMEntObjectivesManager::LoadFromFile()
 
         const char* pEntName = nullptr;
         const char* pOutput = nullptr;
-        format[0] = NULL;
+        format[0] = '\0';
        
 
         if ( !start )

@@ -319,10 +319,10 @@ void CZMHudControlPanel::RemoveButtons()
 
     for (int i=0; i<NUM_BUTTONS; i++ )
     {
-        if (m_pButtons[i] != NULL)
+        if (m_pButtons[i] != nullptr)
         {
             delete m_pButtons[i];
-            m_pButtons[i] = NULL;
+            m_pButtons[i] = nullptr;
         }
     }
 
@@ -597,7 +597,7 @@ void CZMHudControlPanel::UpdateTabs( int activatedTab )
         m_pZombieGroups->SetVisible( false );
 
     //qck: Testing to see if KeyValues stay
-    //if(m_pZombieGroups->GetActiveItemUserData() != NULL)
+    //if(m_pZombieGroups->GetActiveItemUserData() != nullptr)
     //{
     //	KeyValues* kv = m_pZombieGroups->GetActiveItemUserData();
     //	int test = kv->GetInt("serial");

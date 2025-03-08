@@ -279,7 +279,7 @@ void CZMImmolator::HandleAnimEvent( animevent_t* pEvent )
     ||  pEvent->event == AE_ZOMBIE_ATTACK_RIGHT)
     {
         Vector right, forward;
-        AngleVectors( GetLocalAngles(), &forward, &right, NULL );
+        AngleVectors( GetLocalAngles(), &forward, &right, nullptr );
 
         right = right * -100;
         forward = forward * 200;
