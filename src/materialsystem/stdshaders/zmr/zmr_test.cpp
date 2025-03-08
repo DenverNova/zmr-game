@@ -1,7 +1,7 @@
 #include "../BaseVSShader.h"
 
 
-#include "SDK_screenspaceeffect_vs20.inc"
+#include "sdk_screenspaceeffect_vs20.inc"
 
 
 #include "zmr_test_ps20b.inc"
