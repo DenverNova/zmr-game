@@ -85,7 +85,7 @@ private:
 // Similar to CMultiPlayerAnimState, updates animation and animation layers.
 // Animations are no longer transmitted to client from the server. Instead, server sends animation events to client.
 // Also handles movement <-> idle transitions. This is done both on client & server parallel.
-class CZMZombieAnimState
+class CZMZombieAnimState final
 #ifndef CLIENT_DLL
     : public NPCR::CEventListener
 #endif

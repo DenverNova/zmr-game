@@ -93,7 +93,7 @@ namespace ZMWeaponConfig
     {
     public:
         CZMBaseWeaponConfig( const char* wepname, const char* configpath );
-        ~CZMBaseWeaponConfig();
+        virtual ~CZMBaseWeaponConfig();
 
 
         virtual void LoadFromConfig( KeyValues* kv );
