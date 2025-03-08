@@ -141,7 +141,7 @@ CBaseHandle CZMGameMovement::TestPlayerPosition( const Vector& pos, int collisio
     }
     else
     {	
-        return INVALID_EHANDLE_INDEX;
+        return INVALID_EHANDLE;
     }
 }
 

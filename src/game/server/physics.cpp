@@ -243,11 +243,7 @@ void CPhysicsHook::LevelInitPreEntity()
 
 	physenv->SetObjectEventHandler( &g_Collisions );
 	
-#ifdef ZMR // ZMRCHANGE: Speculative tickrate physics bug fix
-	physenv->SetSimulationTimestep( gpGlobals->interval_per_tick );
-#else
-	physenv->SetSimulationTimestep( DEFAULT_TICK_INTERVAL ); // 15 ms per tick
-#endif
+	physenv->SetSimulationTimestep( gpGlobals->interval_per_tick ); // 15 ms per tick
 	// HL Game gravity, not real-world gravity
 	physenv->SetGravity( Vector( 0, 0, -GetCurrentGravity() ) );
 	g_PhysAverageSimTime = 0;
@@ -1082,7 +1078,7 @@ void CCollisionEvent::FluidStartTouch( IPhysicsObject *pObject, IPhysicsFluidCon
 		return;
 
 	pEntity->AddEFlags( EFL_TOUCHING_FLUID );
-	pEntity->OnEntityEvent( ENTITY_EVENT_WATER_TOUCH, (void*)pFluid->GetContents() );
+	pEntity->OnEntityEvent( ENTITY_EVENT_WATER_TOUCH, (void*)(intp)pFluid->GetContents() );
 
 	float timeSinceLastCollision = DeltaTimeSinceLastFluid( pEntity );
 	if ( timeSinceLastCollision < 0.5f )
@@ -1138,7 +1134,7 @@ void CCollisionEvent::FluidEndTouch( IPhysicsObject *pObject, IPhysicsFluidContr
 	}
 
 	pEntity->RemoveEFlags( EFL_TOUCHING_FLUID );
-	pEntity->OnEntityEvent( ENTITY_EVENT_WATER_UNTOUCH, (void*)pFluid->GetContents() );
+	pEntity->OnEntityEvent( ENTITY_EVENT_WATER_UNTOUCH, (void*)(intp)pFluid->GetContents() );
 }
 
 class CSkipKeys : public IVPhysicsKeyHandler
@@ -1620,11 +1616,7 @@ CON_COMMAND( physics_budget, "Times the cost of each active object" )
 		float totalTime = 0.f;
 		g_Collisions.BufferTouchEvents( true );
 		float full = engine->Time();
-#ifdef ZMR // ZMRCHANGE: Speculative tickrate physics bug fix
 		physenv->Simulate( gpGlobals->interval_per_tick );
-#else
-		physenv->Simulate( DEFAULT_TICK_INTERVAL );
-#endif
 		full = engine->Time() - full;
 		float lastTime = full;
 
@@ -1641,11 +1633,7 @@ CON_COMMAND( physics_budget, "Times the cost of each active object" )
 				PhysForceEntityToSleep( ents[j], ents[j]->VPhysicsGetObject() );
 			}
 			float start = engine->Time();
-#ifdef ZMR // ZMRCHANGE: Speculative tickrate physics bug fix
 			physenv->Simulate( gpGlobals->interval_per_tick );
-#else
-			physenv->Simulate( DEFAULT_TICK_INTERVAL );
-#endif
 			float end = engine->Time();
 
 			float elapsed = end - start;

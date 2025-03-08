@@ -239,7 +239,7 @@ void CZMRules::CreateStandardEntities()
 
     if ( pEnt )
     {
-        new CZMVoteRoundRestart();
+        new CZMVoteRoundRestart( static_cast<CVoteController*>( pEnt ) );
     }
 }
 
@@ -1456,6 +1456,10 @@ bool CZMRules::ShouldLateSpawn( CZMPlayer* pPlayer )
     auto* pData = GetZMRejoinSystem()->FindPlayerData( pPlayer, "Late spawn" );
 
     return pData ? pData->Validate() : true;
+}
+
+void InitBodyQue()
+{
 }
 #endif
 

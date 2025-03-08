@@ -67,4 +67,5 @@ void RegisterUserMessages()
 #endif
 
     RegisterZMUserMessages();
+	RegisterScriptMessages();
 }

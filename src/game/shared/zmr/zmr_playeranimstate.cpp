@@ -132,7 +132,8 @@ Activity CZMPlayerAnimState::TranslateActivity( Activity actDesired )
 
     if ( m_pZMPlayer && m_pZMPlayer->GetActiveWeapon() )
     {
-        translateActivity = m_pZMPlayer->GetActiveWeapon()->ActivityOverride( translateActivity, false );
+        bool bRequired = false;
+        translateActivity = m_pZMPlayer->GetActiveWeapon()->ActivityOverride( translateActivity, &bRequired );
     }
 
     return translateActivity;

@@ -300,9 +300,6 @@ bool CZMBaseWeapon::Deploy()
     MDLCACHE_CRITICAL_SECTION();
     bool bResult = DefaultDeploy();
 
-
-    PoseParameterOverride( false );
-
     return bResult;
 }
 
@@ -358,8 +355,6 @@ bool CZMBaseWeapon::Holster( CBaseCombatWeapon* pSwitchingTo )
     SetThink( nullptr );
 
     SetWeaponVisible( false );
-
-    PoseParameterOverride( true );
 
     return true;
 }

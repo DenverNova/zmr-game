@@ -582,7 +582,7 @@ CZMBaseZombie* CZMEntZombieSpawn::CreateZombie( ZombieClass_t zclass, CZMPlayer*
     if ( !classname )
     {
         Warning( "Can't create zombie of class %i!\n", zclass );
-        return false;
+        return nullptr;
     }
 
 

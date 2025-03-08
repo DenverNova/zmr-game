@@ -7,14 +7,9 @@
 // defined $LIGHTING_PREVIEW && defined $FASTPATH && $LIGHTING_PREVIEW && $FASTPATH
 // ($FLASHLIGHT || $FLASHLIGHTSHADOWS) && $LIGHTING_PREVIEW
 
-#ifndef SDK_BLOOM_PS20B_H
-#define SDK_BLOOM_PS20B_H
-
-#include "shaderapi/ishaderapi.h"
-#include "shaderapi/ishadershadow.h"
-#include "materialsystem/imaterialvar.h"
-
-class SDK_Bloom_ps20b_Static_Index
+#pragma once
+#include "shaderlib/cshader.h"
+class sdk_bloom_ps20b_Static_Index
 {
 	unsigned int m_nCONVERT_TO_SRGB : 2;
 public:
@@ -24,7 +19,7 @@ public:
 		m_nCONVERT_TO_SRGB = i;
 	}
 
-	SDK_Bloom_ps20b_Static_Index( IShaderShadow* pShaderShadow, IMaterialVar** params )
+	sdk_bloom_ps20b_Static_Index(  )
 	{
 		m_nCONVERT_TO_SRGB = g_pHardwareConfig->NeedsShaderSRGBConversion();
 	}
@@ -35,13 +30,13 @@ public:
 	}
 };
 
-#define shaderStaticTest_SDK_Bloom_ps20b 1
+#define shaderStaticTest_sdk_bloom_ps20b 1
 
 
-class SDK_Bloom_ps20b_Dynamic_Index
+class sdk_bloom_ps20b_Dynamic_Index
 {
 public:
-	SDK_Bloom_ps20b_Dynamic_Index( IShaderDynamicAPI* pShaderAPI )
+	sdk_bloom_ps20b_Dynamic_Index(  )
 	{
 	}
 
@@ -51,7 +46,5 @@ public:
 	}
 };
 
-#define shaderDynamicTest_SDK_Bloom_ps20b 1
+#define shaderDynamicTest_sdk_bloom_ps20b 1
 
-
-#endif	// SDK_BLOOM_PS20B_H

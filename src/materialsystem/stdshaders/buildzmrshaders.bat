@@ -1,21 +1,12 @@
 @echo off
 setlocal
 
-rem ================================
-rem ==== MOD PATH CONFIGURATIONS ===
+set BUILD_SHADER=call buildshaders.bat
 
-rem == Set the absolute path to your mod's game directory here ==
-set GAMEDIR=%cd%\..\..\..\game\zombie_master_reborn
+set SOURCE_DIR="..\..\"
 
-rem == Set the relative or absolute path to Source SDK Base 2013 Singleplayer\bin ==
-set SDKBINDIR=D:\_steam\steamapps\common\Source SDK Base 2013 Multiplayer\bin
+rem Change me to your mod's name!
+set GAME_DIR="..\..\..\game\zombie_master_reborn"
 
-rem ==  Set the Path to your mod's root source code ==
-rem This should already be correct, accepts relative paths only!
-set SOURCEDIR=..\..
-
-rem ==== MOD PATH CONFIGURATIONS END ===
-rem ====================================
-
-
-call buildsdkshaders.bat
+%BUILD_SHADER% zmrshaders_dx9_20b -game %GAME_DIR% -source %SOURCE_DIR%
+%BUILD_SHADER% zmrshaders_dx9_30  -game %GAME_DIR% -source %SOURCE_DIR% -force30

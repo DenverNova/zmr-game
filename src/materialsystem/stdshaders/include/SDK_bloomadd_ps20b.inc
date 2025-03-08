@@ -7,17 +7,12 @@
 // defined $LIGHTING_PREVIEW && defined $FASTPATH && $LIGHTING_PREVIEW && $FASTPATH
 // ($FLASHLIGHT || $FLASHLIGHTSHADOWS) && $LIGHTING_PREVIEW
 
-#ifndef SDK_BLOOMADD_PS20B_H
-#define SDK_BLOOMADD_PS20B_H
-
-#include "shaderapi/ishaderapi.h"
-#include "shaderapi/ishadershadow.h"
-#include "materialsystem/imaterialvar.h"
-
-class SDK_bloomadd_ps20b_Static_Index
+#pragma once
+#include "shaderlib/cshader.h"
+class sdk_bloomadd_ps20b_Static_Index
 {
 public:
-	SDK_bloomadd_ps20b_Static_Index( IShaderShadow* pShaderShadow, IMaterialVar** params )
+	sdk_bloomadd_ps20b_Static_Index(  )
 	{
 	}
 
@@ -27,13 +22,13 @@ public:
 	}
 };
 
-#define shaderStaticTest_SDK_bloomadd_ps20b 1
+#define shaderStaticTest_sdk_bloomadd_ps20b 1
 
 
-class SDK_bloomadd_ps20b_Dynamic_Index
+class sdk_bloomadd_ps20b_Dynamic_Index
 {
 public:
-	SDK_bloomadd_ps20b_Dynamic_Index( IShaderDynamicAPI* pShaderAPI )
+	sdk_bloomadd_ps20b_Dynamic_Index(  )
 	{
 	}
 
@@ -43,7 +38,5 @@ public:
 	}
 };
 
-#define shaderDynamicTest_SDK_bloomadd_ps20b 1
+#define shaderDynamicTest_sdk_bloomadd_ps20b 1
 
-
-#endif	// SDK_BLOOMADD_PS20B_H

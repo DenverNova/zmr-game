@@ -409,6 +409,7 @@ public:
 		m_pShaderDetail = new ComboBox( this, "ShaderDetail", 6, false );
 		m_pShaderDetail->AddItem("#gameui_low", NULL);
 		m_pShaderDetail->AddItem("#gameui_high", NULL);
+		m_pShaderDetail->AddItem("#gameui_ultra", NULL);
 
 		m_pColorCorrection = new ComboBox( this, "ColorCorrection", 2, false );
 		m_pColorCorrection->AddItem("#gameui_disabled", NULL);
@@ -421,10 +422,6 @@ public:
 		m_pMulticore = new ComboBox( this, "Multicore", 6, false );
         m_pMulticore->AddItem("#gameui_disabled", NULL);
 		m_pMulticore->AddItem("#gameui_enabled", NULL);
-
-		m_pD3D9Ex = new ComboBox( this, "D3D9Ex", 6, false );
-        m_pD3D9Ex->AddItem("#gameui_disabled", NULL);
-		m_pD3D9Ex->AddItem("#gameui_enabled", NULL);
         
 
 		LoadControlSettings( "resource/OptionsSubVideoAdvancedDlg.res" );
@@ -564,11 +561,11 @@ public:
 		int nMatVSync = pKeyValues->GetInt( "ConVar.mat_vsync", 1 );
 		int nRootLOD = pKeyValues->GetInt( "ConVar.r_rootlod", 0 );
 		int nReduceFillRate = pKeyValues->GetInt( "ConVar.mat_reducefillrate", 0 );
+		int nLightmapBicubic = pKeyValues->GetInt( "ConVar.r_lightmap_bicubic", 0 );
 		int nDXLevel = pKeyValues->GetInt( "ConVar.mat_dxlevel", 0 );
 		int nColorCorrection = pKeyValues->GetInt( "ConVar.mat_colorcorrection", 0 );
 		int nMotionBlur = pKeyValues->GetInt( "ConVar.mat_motion_blur_enabled", 0 );
 		int nMulticore = ( pKeyValues->GetInt( "ConVar.mat_queue_mode", -1 ) != 0 ) ? 1 : 0;
-		int nAero = ( pKeyValues->GetInt( "ConVar.mat_disable_d3d9ex", 0 ) == 0 ) ? 1 : 0;
 
 		// Only recommend a dxlevel if there is more than one available
 		if ( m_pDXLevel->GetItemCount() > 1 )
@@ -625,7 +622,14 @@ public:
 		else
 			SetComboItemAsRecommended( m_pShadowDetail, 0 );	// Blobbies
 
-		SetComboItemAsRecommended( m_pShaderDetail, nReduceFillRate ? 0 : 1 );
+		if ( nLightmapBicubic )
+		{
+			SetComboItemAsRecommended( m_pShaderDetail, 2 );
+		}
+		else
+		{
+			SetComboItemAsRecommended( m_pShaderDetail, nReduceFillRate ? 0 : 1 );
+		}
 		
 #ifndef _X360
 		if ( nWaterUseRealtimeReflection )
@@ -656,8 +660,6 @@ public:
 		SetComboItemAsRecommended( m_pMotionBlur, nMotionBlur );
 
 		SetComboItemAsRecommended( m_pMulticore, nMulticore );
-
-        SetComboItemAsRecommended( m_pD3D9Ex, nAero );
 
 		pKeyValues->deleteThis();
 	}
@@ -732,6 +734,7 @@ public:
 		}
 
 		ApplyChangesToConVar( "mat_reducefillrate", ( m_pShaderDetail->GetActiveItem() > 0 ) ? 0 : 1 );
+		ApplyChangesToConVar( "r_lightmap_bicubic", ( m_pShaderDetail->GetActiveItem() == 2 ) ? 1 : 0 );
 
 		switch ( m_pWaterDetail->GetActiveItem() )
 		{
@@ -763,8 +766,6 @@ public:
 		ApplyChangesToConVar( "mat_motion_blur_enabled", m_pMotionBlur->GetActiveItem() );
 
 		ApplyChangesToConVar( "mat_queue_mode", m_pMulticore->GetActiveItem() == 0 ? 0 : -1 );
-
-        ApplyChangesToConVar( "mat_disable_d3d9ex", m_pD3D9Ex->GetActiveItem() == 0 ? 1 : 0 );
 		
 		CCvarSlider *pFOV = (CCvarSlider *)FindChildByName( "FOVSlider" );
 		if ( pFOV ) 
@@ -789,11 +790,11 @@ public:
 #endif
 		ConVarRef r_waterforcereflectentities( "r_waterforcereflectentities" );
 		ConVarRef mat_reducefillrate("mat_reducefillrate" );
+		ConVarRef r_lightmap_bicubic("r_lightmap_bicubic" );
 		ConVarRef mat_hdr_level( "mat_hdr_level" );
 		ConVarRef mat_colorcorrection( "mat_colorcorrection" );
 		ConVarRef mat_motion_blur_enabled( "mat_motion_blur_enabled" );
 		ConVarRef mat_queue_mode( "mat_queue_mode" );
-        ConVarRef mat_disable_d3d9ex( "mat_disable_d3d9ex" );
 		ConVarRef r_shadowrendertotexture( "r_shadowrendertotexture" );
 
 		ResetDXLevelCombo();
@@ -815,7 +816,15 @@ public:
 			m_pShadowDetail->ActivateItem( 0 );
 		}
 
-		m_pShaderDetail->ActivateItem( mat_reducefillrate.GetBool() ? 0 : 1 );
+		if ( r_lightmap_bicubic.GetBool() )
+		{
+			m_pShaderDetail->ActivateItem( 2 );
+		}	
+		else
+		{
+			m_pShaderDetail->ActivateItem( mat_reducefillrate.GetBool() ? 0 : 1 );
+		}
+
 		m_pHDR->ActivateItem(clamp(mat_hdr_level.GetInt(), 0, 2));
 
 		switch (mat_forceaniso.GetInt())
@@ -878,8 +887,6 @@ public:
 		m_pMotionBlur->ActivateItem( mat_motion_blur_enabled.GetInt() );
 
         m_pMulticore->ActivateItem( mat_queue_mode.GetInt() == 0 ? 0 : 1 );
-
-        m_pD3D9Ex->ActivateItem( mat_disable_d3d9ex.GetBool() ? 0 : 1 );
 
 		// get current hardware dx support level
 		char dxVer[64];
@@ -971,7 +978,7 @@ private:
 	vgui::ComboBox *m_pColorCorrection;
 	vgui::ComboBox *m_pMotionBlur;
 	vgui::ComboBox *m_pDXLevel;
-    vgui::ComboBox *m_pMulticore, *m_pD3D9Ex;
+    vgui::ComboBox *m_pMulticore;
 
 	int m_nNumAAModes;
 	AAMode_t m_nAAModes[16];
@@ -1027,6 +1034,7 @@ COptionsSubVideo::COptionsSubVideo(vgui::Panel *parent) : PropertyPage(parent, N
 	m_pWindowed = new vgui::ComboBox( this, "DisplayModeCombo", 6, false );
 	m_pWindowed->AddItem( "#GameUI_Fullscreen", NULL );
 	m_pWindowed->AddItem( "#GameUI_Windowed", NULL );
+	m_pWindowed->AddItem( "#GameUI_NoWindowBorder", NULL );
 
 	LoadControlSettings("Resource\\OptionsSubVideo.res");
 
@@ -1143,7 +1151,8 @@ void COptionsSubVideo::OnResetData()
 	const MaterialSystem_Config_t &config = materials->GetCurrentConfigForVideoCard();
 
     // reset UI elements
-    m_pWindowed->ActivateItem(config.Windowed() ? 1 : 0);
+    int windowedIndex = config.NoWindowBorder() ? 2 : 1; // 1 = windowed, 2 = borderless window
+	m_pWindowed->ActivateItem( config.Windowed() ? windowedIndex : 0 );
 
 	// reset gamma control
 	m_pGammaButton->SetEnabled( !config.Windowed() );
@@ -1229,17 +1238,19 @@ void COptionsSubVideo::OnApplyChanges()
 	sscanf( sz, "%i x %i", &width, &height );
 
 	// windowed
-	bool windowed = (m_pWindowed->GetActiveItem() > 0) ? true : false;
+	bool windowed = ( m_pWindowed->GetActiveItem() > 0 ) ? true : false;
+	bool noborder = ( m_pWindowed->GetActiveItem() == 2 ) ? true : false;
 
 	// make sure there is a change
 	const MaterialSystem_Config_t &config = materials->GetCurrentConfigForVideoCard();
 	if ( config.m_VideoMode.m_Width != width 
 		|| config.m_VideoMode.m_Height != height
-		|| config.Windowed() != windowed)
+		|| config.Windowed() != windowed
+		|| config.NoWindowBorder() != noborder)
 	{
 		// set mode
 		char szCmd[ 256 ];
-		Q_snprintf( szCmd, sizeof( szCmd ), "mat_setvideomode %i %i %i\n", width, height, windowed ? 1 : 0 );
+		Q_snprintf( szCmd, sizeof( szCmd ), "mat_setvideomode %i %i %i %i\n", width, height, windowed ? 1 : 0, noborder ? 1 : 0 );
 		engine->ClientCmd_Unrestricted( szCmd );
 	}
 

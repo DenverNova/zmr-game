@@ -12,7 +12,7 @@ static ConVar zm_sv_transmitdistance( "zm_sv_transmitdistance", "1600", FCVAR_NO
 
 LINK_ENTITY_TO_CLASS( team_manager, CZMTeam );
 
-bool CZMTeam::ShouldTransmitToPlayer( CBasePlayer* pRecipient, CBaseEntity* pEntity )
+bool CZMTeam::ShouldTransmitToPlayer( CBasePlayer* pRecipient, CBaseEntity* pEntity ) const
 {
     if ( !pRecipient ) return false;
 

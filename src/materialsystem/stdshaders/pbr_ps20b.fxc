@@ -11,7 +11,7 @@
 // STATIC: "SPECULAR"                   "0..1"
 
 // DYNAMIC: "WRITEWATERFOGTODESTALPHA"  "0..1"
-// DYNAMIC: "PIXELFOGTYPE"              "0..1"
+// DYNAMIC: "PIXELFOGTYPE"              "0..2"
 // DYNAMIC: "NUM_LIGHTS"                "0..4"
 // DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"  "0..1"
 // DYNAMIC: "FLASHLIGHTSHADOWS"         "0..1"
@@ -174,7 +174,7 @@ float4 main(PS_INPUT i) : COLOR
     }
     // End flashlight
 
-    float fogFactor = CalcPixelFogFactor(PIXELFOGTYPE, g_FogParams, g_EyePos.z, i.worldPos.z, i.projPos.z);
+    float fogFactor = CalcPixelFogFactor(PIXELFOGTYPE, g_FogParams, g_EyePos.xyz, i.worldPos.xyz, i.projPos.z);
 
 #if WRITEWATERFOGTODESTALPHA && (PIXELFOGTYPE == PIXEL_FOG_TYPE_HEIGHT)
     float alpha = fogFactor;

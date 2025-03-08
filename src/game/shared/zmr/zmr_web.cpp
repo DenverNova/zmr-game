@@ -6,9 +6,9 @@
 #ifndef CLIENT_DLL
 #include "steam/steam_gameserver.h"
 
-#define STEAM_API     steamgameserverapicontext
+#define STEAMAPI_CONTEXT     steamgameserverapicontext
 #else
-#define STEAM_API     steamapicontext
+#define STEAMAPI_CONTEXT     steamapicontext
 #endif
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -20,24 +20,24 @@
 
 void CZMWeb::Get( const char* url, HTTPCallback::func_t func )
 {
-    if ( !STEAM_API || !STEAM_API->SteamHTTP() )
+    if ( !STEAMAPI_CONTEXT || !STEAMAPI_CONTEXT->SteamHTTP() )
     {
         Assert( 0 );
         return;
     }
     
-    HTTPRequestHandle req = STEAM_API->SteamHTTP()->CreateHTTPRequest( k_EHTTPMethodGET, url );
+    HTTPRequestHandle req = STEAMAPI_CONTEXT->SteamHTTP()->CreateHTTPRequest( k_EHTTPMethodGET, url );
 
 
     SteamAPICall_t call;
 
-    if ( STEAM_API->SteamHTTP()->SendHTTPRequest( req, &call ) )
+    if ( STEAMAPI_CONTEXT->SteamHTTP()->SendHTTPRequest( req, &call ) )
     {
         m_Callback.Set( call, this, func );
     }
     else
     {
-        STEAM_API->SteamHTTP()->ReleaseHTTPRequest( req );
+        STEAMAPI_CONTEXT->SteamHTTP()->ReleaseHTTPRequest( req );
     }
 }
 
@@ -50,7 +50,7 @@ void CZMWeb::QueryVersionNumber()
 
 void CZMWeb::Callback_Version( HTTPRequestCompleted_t* pResult, bool bIOFailure )
 {
-    if ( !STEAM_API || !STEAM_API->SteamHTTP() )
+    if ( !STEAMAPI_CONTEXT || !STEAMAPI_CONTEXT->SteamHTTP() )
     {
         Assert( 0 );
         return;
@@ -65,7 +65,7 @@ void CZMWeb::Callback_Version( HTTPRequestCompleted_t* pResult, bool bIOFailure 
         pResult->m_unBodySize > 0 )
     {
         uint8* data = new uint8[pResult->m_unBodySize + 1];
-        STEAM_API->SteamHTTP()->GetHTTPResponseBodyData( pResult->m_hRequest, data, pResult->m_unBodySize );
+        STEAMAPI_CONTEXT->SteamHTTP()->GetHTTPResponseBodyData( pResult->m_hRequest, data, pResult->m_unBodySize );
         data[pResult->m_unBodySize] = NULL;
 
         ParseVersion( reinterpret_cast<char*>( data ) );
@@ -73,7 +73,7 @@ void CZMWeb::Callback_Version( HTTPRequestCompleted_t* pResult, bool bIOFailure 
         delete[] data;
     }
 
-    STEAM_API->SteamHTTP()->ReleaseHTTPRequest( pResult->m_hRequest );
+    STEAMAPI_CONTEXT->SteamHTTP()->ReleaseHTTPRequest( pResult->m_hRequest );
 }
 
 void CZMWeb::ParseVersion( const char* pszVersionString )

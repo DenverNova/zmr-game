@@ -79,7 +79,7 @@ public:
 	QAngle	m_angRotation;
 	Vector	m_vOriginVelocity;
 	int		m_nLastFramecount : 31;
-	bool	m_bAnglesComputed : 1;
+	int		m_bAnglesComputed : 1;
 };
 
 
@@ -147,11 +147,14 @@ public:
 	virtual void UpdateIKLocks( float currentTime );
 	virtual void CalculateIKLocks( float currentTime );
 	virtual bool ShouldDraw();
+	virtual void UpdateVisibility() OVERRIDE;
 	virtual int DrawModel( int flags );
 	virtual int	InternalDrawModel( int flags );
 	virtual bool OnInternalDrawModel( ClientModelRenderInfo_t *pInfo );
 	virtual bool OnPostInternalDrawModel( ClientModelRenderInfo_t *pInfo );
 	void		DoInternalDrawModel( ClientModelRenderInfo_t *pInfo, DrawModelState_t *pState, matrix3x4_t *pBoneToWorldArray = NULL );
+
+	virtual IMaterial* GetEconWeaponMaterialOverride( int iTeam ) { return NULL; }
 
 	//
 	virtual CMouthInfo *GetMouth();
@@ -469,6 +472,8 @@ protected:
 
 	virtual bool					CalcAttachments();
 
+	virtual bool					ShouldFlipViewModel();
+
 private:
 	// This method should return true if the bones have changed + SetupBones needs to be called
 	virtual float					LastBoneChangedTime() { return FLT_MAX; }
@@ -621,6 +626,7 @@ private:
 	unsigned char m_nOldMuzzleFlashParity;
 
 	bool							m_bInitModelEffects;
+	bool							m_bDelayInitModelEffects;
 
 	// Dynamic models
 	bool							m_bDynamicModelAllowed;
@@ -639,6 +645,7 @@ private:
 	mutable CStudioHdr				*m_pStudioHdr;
 	mutable MDLHandle_t				m_hStudioHdr;
 	CThreadFastMutex				m_StudioHdrInitLock;
+	bool							m_bHasAttachedParticles;
 
 #ifdef ZMR // ZMRCHANGE: Need this for animations
 	friend class C_NPCRNonPlayer;

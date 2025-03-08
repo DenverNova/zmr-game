@@ -63,8 +63,8 @@ BEGIN_SHADER( ZMR_Test, "Help for my shader." )
 			pShaderShadow->VertexShaderVertexFormat(fmt, 1, 0, 0);
 
 
-			DECLARE_STATIC_VERTEX_SHADER(SDK_screenspaceeffect_vs20);
-			SET_STATIC_VERTEX_SHADER(SDK_screenspaceeffect_vs20);
+			DECLARE_STATIC_VERTEX_SHADER(sdk_screenspaceeffect_vs20);
+			SET_STATIC_VERTEX_SHADER(sdk_screenspaceeffect_vs20);
 
 			DECLARE_STATIC_PIXEL_SHADER(zmr_test_ps20b);
 			SET_STATIC_PIXEL_SHADER(zmr_test_ps20b);
@@ -77,8 +77,8 @@ BEGIN_SHADER( ZMR_Test, "Help for my shader." )
             BindTexture( SHADER_SAMPLER1, VIGNETTETEXTURE, -1 );
 
 
-			DECLARE_DYNAMIC_VERTEX_SHADER(SDK_screenspaceeffect_vs20);
-			SET_DYNAMIC_VERTEX_SHADER(SDK_screenspaceeffect_vs20);
+			DECLARE_DYNAMIC_VERTEX_SHADER(sdk_screenspaceeffect_vs20);
+			SET_DYNAMIC_VERTEX_SHADER(sdk_screenspaceeffect_vs20);
 
 
             const float strength = zm_cl_vignettestrength.GetFloat();

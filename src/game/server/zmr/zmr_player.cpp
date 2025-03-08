@@ -56,14 +56,6 @@ ConVar zm_sv_flashlightdrainrate( "zm_sv_flashlightdrainrate", "0.6", FCVAR_NOTI
 ConVar zm_sv_flashlightrechargerate( "zm_sv_flashlightrechargerate", "2.5", FCVAR_NOTIFY, "How fast the flashlight battery recharges per second. (out of 100)" ); // Originally 0.1
 
 
-
-void* SendProxy_SendNonLocalDataTable( const SendProp* pProp, const void* pStruct, const void* pVarData, CSendProxyRecipients* pRecipients, int objectID )
-{
-    pRecipients->SetAllRecipients();
-    pRecipients->ClearRecipient( objectID - 1 );
-    return (void*)pVarData;
-}
-
 BEGIN_SEND_TABLE_NOBASE( CZMPlayer, DT_ZMLocalPlayerExclusive )
     // Send high-resolution for local
     SendPropVector( SENDINFO( m_vecOrigin ), -1,  SPROP_NOSCALE | SPROP_CHANGES_OFTEN, 0.0f, HIGH_DEFAULT, SendProxy_Origin ),

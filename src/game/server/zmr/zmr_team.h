@@ -7,5 +7,5 @@ public:
     DECLARE_CLASS( CZMTeam, CTeam );
     //DECLARE_SERVERCLASS();
 
-    virtual bool ShouldTransmitToPlayer( CBasePlayer* pRecipient, CBaseEntity* pEntity ) OVERRIDE;
+    virtual bool ShouldTransmitToPlayer( CBasePlayer* pRecipient, CBaseEntity* pEntity ) const OVERRIDE;
 };

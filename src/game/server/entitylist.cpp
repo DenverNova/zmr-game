@@ -307,7 +307,7 @@ static bool g_fInCleanupDelete;
 // mark an entity as deleted
 void CGlobalEntityList::AddToDeleteList( IServerNetworkable *ent )
 {
-	if ( ent && ent->GetEntityHandle()->GetRefEHandle() != INVALID_EHANDLE_INDEX )
+	if ( ent && ent->GetEntityHandle()->GetRefEHandle() != CBaseHandle( INVALID_EHANDLE ) )
 	{
 		g_DeleteList.AddToTail( ent );
 	}
@@ -481,7 +481,7 @@ bool CGlobalEntityList::IsEntityPtr( void *pTest )
 // Input  : pStartEntity - Last entity found, NULL to start a new iteration.
 //			szName - Classname to search for.
 //-----------------------------------------------------------------------------
-CBaseEntity *CGlobalEntityList::FindEntityByClassname( CBaseEntity *pStartEntity, const char *szName )
+CBaseEntity *CGlobalEntityList::FindEntityByClassname( CBaseEntity *pStartEntity, const char *szName, IEntityFindFilter *pFilter )
 {
 	const CEntInfo *pInfo = pStartEntity ? GetEntInfoPtr( pStartEntity->GetRefEHandle() )->m_pNext : FirstEntInfo();
 
@@ -495,7 +495,12 @@ CBaseEntity *CGlobalEntityList::FindEntityByClassname( CBaseEntity *pStartEntity
 		}
 
 		if ( pEntity->ClassMatches(szName) )
+		{
+			if ( pFilter && !pFilter->ShouldFindEntity( pEntity ) )
+				continue;
+
 			return pEntity;
+		}
 	}
 
 	return NULL;
@@ -638,7 +643,7 @@ CBaseEntity *CGlobalEntityList::FindEntityByName( CBaseEntity *pStartEntity, con
 // Input  : pStartEntity - 
 //			szModelName - 
 //-----------------------------------------------------------------------------
-CBaseEntity *CGlobalEntityList::FindEntityByModel( CBaseEntity *pStartEntity, const char *szModelName )
+CBaseEntity *CGlobalEntityList::FindEntityByModel( CBaseEntity *pStartEntity, const char *szModelName, IEntityFindFilter *pFilter )
 {
 	const CEntInfo *pInfo = pStartEntity ? GetEntInfoPtr( pStartEntity->GetRefEHandle() )->m_pNext : FirstEntInfo();
 
@@ -655,7 +660,12 @@ CBaseEntity *CGlobalEntityList::FindEntityByModel( CBaseEntity *pStartEntity, co
 			continue;
 
 		if ( FStrEq( STRING(ent->GetModelName()), szModelName ) )
+		{
+			if ( pFilter && !pFilter->ShouldFindEntity( ent ) )
+				continue;
+
 			return ent;
+		}
 	}
 
 	return NULL;
@@ -668,7 +678,7 @@ CBaseEntity *CGlobalEntityList::FindEntityByModel( CBaseEntity *pStartEntity, co
 //			szName - 
 //-----------------------------------------------------------------------------
 // FIXME: obsolete, remove
-CBaseEntity	*CGlobalEntityList::FindEntityByTarget( CBaseEntity *pStartEntity, const char *szName )
+CBaseEntity	*CGlobalEntityList::FindEntityByTarget( CBaseEntity *pStartEntity, const char *szName, IEntityFindFilter *pFilter )
 {
 	const CEntInfo *pInfo = pStartEntity ? GetEntInfoPtr( pStartEntity->GetRefEHandle() )->m_pNext : FirstEntInfo();
 
@@ -685,7 +695,12 @@ CBaseEntity	*CGlobalEntityList::FindEntityByTarget( CBaseEntity *pStartEntity, c
 			continue;
 
 		if ( FStrEq( STRING(ent->m_target), szName ) )
+		{
+			if ( pFilter && !pFilter->ShouldFindEntity( ent ) )
+				continue;
+
 			return ent;
+		}
 	}
 
 	return NULL;
@@ -698,7 +713,7 @@ CBaseEntity	*CGlobalEntityList::FindEntityByTarget( CBaseEntity *pStartEntity, c
 //			vecCenter - 
 //			flRadius - 
 //-----------------------------------------------------------------------------
-CBaseEntity *CGlobalEntityList::FindEntityInSphere( CBaseEntity *pStartEntity, const Vector &vecCenter, float flRadius )
+CBaseEntity *CGlobalEntityList::FindEntityInSphere( CBaseEntity *pStartEntity, const Vector &vecCenter, float flRadius, IEntityFindFilter *pFilter )
 {
 	const CEntInfo *pInfo = pStartEntity ? GetEntInfoPtr( pStartEntity->GetRefEHandle() )->m_pNext : FirstEntInfo();
 
@@ -719,6 +734,9 @@ CBaseEntity *CGlobalEntityList::FindEntityInSphere( CBaseEntity *pStartEntity, c
 		if ( !IsBoxIntersectingSphere( ent->CollisionProp()->OBBMins(),	ent->CollisionProp()->OBBMaxs(), vecRelativeCenter, flRadius ) )
 			continue;
 
+		if ( pFilter && !pFilter->ShouldFindEntity( ent ) )
+			continue;
+
 		return ent;
 	}
 
@@ -737,7 +755,7 @@ CBaseEntity *CGlobalEntityList::FindEntityInSphere( CBaseEntity *pStartEntity, c
 //				or Use handler, NULL otherwise.
 // Output : Returns a pointer to the found entity, NULL if none.
 //-----------------------------------------------------------------------------
-CBaseEntity *CGlobalEntityList::FindEntityByNameNearest( const char *szName, const Vector &vecSrc, float flRadius, CBaseEntity *pSearchingEntity, CBaseEntity *pActivator, CBaseEntity *pCaller )
+CBaseEntity *CGlobalEntityList::FindEntityByNameNearest( const char *szName, const Vector &vecSrc, float flRadius, CBaseEntity *pSearchingEntity, CBaseEntity *pActivator, CBaseEntity *pCaller, IEntityFindFilter *pFilter )
 {
 	CBaseEntity *pEntity = NULL;
 
@@ -760,6 +778,9 @@ CBaseEntity *CGlobalEntityList::FindEntityByNameNearest( const char *szName, con
 
 		if (flMaxDist2 > flDist2)
 		{
+			if ( pFilter && !pFilter->ShouldFindEntity( pSearch ) )
+				continue;
+
 			pEntity = pSearch;
 			flMaxDist2 = flDist2;
 		}
@@ -781,7 +802,7 @@ CBaseEntity *CGlobalEntityList::FindEntityByNameNearest( const char *szName, con
 //				or Use handler, NULL otherwise.
 // Output : Returns a pointer to the found entity, NULL if none.
 //-----------------------------------------------------------------------------
-CBaseEntity *CGlobalEntityList::FindEntityByNameWithin( CBaseEntity *pStartEntity, const char *szName, const Vector &vecSrc, float flRadius, CBaseEntity *pSearchingEntity, CBaseEntity *pActivator, CBaseEntity *pCaller )
+CBaseEntity *CGlobalEntityList::FindEntityByNameWithin( CBaseEntity *pStartEntity, const char *szName, const Vector &vecSrc, float flRadius, CBaseEntity *pSearchingEntity, CBaseEntity *pActivator, CBaseEntity *pCaller, IEntityFindFilter *pFilter )
 {
 	//
 	// Check for matching class names within the search radius.
@@ -802,6 +823,9 @@ CBaseEntity *CGlobalEntityList::FindEntityByNameWithin( CBaseEntity *pStartEntit
 
 		if (flMaxDist2 > flDist2)
 		{
+			if ( pFilter && !pFilter->ShouldFindEntity( pEntity ) )
+				continue;
+
 			return pEntity;
 		}
 	}
@@ -818,7 +842,7 @@ CBaseEntity *CGlobalEntityList::FindEntityByNameWithin( CBaseEntity *pStartEntit
 //			flRadius - Search radius for classname search, 0 to search everywhere.
 // Output : Returns a pointer to the found entity, NULL if none.
 //-----------------------------------------------------------------------------
-CBaseEntity *CGlobalEntityList::FindEntityByClassnameNearest( const char *szName, const Vector &vecSrc, float flRadius )
+CBaseEntity *CGlobalEntityList::FindEntityByClassnameNearest( const char *szName, const Vector &vecSrc, float flRadius, IEntityFindFilter *pFilter )
 {
 	CBaseEntity *pEntity = NULL;
 
@@ -841,6 +865,9 @@ CBaseEntity *CGlobalEntityList::FindEntityByClassnameNearest( const char *szName
 
 		if (flMaxDist2 > flDist2)
 		{
+			if ( pFilter && !pFilter->ShouldFindEntity( pSearch ) )
+				continue;
+
 			pEntity = pSearch;
 			flMaxDist2 = flDist2;
 		}
@@ -859,7 +886,7 @@ CBaseEntity *CGlobalEntityList::FindEntityByClassnameNearest( const char *szName
 //			flRadius - Search radius for classname search, 0 to search everywhere.
 // Output : Returns a pointer to the found entity, NULL if none.
 //-----------------------------------------------------------------------------
-CBaseEntity *CGlobalEntityList::FindEntityByClassnameWithin( CBaseEntity *pStartEntity, const char *szName, const Vector &vecSrc, float flRadius )
+CBaseEntity *CGlobalEntityList::FindEntityByClassnameWithin( CBaseEntity *pStartEntity, const char *szName, const Vector &vecSrc, float flRadius, IEntityFindFilter *pFilter )
 {
 	//
 	// Check for matching class names within the search radius.
@@ -880,6 +907,9 @@ CBaseEntity *CGlobalEntityList::FindEntityByClassnameWithin( CBaseEntity *pStart
 
 		if (flMaxDist2 > flDist2)
 		{
+			if ( pFilter && !pFilter->ShouldFindEntity( pEntity ) )
+				continue;
+
 			return pEntity;
 		}
 	}
@@ -896,7 +926,7 @@ CBaseEntity *CGlobalEntityList::FindEntityByClassnameWithin( CBaseEntity *pStart
 //			vecMaxs - Search maxs.
 // Output : Returns a pointer to the found entity, NULL if none.
 //-----------------------------------------------------------------------------
-CBaseEntity *CGlobalEntityList::FindEntityByClassnameWithin( CBaseEntity *pStartEntity, const char *szName, const Vector &vecMins, const Vector &vecMaxs )
+CBaseEntity *CGlobalEntityList::FindEntityByClassnameWithin( CBaseEntity *pStartEntity, const char *szName, const Vector &vecMins, const Vector &vecMaxs, IEntityFindFilter *pFilter )
 {
 	//
 	// Check for matching class names within the search radius.
@@ -913,6 +943,9 @@ CBaseEntity *CGlobalEntityList::FindEntityByClassnameWithin( CBaseEntity *pStart
 		pEntity->CollisionProp()->WorldSpaceAABB( &entMins, &entMaxs );
 		if ( IsBoxIntersectingBox( vecMins, vecMaxs, entMins, entMaxs ) )
 		{
+			if ( pFilter && !pFilter->ShouldFindEntity( pEntity ) )
+				continue;
+
 			return pEntity;
 		}
 	}

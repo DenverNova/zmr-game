@@ -1,0 +1,41 @@
+//-----------------------------------------------------------------------------
+//	game_shader_dx9.vpc
+//
+//	Project Script for mods to use an an example of how to override shaders
+//-----------------------------------------------------------------------------
+
+$Macro SRCDIR		"..\.."
+
+$Macro GAMENAME "zmr" [$ZMR_STEAM]
+$Macro GAMENAME "zombie_master_reborn" [!$ZMR_STEAM]
+$Macro OUTBINNAME "game_shader_generic_zmr"
+
+$Include "$SRCDIR\materialsystem\stdshaders\game_shader_generic_example_base.vpc"
+
+$Project "Shaders (ZMR)"
+{
+	$Folder	"Source Files"
+	{
+		$Folder "Standard shaders"
+		{
+			$File	"shadow.cpp"
+			$File	"sprite_dx9.cpp"
+			$File	"shatteredglass.cpp"
+		}
+
+		$Folder	"ZMR"
+		{
+			$File	"zmr/zmr_test.cpp"
+		}
+		
+		//$File	"lightmappedgeneric_dx9.cpp"
+		//$File	"lightmappedgeneric_dx9_helper.cpp"
+		//$File	"lightmappedgeneric_dx9_helper.h"
+		$File	"pbr_dx9.cpp"
+	}
+
+	$File	"buildzmrshaders.bat"
+
+	$Shaders	"zmrshaders_dx9_20b.txt"
+	$Shaders	"zmrshaders_dx9_30.txt"
+}

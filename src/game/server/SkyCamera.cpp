@@ -55,6 +55,9 @@ BEGIN_DATADESC( CSkyCamera )
 	DEFINE_KEYFIELD( m_skyboxData.fog.start,			FIELD_FLOAT, "fogstart" ),
 	DEFINE_KEYFIELD( m_skyboxData.fog.end,				FIELD_FLOAT, "fogend" ),
 	DEFINE_KEYFIELD( m_skyboxData.fog.maxdensity,		FIELD_FLOAT, "fogmaxdensity" ),
+#ifndef ZMR // ZMRCHANGE: RADIAL ON.
+	DEFINE_KEYFIELD( m_skyboxData.fog.radial,			FIELD_BOOLEAN, "fogradial" ),
+#endif
 
 END_DATADESC()
 
@@ -93,6 +96,11 @@ CSkyCamera::CSkyCamera()
 {
 	g_SkyList.Insert( this );
 	m_skyboxData.fog.maxdensity = 1.0f;
+#ifdef ZMR // ZMRCHANGE: RADIAL ON.
+	m_skyboxData.fog.radial = true;
+#else
+	m_skyboxData.fog.radial = false;
+#endif
 }
 
 CSkyCamera::~CSkyCamera()

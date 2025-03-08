@@ -251,8 +251,6 @@ void C_RotorWashEmitter::ClientThink( void )
 	Vector	offset;
 	SimpleParticle	*pParticle;
 
-	vecForward.z = 0.0f;
-
 	// Draw the rings
 	for ( int i = 0; i < numRingSprites; i++ )
 	{

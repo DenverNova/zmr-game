@@ -1,14 +1,9 @@
 // ALL SKIP STATEMENTS THAT AFFECT THIS SHADER!!!
 // defined $LIGHTING_PREVIEW && defined $FASTPATH && $LIGHTING_PREVIEW && $FASTPATH
 
-#ifndef SDK_SCREENSPACEEFFECT_VS20_H
-#define SDK_SCREENSPACEEFFECT_VS20_H
-
-#include "shaderapi/ishaderapi.h"
-#include "shaderapi/ishadershadow.h"
-#include "materialsystem/imaterialvar.h"
-
-class SDK_screenspaceeffect_vs20_Static_Index
+#pragma once
+#include "shaderlib/cshader.h"
+class sdk_screenspaceeffect_vs20_Static_Index
 {
 	unsigned int m_nX360APPCHOOSER : 2;
 public:
@@ -18,7 +13,7 @@ public:
 		m_nX360APPCHOOSER = i;
 	}
 
-	SDK_screenspaceeffect_vs20_Static_Index( IShaderShadow* pShaderShadow, IMaterialVar** params )
+	sdk_screenspaceeffect_vs20_Static_Index(  )
 	{
 		m_nX360APPCHOOSER = 0;
 	}
@@ -29,13 +24,13 @@ public:
 	}
 };
 
-#define shaderStaticTest_SDK_screenspaceeffect_vs20 1
+#define shaderStaticTest_sdk_screenspaceeffect_vs20 1
 
 
-class SDK_screenspaceeffect_vs20_Dynamic_Index
+class sdk_screenspaceeffect_vs20_Dynamic_Index
 {
 public:
-	SDK_screenspaceeffect_vs20_Dynamic_Index( IShaderDynamicAPI* pShaderAPI )
+	sdk_screenspaceeffect_vs20_Dynamic_Index(  )
 	{
 	}
 
@@ -45,7 +40,5 @@ public:
 	}
 };
 
-#define shaderDynamicTest_SDK_screenspaceeffect_vs20 1
+#define shaderDynamicTest_sdk_screenspaceeffect_vs20 1
 
-
-#endif	// SDK_SCREENSPACEEFFECT_VS20_H

@@ -138,11 +138,11 @@ void CGameUI::Deactivate( CBaseEntity *pActivator )
 		if ( FBitSet( m_spawnflags, SF_GAMEUI_FREEZE_PLAYER ) )
 		{
 			m_player->RemoveFlag( FL_ATCONTROLS );
-		}
 
 #ifdef ZMR // ZMRCHANGE: Fix death-release. This never got changed back.
 		m_player->RemoveFlag( FL_ONTRAIN );
 #endif
+		}
 
 		// Restore weapons
 		if ( FBitSet( m_spawnflags, SF_GAMEUI_HIDE_WEAPON ) )
@@ -175,7 +175,7 @@ void CGameUI::Deactivate( CBaseEntity *pActivator )
 	}
 	else
 	{
-		Warning("%s Deactivate(): I have no player when called by %s!\n", GetEntityName().ToCStr(), pActivator->GetEntityName().ToCStr());
+		Warning("%s Deactivate(): I have no player when called by %s!\n", GetEntityName().ToCStr(), pActivator ? pActivator->GetEntityName().ToCStr() : NULL);
 	}
 	
 	// Stop thinking

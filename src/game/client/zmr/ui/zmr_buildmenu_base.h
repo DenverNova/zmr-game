@@ -59,6 +59,8 @@ public:
 
     int GetAltSpawnAmount() const;
 
+    virtual GameActionSet_t GetPreferredActionSet() OVERRIDE { return GAME_ACTION_SET_NONE; };
+
 private:
     int m_iLastSpawnIndex;
     int m_iSpawnIndex;

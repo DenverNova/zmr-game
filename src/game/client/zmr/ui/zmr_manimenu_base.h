@@ -54,6 +54,8 @@ public:
     inline int GetTrapCost() { return m_nTrapCost; };
     virtual void SetTrapCost( int ) = 0;
 
+    virtual GameActionSet_t GetPreferredActionSet() OVERRIDE { return GAME_ACTION_SET_NONE; };
+
 protected:
     int m_nCost;
     int m_nTrapCost;

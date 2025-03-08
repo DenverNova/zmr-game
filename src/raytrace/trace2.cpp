@@ -155,7 +155,7 @@ void RayTracingEnvironment::RenderScene(
 							fltx4 MaxT=ldir.length();
 							ldir.VectorNormalizeFast();
 							// now, compute shadow flag
-							FourRays myrays;
+							//FourRays myrays;
 							myrays.origin=surface_pos;
 							FourVectors epsilon=ldir;
 							epsilon*=0.01;

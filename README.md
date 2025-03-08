@@ -7,16 +7,24 @@ You can read it [here](https://github.com/zm-reborn/zmr-game/blob/master/LICENSE
 ## Building
 
 ### Windows
-1. Download [Visual Studio 2022](https://visualstudio.microsoft.com/vs/)
+1. Download [Visual Studio 2022](https://visualstudio.microsoft.com/vs/).
 2. Install `Desktop development with C++` workload.
     * The required components are: **MSVC v143** and **Windows SDK 10.0** (10.0.20348.0 tested)
-3. Run `src/fix_vcxproj.bat` with Admininistrator privileges.
-4. Run `creategameprojects.bat` in `src`-folder.
-5. You now have a solution file `src/zmr-games.sln`
+3. Run `creategameprojects.bat` in `src`-folder.
+4. You now have a solution file `zmr-games.sln` which you can open and build.
 
 ### Linux
 
-Follow [this tutorial](https://developer.valvesoftware.com/wiki/Source_SDK_2013) in Valve developer wiki for the steps.
+You should use the Steam Runtime SDK to compile. Here's an example using Docker:
+
+```bash
+docker run --rm -v .:/build/ -it "registry.gitlab.steamos.cloud/steamrt/sniper/sdk" /bin/bash
+# You should now have a shell in the container.
+
+# Create build files & build.
+cd /build/src
+./creategameprojects
+```
 
 ## Running
 
@@ -43,10 +51,6 @@ Turning on the conditional `ZMR_FINAL` in `src/vpc_scripts/default.vgc` will ena
 You'll also need a copy of the binaries to run the game. (discord-rpc.dll & fmod.dll)
 
 ## FAQ
-
-### Is compiling for Linux really this convoluted?
-
-Yes.
 
 ### Project refuses to compile, says something about wrong/missing toolset. / Opening the solution says something about upgrading.
 

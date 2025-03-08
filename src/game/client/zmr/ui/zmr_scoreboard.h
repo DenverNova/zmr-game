@@ -71,6 +71,7 @@ public:
     virtual bool        NeedsUpdate() OVERRIDE;
     virtual void        ShowPanel( bool bShow ) OVERRIDE;
 
+    virtual GameActionSet_t GetPreferredActionSet() OVERRIDE { return GAME_ACTION_SET_NONE; };
 
     MESSAGE_FUNC_PARAMS( OnListLayout, "OnListLayout", kv );
     MESSAGE_FUNC_PARAMS( OnRowItemPressed, "OnRowItemPressed", kv );

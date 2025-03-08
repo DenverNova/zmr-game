@@ -1,0 +1,6 @@
+// Standard shaders that we need to recompile.
+// Flashlight can't be modified in game shader dll?
+// flashlight_ps2x.fxc
+shadow_ps2x.fxc
+ShatteredGlass_ps2x.fxc
+sprite_ps2x.fxc

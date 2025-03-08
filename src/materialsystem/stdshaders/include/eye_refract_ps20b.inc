@@ -17,13 +17,8 @@
 // defined $LIGHTING_PREVIEW && defined $FASTPATH && $LIGHTING_PREVIEW && $FASTPATH
 // ($FLASHLIGHT || $FLASHLIGHTSHADOWS) && $LIGHTING_PREVIEW
 
-#ifndef EYE_REFRACT_PS20B_H
-#define EYE_REFRACT_PS20B_H
-
-#include "shaderapi/ishaderapi.h"
-#include "shaderapi/ishadershadow.h"
-#include "materialsystem/imaterialvar.h"
-
+#pragma once
+#include "shaderlib/cshader.h"
 class eye_refract_ps20b_Static_Index
 {
 	unsigned int m_nFLASHLIGHT : 2;
@@ -84,7 +79,7 @@ public:
 #endif	// _DEBUG
 	}
 
-	eye_refract_ps20b_Static_Index( IShaderShadow* pShaderShadow, IMaterialVar** params )
+	eye_refract_ps20b_Static_Index(  )
 	{
 		m_nFLASHLIGHT = 0;
 		m_nLIGHTWARPTEXTURE = 0;
@@ -103,7 +98,8 @@ public:
 	int GetIndex() const
 	{
 		Assert( m_bFLASHLIGHT && m_bLIGHTWARPTEXTURE && m_bSPHERETEXKILLCOMBO && m_bRAYTRACESPHERE && m_bFLASHLIGHTDEPTHFILTERMODE );
-		return ( 10 * m_nFLASHLIGHT ) + ( 20 * m_nLIGHTWARPTEXTURE ) + ( 40 * m_nSPHERETEXKILLCOMBO ) + ( 80 * m_nRAYTRACESPHERE ) + ( 160 * m_nFLASHLIGHTDEPTHFILTERMODE ) + 0;
+		AssertMsg( !( ( m_nRAYTRACESPHERE == 0 ) && ( m_nSPHERETEXKILLCOMBO == 1 ) ), "Invalid combo combination ( ( RAYTRACESPHERE == 0 ) && ( SPHERETEXKILLCOMBO == 1 ) )" );
+		return ( 30 * m_nFLASHLIGHT ) + ( 60 * m_nLIGHTWARPTEXTURE ) + ( 120 * m_nSPHERETEXKILLCOMBO ) + ( 240 * m_nRAYTRACESPHERE ) + ( 480 * m_nFLASHLIGHTDEPTHFILTERMODE ) + 0;
 	}
 };
 
@@ -114,9 +110,11 @@ class eye_refract_ps20b_Dynamic_Index
 {
 	unsigned int m_nNUM_LIGHTS : 3;
 	unsigned int m_nFLASHLIGHTSHADOWS : 2;
+	unsigned int m_nPIXELFOGTYPE : 2;
 #ifdef _DEBUG
 	bool m_bNUM_LIGHTS : 1;
 	bool m_bFLASHLIGHTSHADOWS : 1;
+	bool m_bPIXELFOGTYPE : 1;
 #endif	// _DEBUG
 public:
 	void SetNUM_LIGHTS( int i )
@@ -137,24 +135,33 @@ public:
 #endif	// _DEBUG
 	}
 
-	eye_refract_ps20b_Dynamic_Index( IShaderDynamicAPI* pShaderAPI )
+	void SetPIXELFOGTYPE( int i )
+	{
+		Assert( i >= 0 && i <= 2 );
+		m_nPIXELFOGTYPE = i;
+#ifdef _DEBUG
+		m_bPIXELFOGTYPE = true;
+#endif	// _DEBUG
+	}
+
+	eye_refract_ps20b_Dynamic_Index(  )
 	{
 		m_nNUM_LIGHTS = 0;
 		m_nFLASHLIGHTSHADOWS = 0;
+		m_nPIXELFOGTYPE = 0;
 #ifdef _DEBUG
 		m_bNUM_LIGHTS = false;
 		m_bFLASHLIGHTSHADOWS = false;
+		m_bPIXELFOGTYPE = false;
 #endif	// _DEBUG
 	}
 
 	int GetIndex() const
 	{
-		Assert( m_bNUM_LIGHTS && m_bFLASHLIGHTSHADOWS );
-		return ( 1 * m_nNUM_LIGHTS ) + ( 5 * m_nFLASHLIGHTSHADOWS ) + 0;
+		Assert( m_bNUM_LIGHTS && m_bFLASHLIGHTSHADOWS && m_bPIXELFOGTYPE );
+		return ( 1 * m_nNUM_LIGHTS ) + ( 5 * m_nFLASHLIGHTSHADOWS ) + ( 10 * m_nPIXELFOGTYPE ) + 0;
 	}
 };
 
-#define shaderDynamicTest_eye_refract_ps20b psh_forgot_to_set_dynamic_NUM_LIGHTS + psh_forgot_to_set_dynamic_FLASHLIGHTSHADOWS
+#define shaderDynamicTest_eye_refract_ps20b psh_forgot_to_set_dynamic_NUM_LIGHTS + psh_forgot_to_set_dynamic_FLASHLIGHTSHADOWS + psh_forgot_to_set_dynamic_PIXELFOGTYPE
 
-
-#endif	// EYE_REFRACT_PS20B_H

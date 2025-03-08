@@ -1,4 +1,4 @@
-//====== Copyright © Sandern Corporation, All rights reserved. ===========//
+//====== Copyright ï¿½ Sandern Corporation, All rights reserved. ===========//
 //
 // Purpose: Implementation of IMaterialSystem interface which "passes tru" all 
 //			function calls to the real interface. Can be used to override
@@ -326,6 +326,31 @@ public:
 	virtual ITexture*			CreateNamedTextureFromBitsEx( const char* pName, const char *pTextureGroupName, int w, int h, int mips, ImageFormat fmt, int srcBufferSize, byte* srcBits, int nFlags )
 	{
 		return m_pBaseMaterialsPassThru->CreateNamedTextureFromBitsEx( pName, pTextureGroupName, w, h, mips, fmt, srcBufferSize, srcBits, nFlags );
+	}
+
+	virtual bool				AddTextureCompositorTemplate( const char* pName, KeyValues* pTmplDesc, int nTexCompositeTemplateFlags = 0 )
+	{
+		return m_pBaseMaterialsPassThru->AddTextureCompositorTemplate( pName, pTmplDesc, nTexCompositeTemplateFlags );
+	}
+
+	virtual bool				VerifyTextureCompositorTemplates()
+	{
+		return m_pBaseMaterialsPassThru->VerifyTextureCompositorTemplates();
+	}
+
+	virtual RenderBackend_t		GetRenderBackend() const
+	{
+		return m_pBaseMaterialsPassThru->GetRenderBackend();
+	}
+
+	virtual void				SuspendTextureStreaming()
+	{
+		m_pBaseMaterialsPassThru->SuspendTextureStreaming();
+	}
+
+	virtual void				ResumeTextureStreaming()
+	{
+		m_pBaseMaterialsPassThru->ResumeTextureStreaming();
 	}
 
 protected:

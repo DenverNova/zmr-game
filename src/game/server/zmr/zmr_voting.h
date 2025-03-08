@@ -10,7 +10,7 @@
 class CZMVoteRoundRestart : public CBaseIssue
 {
 public:
-    CZMVoteRoundRestart() : CBaseIssue( "ZMVoteRoundRestart" ) {}
+    CZMVoteRoundRestart( CVoteController* pVoteController  ) : CBaseIssue( "ZMVoteRoundRestart", pVoteController ) {}
 
     virtual bool IsEnabled() OVERRIDE { return !ZMRules()->IsInRoundEnd(); };
     virtual bool IsTeamRestrictedVote() OVERRIDE { return false; }; // This will include the ZM, but otherwise it would be completely team restricted.
@@ -26,11 +26,11 @@ public:
         ZMRules()->EndRound( ZMROUND_VOTERESTART );
     }
 
-    virtual bool CanCallVote( int nEntIndex, const char *pszDetails, vote_create_failed_t &nFailCode, int &nTime ) OVERRIDE
+    virtual bool RequestCallVote( int nEntIndex, const char *pszDetails, vote_create_failed_t &nFailCode, int &nTime ) OVERRIDE
     {
         if ( ZMRules()->IsInRoundEnd() )
             return false;
 
-        return CBaseIssue::CanCallVote( nEntIndex, pszDetails, nFailCode, nTime );
+        return CBaseIssue::RequestCallVote( nEntIndex, pszDetails, nFailCode, nTime );
     }
 };

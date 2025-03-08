@@ -44,9 +44,6 @@
 #include "lightmappedgeneric_bumpmappedlightmap.inc"
 #endif // GAME_SHADER_DLL
 
-#include "SDK_lightmappedgeneric_flashlight_vs20.inc"
-#include "SDK_flashlight_ps20b.inc"
-
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -538,7 +535,7 @@ void CBaseVSShader::LoadProjectionMatrixIntoVertexShaderConstant( int vertexReg 
 //-----------------------------------------------------------------------------
 void CBaseVSShader::LoadModelViewMatrixIntoVertexShaderConstant( int vertexReg )
 {
-	VMatrix view, model, modelView, transpose;
+	VMatrix view, model, modelView;
 	s_pShaderAPI->GetMatrix( MATERIAL_MODEL, model.m[0] );
 	MatrixTranspose( model, model );
 	s_pShaderAPI->GetMatrix( MATERIAL_VIEW, view.m[0] );
@@ -1608,6 +1605,8 @@ BlendType_t CBaseVSShader::EvaluateBlendRequirements( int textureVar, bool isBas
 	}
 }
 
+#ifndef GAME_SHADER_DLL
+
 void CBaseVSShader::SetFlashlightVertexShaderConstants( bool bBump, int bumpTransformVar, bool bDetail, int detailScaleVar, bool bSetTextureTransforms )
 {
 	Assert( !IsSnapshotting() );
@@ -1648,7 +1647,7 @@ void CBaseVSShader::SetFlashlightVertexShaderConstants( bool bBump, int bumpTran
 		}
 	}
 }
-#ifndef GAME_SHADER_DLL
+
 #if SUPPORT_DX8
 void CBaseVSShader::DrawFlashlight_dx80( IMaterialVar** params, IShaderDynamicAPI *pShaderAPI, IShaderShadow* pShaderShadow, bool bBump,
 										int bumpmapVar, int bumpmapFrame, int bumpTransform, int flashlightTextureVar, int flashlightTextureFrameVar,
@@ -1808,8 +1807,6 @@ void CBaseVSShader::DrawFlashlight_dx80( IMaterialVar** params, IShaderDynamicAP
 #endif // support_dx8
 
 #ifdef STDSHADER_DX9_DLL_EXPORT
-#endif
-#endif // GAME_SHADER_DLL
 void CBaseVSShader::DrawFlashlight_dx90( IMaterialVar** params, IShaderDynamicAPI *pShaderAPI, 
 										IShaderShadow* pShaderShadow, DrawFlashlight_dx90_Vars_t &vars )
 {
@@ -1886,58 +1883,69 @@ void CBaseVSShader::DrawFlashlight_dx90( IMaterialVar** params, IShaderDynamicAP
 		
 		pShaderShadow->EnableSRGBWrite( true );
 
-
-        //if ( g_pHardwareConfig->SupportsShaderModel_3_0() )
-        //{
-        //    DECLARE_STATIC_VERTEX_SHADER( SDK_lightmappedgeneric_flashlight_vs30 );
-        //    SET_STATIC_VERTEX_SHADER_COMBO( WORLDVERTEXTRANSITION, vars.m_bWorldVertexTransition );
-        //    SET_STATIC_VERTEX_SHADER_COMBO( NORMALMAP, vars.m_bBump );
-        //    SET_STATIC_VERTEX_SHADER_COMBO( SEAMLESS, bSeamless );
-        //    SET_STATIC_VERTEX_SHADER_COMBO( DETAIL, bDetail );
-        //    SET_STATIC_VERTEX_SHADER( SDK_lightmappedgeneric_flashlight_vs30 );
-        //}
-        //else
-        {
-            DECLARE_STATIC_VERTEX_SHADER( SDK_lightmappedgeneric_flashlight_vs20 );
-            SET_STATIC_VERTEX_SHADER_COMBO( WORLDVERTEXTRANSITION, vars.m_bWorldVertexTransition );
-            SET_STATIC_VERTEX_SHADER_COMBO( NORMALMAP, vars.m_bBump );
-            SET_STATIC_VERTEX_SHADER_COMBO( SEAMLESS, bSeamless );
-            SET_STATIC_VERTEX_SHADER_COMBO( DETAIL, bDetail );
-            SET_STATIC_VERTEX_SHADER( SDK_lightmappedgeneric_flashlight_vs20 );
-        }
-
-
-		unsigned int flags = VERTEX_POSITION | VERTEX_NORMAL;
-		if( vars.m_bBump )
+		if( vars.m_bLightmappedGeneric )
 		{
-			flags |= VERTEX_TANGENT_S | VERTEX_TANGENT_T;
+			lightmappedgeneric_flashlight_vs20_Static_Index	vshIndex;
+			vshIndex.SetWORLDVERTEXTRANSITION( vars.m_bWorldVertexTransition );
+			vshIndex.SetNORMALMAP( vars.m_bBump );
+			vshIndex.SetSEAMLESS( bSeamless );
+			vshIndex.SetDETAIL( bDetail );
+			pShaderShadow->SetVertexShader( "lightmappedgeneric_flashlight_vs20", vshIndex.GetIndex() );
+
+			unsigned int flags = VERTEX_POSITION | VERTEX_NORMAL;
+			if( vars.m_bBump )
+			{
+				flags |= VERTEX_TANGENT_S | VERTEX_TANGENT_T;
+			}
+			int numTexCoords = 1;
+			if( vars.m_bWorldVertexTransition )
+			{
+				flags |= VERTEX_COLOR;
+				numTexCoords = 2; // need lightmap texcoords to get alpha.
+			}
+			pShaderShadow->VertexShaderVertexFormat( flags, numTexCoords, 0, 0 );
 		}
-		int numTexCoords = 1;
-		if( vars.m_bWorldVertexTransition )
+		else
 		{
-			flags |= VERTEX_COLOR;
-			numTexCoords = 2; // need lightmap texcoords to get alpha.
+			vertexlitgeneric_flashlight_vs11_Static_Index vshIndex;
+			vshIndex.SetTEETH( vars.m_bTeeth );
+			pShaderShadow->SetVertexShader( "vertexlitgeneric_flashlight_vs11", vshIndex.GetIndex() );
+
+			unsigned int flags = VERTEX_POSITION | VERTEX_NORMAL;
+			int numTexCoords = 1;
+			pShaderShadow->VertexShaderVertexFormat( flags, numTexCoords, 0, vars.m_bBump ? 4 : 0 );
 		}
-		pShaderShadow->VertexShaderVertexFormat( flags, numTexCoords, 0, 0 );
 
 		int nBumpMapVariant = 0;
 		if ( vars.m_bBump )
 		{
 			nBumpMapVariant = ( vars.m_bSSBump ) ? 2 : 1;
 		}
+		if ( g_pHardwareConfig->SupportsPixelShaders_2_b() )
+		{
+			int nShadowFilterMode = g_pHardwareConfig->GetShadowFilterMode();
 
-		int nShadowFilterMode = g_pHardwareConfig->GetShadowFilterMode();
-
-        DECLARE_STATIC_PIXEL_SHADER( SDK_flashlight_ps20b );
-        SET_STATIC_PIXEL_SHADER_COMBO( NORMALMAP, nBumpMapVariant );
-        SET_STATIC_PIXEL_SHADER_COMBO( NORMALMAP2, bBump2 );
-        SET_STATIC_PIXEL_SHADER_COMBO( WORLDVERTEXTRANSITION, vars.m_bWorldVertexTransition );
-        SET_STATIC_PIXEL_SHADER_COMBO( SEAMLESS, bSeamless );
-        SET_STATIC_PIXEL_SHADER_COMBO( DETAILTEXTURE, bDetail );
-        SET_STATIC_PIXEL_SHADER_COMBO( DETAIL_BLEND_MODE, nDetailBlendMode );
-        SET_STATIC_PIXEL_SHADER_COMBO( FLASHLIGHTDEPTHFILTERMODE, nShadowFilterMode );
-        SET_STATIC_PIXEL_SHADER( SDK_flashlight_ps20b );
-		
+			flashlight_ps20b_Static_Index	pshIndex;
+			pshIndex.SetNORMALMAP( nBumpMapVariant );
+			pshIndex.SetNORMALMAP2( bBump2 );
+			pshIndex.SetWORLDVERTEXTRANSITION( vars.m_bWorldVertexTransition );
+			pshIndex.SetSEAMLESS( bSeamless );
+			pshIndex.SetDETAILTEXTURE( bDetail );
+			pshIndex.SetDETAIL_BLEND_MODE( nDetailBlendMode );
+			pshIndex.SetFLASHLIGHTDEPTHFILTERMODE( nShadowFilterMode );
+			pShaderShadow->SetPixelShader( "flashlight_ps20b", pshIndex.GetIndex() );
+		}
+		else
+		{
+			flashlight_ps20_Static_Index	pshIndex;
+			pshIndex.SetNORMALMAP( nBumpMapVariant );
+			pshIndex.SetNORMALMAP2( bBump2 );
+			pshIndex.SetWORLDVERTEXTRANSITION( vars.m_bWorldVertexTransition );
+			pshIndex.SetSEAMLESS( bSeamless );
+			pshIndex.SetDETAILTEXTURE( bDetail );
+			pshIndex.SetDETAIL_BLEND_MODE( nDetailBlendMode );
+			pShaderShadow->SetPixelShader( "flashlight_ps20", pshIndex.GetIndex() );
+		}
 		FogToBlack();
 	}
 	else
@@ -2007,47 +2015,72 @@ void CBaseVSShader::DrawFlashlight_dx90( IMaterialVar** params, IShaderDynamicAP
 			}
 		}
 
-		DECLARE_DYNAMIC_VERTEX_SHADER( SDK_lightmappedgeneric_flashlight_vs20 );
-		SET_DYNAMIC_VERTEX_SHADER_COMBO( DOWATERFOG, pShaderAPI->GetSceneFogMode() == MATERIAL_FOG_LINEAR_BELOW_FOG_Z );
-		SET_DYNAMIC_VERTEX_SHADER( SDK_lightmappedgeneric_flashlight_vs20 );
-		if ( bSeamless )
+		if( vars.m_bLightmappedGeneric )
 		{
-			float const0[4]={ vars.m_fSeamlessScale,0,0,0};
-			pShaderAPI->SetVertexShaderConstant( VERTEX_SHADER_SHADER_SPECIFIC_CONST_6, const0 );
+			DECLARE_DYNAMIC_VERTEX_SHADER( lightmappedgeneric_flashlight_vs20 );
+			SET_DYNAMIC_VERTEX_SHADER_COMBO( DOWATERFOG, pShaderAPI->GetSceneFogMode() == MATERIAL_FOG_LINEAR_BELOW_FOG_Z );
+			SET_DYNAMIC_VERTEX_SHADER( lightmappedgeneric_flashlight_vs20 );
+			if ( bSeamless )
+			{
+				float const0[4]={ vars.m_fSeamlessScale,0,0,0};
+				pShaderAPI->SetVertexShaderConstant( VERTEX_SHADER_SHADER_SPECIFIC_CONST_6, const0 );
+			}
+
+			if ( bDetail )
+			{
+				float vDetailConstants[4] = {1,1,1,1};
+
+				if ( vars.m_nDetailTint != -1 )
+				{
+					params[vars.m_nDetailTint]->GetVecValue( vDetailConstants, 3 );
+				}
+
+				if ( vars.m_nDetailTextureBlendFactor != -1 )
+				{
+					vDetailConstants[3] = params[vars.m_nDetailTextureBlendFactor]->GetFloatValue();
+				}
+
+				pShaderAPI->SetPixelShaderConstant( 0, vDetailConstants, 1 );
+			}
 		}
-
-		if ( bDetail )
+		else
 		{
-			float vDetailConstants[4] = {1,1,1,1};
+			vertexlitgeneric_flashlight_vs11_Dynamic_Index vshIndex;
+			vshIndex.SetDOWATERFOG( pShaderAPI->GetSceneFogMode() == MATERIAL_FOG_LINEAR_BELOW_FOG_Z );
+			vshIndex.SetSKINNING( pShaderAPI->GetCurrentNumBones() > 0 );
+			pShaderAPI->SetVertexShaderIndex( vshIndex.GetIndex() );
 
-			if ( vars.m_nDetailTint != -1 )
+			if( vars.m_bTeeth )
 			{
-				params[vars.m_nDetailTint]->GetVecValue( vDetailConstants, 3 );
+				Assert( vars.m_nTeethForwardVar >= 0 );
+				Assert( vars.m_nTeethIllumFactorVar >= 0 );
+				Vector4D lighting;
+				params[vars.m_nTeethForwardVar]->GetVecValue( lighting.Base(), 3 );
+				lighting[3] = params[vars.m_nTeethIllumFactorVar]->GetFloatValue();
+				pShaderAPI->SetVertexShaderConstant( VERTEX_SHADER_SHADER_SPECIFIC_CONST_0, lighting.Base() );
 			}
-
-			if ( vars.m_nDetailTextureBlendFactor != -1 )
-			{
-				vDetailConstants[3] = params[vars.m_nDetailTextureBlendFactor]->GetFloatValue();
-			}
-
-			pShaderAPI->SetPixelShaderConstant( 0, vDetailConstants, 1 );
 		}
 
 		pShaderAPI->SetPixelShaderFogParams( PSREG_FOG_PARAMS );
 
 		float vEyePos_SpecExponent[4];
 		pShaderAPI->GetWorldSpaceCameraPosition( vEyePos_SpecExponent );
-
-		//vEyePos_SpecExponent[0] = flashlightState.m_vecLightOrigin[0];
-		//vEyePos_SpecExponent[1] = flashlightState.m_vecLightOrigin[1];
-		//vEyePos_SpecExponent[2] = flashlightState.m_vecLightOrigin[2];
 		vEyePos_SpecExponent[3] = 0.0f;
 		pShaderAPI->SetPixelShaderConstant( PSREG_EYEPOS_SPEC_EXPONENT, vEyePos_SpecExponent, 1 );
 
-		DECLARE_DYNAMIC_PIXEL_SHADER( SDK_flashlight_ps20b );
-		SET_DYNAMIC_PIXEL_SHADER_COMBO( PIXELFOGTYPE,  pShaderAPI->GetPixelFogCombo() );
-		SET_DYNAMIC_PIXEL_SHADER_COMBO( FLASHLIGHTSHADOWS, flashlightState.m_bEnableShadows && ( pFlashlightDepthTexture != NULL ) );
-		SET_DYNAMIC_PIXEL_SHADER( SDK_flashlight_ps20b );
+		if ( g_pHardwareConfig->SupportsPixelShaders_2_b() )
+		{
+			DECLARE_DYNAMIC_PIXEL_SHADER( flashlight_ps20b );
+			SET_DYNAMIC_PIXEL_SHADER_COMBO( PIXELFOGTYPE,  pShaderAPI->GetPixelFogCombo() );
+			SET_DYNAMIC_PIXEL_SHADER_COMBO( FLASHLIGHTSHADOWS, flashlightState.m_bEnableShadows && ( pFlashlightDepthTexture != NULL ) );
+			SET_DYNAMIC_PIXEL_SHADER( flashlight_ps20b );
+		}
+		else
+		{
+			DECLARE_DYNAMIC_PIXEL_SHADER( flashlight_ps20 );
+			SET_DYNAMIC_PIXEL_SHADER_COMBO( PIXELFOGTYPE,  pShaderAPI->GetPixelFogCombo() );
+			SET_DYNAMIC_PIXEL_SHADER( flashlight_ps20 );
+		}
 
 		float atten[4];										// Set the flashlight attenuation factors
 		atten[0] = flashlightState.m_fConstantAtten;
@@ -2062,7 +2095,6 @@ void CBaseVSShader::DrawFlashlight_dx90( IMaterialVar** params, IShaderDynamicAP
 }
 
 #endif
-#ifndef GAME_SHADER_DLL
 
 void CBaseVSShader::InitParamsUnlitGeneric_DX8(
 		int baseTextureVar,
@@ -2163,6 +2195,7 @@ void CBaseVSShader::InitUnlitGeneric_DX8(
 			LoadTexture( envmapMaskVar );
 	}
 }
+#endif // GAME_SHADER_DLL
 
 #endif // !_STATIC_LINKED || STDSHADER_DX8_DLL_EXPORT
 

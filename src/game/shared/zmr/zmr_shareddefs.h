@@ -5,7 +5,7 @@
 #define ZMR_VERSION     "b6"
 
 
-#define ZMR_GAMEDESC    (ZMR_NAME" "ZMR_VERSION)
+#define ZMR_GAMEDESC    (ZMR_NAME " " ZMR_VERSION)
 
 enum
 {

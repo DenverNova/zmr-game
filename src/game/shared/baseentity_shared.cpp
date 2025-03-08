@@ -414,7 +414,7 @@ bool CBaseEntity::KeyValue( const char *szKeyName, const char *szValue )
 		}
 
 		// Do this so inherited classes looking for 'angles' don't have to bother with 'angle'
-		return KeyValue( "angles", szBuf );
+		return KeyValue( szKeyName, szBuf );
 	}
 
 	// NOTE: Have to do these separate because they set two values instead of one
@@ -661,15 +661,15 @@ void CBaseEntity::SetPredictionRandomSeed( const CUserCmd *cmd )
 //------------------------------------------------------------------------------
 void CBaseEntity::DecalTrace( trace_t *pTrace, char const *decalName )
 {
-	int index = decalsystem->GetDecalIndexForName( decalName );
-	if ( index < 0 )
+	int indexD = decalsystem->GetDecalIndexForName( decalName );
+	if ( indexD < 0 )
 		return;
 
 	Assert( pTrace->m_pEnt );
 
 	CBroadcastRecipientFilter filter;
 	te->Decal( filter, 0.0, &pTrace->endpos, &pTrace->startpos,
-		pTrace->GetEntityIndex(), pTrace->hitbox, index );
+		pTrace->GetEntityIndex(), pTrace->hitbox, indexD );
 }
 
 //-----------------------------------------------------------------------------
@@ -765,14 +765,8 @@ int CBaseEntity::RegisterThinkContext( const char *szContext )
 //-----------------------------------------------------------------------------
 BASEPTR	CBaseEntity::ThinkSet( BASEPTR func, float thinkTime, const char *szContext )
 {
-#if !defined( CLIENT_DLL )
-#ifdef _DEBUG
-#ifdef GNUC
-	COMPILE_TIME_ASSERT( sizeof(func) == 8 );
-#else
-	COMPILE_TIME_ASSERT( sizeof(func) == 4 );
-#endif
-#endif
+#if !defined( CLIENT_DLL ) && defined( _DEBUG )
+	COMPILE_TIME_ASSERT( sizeof(func) == ENTITYFUNCPTR_SIZE );
 #endif
 
 	// Old system?
@@ -1413,9 +1407,9 @@ bool CBaseEntity::IsBSPModel() const
 	if ( GetSolid() == SOLID_BSP )
 		return true;
 	
-	const model_t *model = modelinfo->GetModel( GetModelIndex() );
+	const model_t *pModel = modelinfo->GetModel( GetModelIndex() );
 
-	if ( GetSolid() == SOLID_VPHYSICS && modelinfo->GetModelType( model ) == mod_brush )
+	if ( GetSolid() == SOLID_VPHYSICS && modelinfo->GetModelType( pModel ) == mod_brush )
 		return true;
 
 	return false;
@@ -1614,7 +1608,6 @@ public:
 typedef CTraceFilterSimpleList CBulletsTraceFilter;
 #endif
 
-
 void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 {
 	static int	tracerCount;
@@ -1678,7 +1671,6 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 	
 	// Skip multiple entities when tracing
 	CBulletsTraceFilter traceFilter( COLLISION_GROUP_NONE );
-
 	traceFilter.SetPassEntity( this ); // Standard pass entity for THIS so that it can be easily removed from the list after passing through a portal
 	traceFilter.AddEntityToIgnore( info.m_pAdditionalIgnoreEnt );
 
@@ -1906,6 +1898,10 @@ void CBaseEntity::FireBullets( const FireBulletsInfo_t &info )
 			if ( flActualDamage == 0.0 )
 			{
 				flActualDamage = g_pGameRules->GetAmmoDamage( pAttacker, tr.m_pEnt, info.m_iAmmoType );
+			}
+			else
+			{
+				nActualDamageType = nDamageType | ((flActualDamage > 16) ? DMG_ALWAYSGIB : DMG_NEVERGIB );
 			}
 
 			if ( !bHitWater || ((info.m_nFlags & FIRE_BULLETS_DONT_HIT_UNDERWATER) == 0) )

@@ -24,13 +24,8 @@
 // defined $LIGHTING_PREVIEW && defined $FASTPATH && $LIGHTING_PREVIEW && $FASTPATH
 // ($FLASHLIGHT || $FLASHLIGHTSHADOWS) && $LIGHTING_PREVIEW
 
-#ifndef PBR_PS20B_H
-#define PBR_PS20B_H
-
-#include "shaderapi/ishaderapi.h"
-#include "shaderapi/ishadershadow.h"
-#include "materialsystem/imaterialvar.h"
-
+#pragma once
+#include "shaderlib/cshader.h"
 class pbr_ps20b_Static_Index
 {
 	unsigned int m_nFLASHLIGHT : 2;
@@ -91,7 +86,7 @@ public:
 #endif	// _DEBUG
 	}
 
-	pbr_ps20b_Static_Index( IShaderShadow* pShaderShadow, IMaterialVar** params )
+	pbr_ps20b_Static_Index(  )
 	{
 		m_nFLASHLIGHT = 0;
 		m_nFLASHLIGHTDEPTHFILTERMODE = 0;
@@ -110,7 +105,8 @@ public:
 	int GetIndex() const
 	{
 		Assert( m_bFLASHLIGHT && m_bFLASHLIGHTDEPTHFILTERMODE && m_bLIGHTMAPPED && m_bEMISSIVE && m_bSPECULAR );
-		return ( 80 * m_nFLASHLIGHT ) + ( 160 * m_nFLASHLIGHTDEPTHFILTERMODE ) + ( 480 * m_nLIGHTMAPPED ) + ( 960 * m_nEMISSIVE ) + ( 1920 * m_nSPECULAR ) + 0;
+		AssertMsg( !( ( m_nFLASHLIGHT == 0 ) && ( m_nFLASHLIGHTDEPTHFILTERMODE != 0 ) ), "Invalid combo combination ( ( FLASHLIGHT == 0 ) && ( FLASHLIGHTDEPTHFILTERMODE != 0 ) )" );
+		return ( 120 * m_nFLASHLIGHT ) + ( 240 * m_nFLASHLIGHTDEPTHFILTERMODE ) + ( 720 * m_nLIGHTMAPPED ) + ( 1440 * m_nEMISSIVE ) + ( 2880 * m_nSPECULAR ) + 0;
 	}
 };
 
@@ -143,7 +139,7 @@ public:
 
 	void SetPIXELFOGTYPE( int i )
 	{
-		Assert( i >= 0 && i <= 1 );
+		Assert( i >= 0 && i <= 2 );
 		m_nPIXELFOGTYPE = i;
 #ifdef _DEBUG
 		m_bPIXELFOGTYPE = true;
@@ -177,7 +173,7 @@ public:
 #endif	// _DEBUG
 	}
 
-	pbr_ps20b_Dynamic_Index( IShaderDynamicAPI* pShaderAPI )
+	pbr_ps20b_Dynamic_Index(  )
 	{
 		m_nWRITEWATERFOGTODESTALPHA = 0;
 		m_nPIXELFOGTYPE = 0;
@@ -196,11 +192,13 @@ public:
 	int GetIndex() const
 	{
 		Assert( m_bWRITEWATERFOGTODESTALPHA && m_bPIXELFOGTYPE && m_bNUM_LIGHTS && m_bWRITE_DEPTH_TO_DESTALPHA && m_bFLASHLIGHTSHADOWS );
-		return ( 1 * m_nWRITEWATERFOGTODESTALPHA ) + ( 2 * m_nPIXELFOGTYPE ) + ( 4 * m_nNUM_LIGHTS ) + ( 20 * m_nWRITE_DEPTH_TO_DESTALPHA ) + ( 40 * m_nFLASHLIGHTSHADOWS ) + 0;
+		AssertMsg( !( ( m_nPIXELFOGTYPE == 0 ) && ( m_nWRITEWATERFOGTODESTALPHA != 0 ) ), "Invalid combo combination ( ( PIXELFOGTYPE == 0 ) && ( WRITEWATERFOGTODESTALPHA != 0 ) )" );
+		AssertMsg( !( 1 && ( 1 && ( ( m_nPIXELFOGTYPE != 1 ) && m_nWRITEWATERFOGTODESTALPHA ) ) ), "Invalid combo combination ( 1 && ( 1 && ( ( PIXELFOGTYPE != 1 ) && WRITEWATERFOGTODESTALPHA ) ) )" );
+		AssertMsg( !( 1 && ( 1 && ( ( m_nPIXELFOGTYPE != 1 ) && m_nWRITEWATERFOGTODESTALPHA ) ) ), "Invalid combo combination ( 1 && ( 1 && ( ( PIXELFOGTYPE != 1 ) && WRITEWATERFOGTODESTALPHA ) ) )" );
+		AssertMsg( !( 1 && ( 1 && ( ( m_nPIXELFOGTYPE != 1 ) && m_nWRITEWATERFOGTODESTALPHA ) ) ), "Invalid combo combination ( 1 && ( 1 && ( ( PIXELFOGTYPE != 1 ) && WRITEWATERFOGTODESTALPHA ) ) )" );
+		return ( 1 * m_nWRITEWATERFOGTODESTALPHA ) + ( 2 * m_nPIXELFOGTYPE ) + ( 6 * m_nNUM_LIGHTS ) + ( 30 * m_nWRITE_DEPTH_TO_DESTALPHA ) + ( 60 * m_nFLASHLIGHTSHADOWS ) + 0;
 	}
 };
 
 #define shaderDynamicTest_pbr_ps20b psh_forgot_to_set_dynamic_WRITEWATERFOGTODESTALPHA + psh_forgot_to_set_dynamic_PIXELFOGTYPE + psh_forgot_to_set_dynamic_NUM_LIGHTS + psh_forgot_to_set_dynamic_WRITE_DEPTH_TO_DESTALPHA + psh_forgot_to_set_dynamic_FLASHLIGHTSHADOWS
 
-
-#endif	// PBR_PS20B_H

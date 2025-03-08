@@ -13,7 +13,7 @@
 // STATIC:  "PARALLAXOCCLUSION"         "0..1"
 
 // DYNAMIC: "WRITEWATERFOGTODESTALPHA"  "0..1"
-// DYNAMIC: "PIXELFOGTYPE"              "0..1"
+// DYNAMIC: "PIXELFOGTYPE"              "0..2"
 // DYNAMIC: "NUM_LIGHTS"                "0..4"
 // DYNAMIC: "WRITE_DEPTH_TO_DESTALPHA"  "0..1"
 // DYNAMIC: "FLASHLIGHTSHADOWS"         "0..1"
@@ -204,7 +204,7 @@ float4 main(PS_INPUT i) : COLOR
 
 float fogFactor = 0.0f;
 #if !FLASHLIGHT
-fogFactor = CalcPixelFogFactor(PIXELFOGTYPE, g_FogParams, g_EyePos.z, i.worldPos.z, i.projPos.z);
+fogFactor = CalcPixelFogFactor(PIXELFOGTYPE, g_FogParams, g_EyePos.xyz, i.worldPos.xyz, i.projPos.z);
 #endif
 
 float alpha = 0.0f;

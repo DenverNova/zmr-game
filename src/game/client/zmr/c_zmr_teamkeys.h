@@ -5,13 +5,13 @@
 #define KEYCONFIG_NAME_SURVIVOR     "keys_survivor"
 #define KEYCONFIG_NAME_SPEC         "keys_spectator"
 
-#define KEYCONFIG_ZM                "cfg/"KEYCONFIG_NAME_ZM".cfg"
-#define KEYCONFIG_SURVIVOR          "cfg/"KEYCONFIG_NAME_SURVIVOR".cfg"
-#define KEYCONFIG_SPEC              "cfg/"KEYCONFIG_NAME_SPEC".cfg"
+#define KEYCONFIG_ZM                ("cfg/" KEYCONFIG_NAME_ZM ".cfg")
+#define KEYCONFIG_SURVIVOR          ("cfg/" KEYCONFIG_NAME_SURVIVOR ".cfg")
+#define KEYCONFIG_SPEC              ("cfg/" KEYCONFIG_NAME_SPEC ".cfg")
 
-#define KEYCONFIG_ZM_DEF            "cfg/"KEYCONFIG_NAME_ZM"_default.cfg"
-#define KEYCONFIG_SURVIVOR_DEF      "cfg/"KEYCONFIG_NAME_SURVIVOR"_default.cfg"
-#define KEYCONFIG_SPEC_DEF          "cfg/"KEYCONFIG_NAME_SPEC"_default.cfg"
+#define KEYCONFIG_ZM_DEF            ("cfg/" KEYCONFIG_NAME_ZM "_default.cfg")
+#define KEYCONFIG_SURVIVOR_DEF      ("cfg/" KEYCONFIG_NAME_SURVIVOR "_default.cfg")
+#define KEYCONFIG_SPEC_DEF          ("cfg/" KEYCONFIG_NAME_SPEC "_default.cfg")
 
 
 

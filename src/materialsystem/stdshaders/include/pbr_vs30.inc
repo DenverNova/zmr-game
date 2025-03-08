@@ -1,17 +1,12 @@
 // ALL SKIP STATEMENTS THAT AFFECT THIS SHADER!!!
 // defined $LIGHTING_PREVIEW && defined $FASTPATH && $LIGHTING_PREVIEW && $FASTPATH
 
-#ifndef PBR_VS30_H
-#define PBR_VS30_H
-
-#include "shaderapi/ishaderapi.h"
-#include "shaderapi/ishadershadow.h"
-#include "materialsystem/imaterialvar.h"
-
+#pragma once
+#include "shaderlib/cshader.h"
 class pbr_vs30_Static_Index
 {
 public:
-	pbr_vs30_Static_Index( IShaderShadow* pShaderShadow, IMaterialVar** params )
+	pbr_vs30_Static_Index(  )
 	{
 	}
 
@@ -84,7 +79,7 @@ public:
 #endif	// _DEBUG
 	}
 
-	pbr_vs30_Dynamic_Index( IShaderDynamicAPI* pShaderAPI )
+	pbr_vs30_Dynamic_Index(  )
 	{
 		m_nCOMPRESSED_VERTS = 0;
 		m_nDOWATERFOG = 0;
@@ -109,5 +104,3 @@ public:
 
 #define shaderDynamicTest_pbr_vs30 vsh_forgot_to_set_dynamic_COMPRESSED_VERTS + vsh_forgot_to_set_dynamic_DOWATERFOG + vsh_forgot_to_set_dynamic_SKINNING + vsh_forgot_to_set_dynamic_LIGHTING_PREVIEW + vsh_forgot_to_set_dynamic_NUM_LIGHTS
 
-
-#endif	// PBR_VS30_H

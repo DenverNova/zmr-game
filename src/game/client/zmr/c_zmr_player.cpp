@@ -1143,18 +1143,9 @@ bool C_ZMPlayer::CreateMove( float delta, CUserCmd* cmd )
 {
     bool bResult = BaseClass::CreateMove( delta, cmd );
     
-
-    if ( IsZM() && m_flNextUpMove > gpGlobals->curtime && zm_cl_zmmovemwheelmove.GetBool() )
-    {
-        cmd->upmove += m_flUpMove;
-    }
-
-
     if ( IsZM() )
     {
         // Encode the real wanted movement speed to 1/100
-
-
         if ( cmd->forwardmove != 0.0f )
         {
             float value = zm_cl_zmmovespeed.GetFloat() * 0.01f;
@@ -1167,6 +1158,10 @@ bool C_ZMPlayer::CreateMove( float delta, CUserCmd* cmd )
             cmd->sidemove = cmd->sidemove > 0.0f ? value : -value;
         }
 
+        if ( m_flNextUpMove > gpGlobals->curtime && zm_cl_zmmovemwheelmove.GetBool() )
+        {
+            cmd->upmove += m_flUpMove * 0.01f;
+        }
 
         // Let players go up/down with jump and sprint key.
         if ( cmd->buttons & IN_JUMP )

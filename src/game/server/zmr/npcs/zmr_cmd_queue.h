@@ -19,6 +19,7 @@ abstract_class CZMCommandBase
 {
 public:
     CZMCommandBase( CZMPlayer* pCommander ) { m_hCommander.Set( pCommander ); }
+    virtual ~CZMCommandBase() {}
 
     virtual ZombieCommandType_t     GetCommandType() const { return COMMAND_NONE; }
 
@@ -39,7 +40,7 @@ private:
     CHandle<CZMPlayer> m_hCommander;
 };
 
-class CZMCommandMove : public CZMCommandBase
+class CZMCommandMove final : public CZMCommandBase
 {
 public:
     CZMCommandMove( CZMPlayer* pCommander, const Vector& vecPos ) : CZMCommandBase( pCommander )
@@ -56,7 +57,7 @@ private:
     Vector m_vecTarget;
 };
 
-class CZMCommandSwat : public CZMCommandBase
+class CZMCommandSwat final : public CZMCommandBase
 {
 public:
     CZMCommandSwat( CZMPlayer* pCommander, CBaseEntity* pEnt, bool bBreak = false ) : CZMCommandBase( pCommander )
@@ -93,7 +94,7 @@ private:
     bool m_bBreak;
 };
 
-class CZMCommandCeilingAmbush : public CZMCommandBase
+class CZMCommandCeilingAmbush final : public CZMCommandBase
 {
 public:
     CZMCommandCeilingAmbush( CZMPlayer* pCommander ) : CZMCommandBase( pCommander ) {}
