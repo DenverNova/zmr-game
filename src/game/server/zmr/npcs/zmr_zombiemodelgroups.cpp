@@ -10,9 +10,9 @@
 #define DEF_MODELGROUP                  "DefaultModels"
 
 #define DATAFILE_NAME                   "zombiemodelgroups"
-#define DATAFILE_PATH                   "scripts/"DATAFILE_NAME".txt"
+#define DATAFILE_PATH                   ("scripts/" DATAFILE_NAME ".txt")
 
-#define DATAFILE_PATH_MAP_FORMAT        "scripts/"DATAFILE_NAME"_%s.txt"
+#define DATAFILE_PATH_MAP_FORMAT        ("scripts/" DATAFILE_NAME "_%s.txt")
 
 
 

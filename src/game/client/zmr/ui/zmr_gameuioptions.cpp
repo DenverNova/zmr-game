@@ -19,7 +19,7 @@ CON_COMMAND( OpenZMGameUIOptions, "" )
     if ( !g_hGameUIOptions.Get() )
     {
         vgui::VPANEL parent = enginevgui->GetPanel( PANEL_GAMEUIDLL );
-        if ( parent == NULL )
+        if ( !parent )
         {
             Assert( 0 );
             return;

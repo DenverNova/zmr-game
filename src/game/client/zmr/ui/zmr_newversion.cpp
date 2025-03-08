@@ -30,7 +30,7 @@ CON_COMMAND( OpenZMNewVersion, "" )
     if ( !g_hZMNewVer.Get() )
     {
         vgui::VPANEL parent = enginevgui->GetPanel( PANEL_GAMEUIDLL );
-        if ( parent == NULL )
+        if ( !parent )
         {
             Assert( 0 );
             return;

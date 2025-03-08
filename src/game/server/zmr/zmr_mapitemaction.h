@@ -147,6 +147,8 @@ namespace ZMItemAction
     abstract_class CZMMapItemAction
     {
     public:
+        virtual ~CZMMapItemAction() {}
+
         virtual int     PerformAction( ActionData_t& actiondata, ItemSpawnTime_t status ) { return false; }
         virtual bool    AffectsItem( ItemEntData_t& itemEntData, ItemSpawnTime_t status ) const { return false; }
     };
