@@ -7,8 +7,8 @@ You can read it [here](https://github.com/zm-reborn/zmr-game/blob/master/LICENSE
 ## Building
 
 ### Windows
-1. Download [Visual Studio 2022](https://visualstudio.microsoft.com/vs/).
-2. Install `Desktop development with C++` workload.
+1. Download [Visual Studio 2022](https://visualstudio.microsoft.com/vs/) & [Python](https://www.python.org/).
+2. In VS, install `Desktop development with C++` workload.
     * The required components are: **MSVC v143** and **Windows SDK 10.0** (10.0.20348.0 tested)
 3. Run `creategameprojects.bat` in `src`-folder.
 4. You now have a solution file `zmr-games.sln` which you can open and build.
