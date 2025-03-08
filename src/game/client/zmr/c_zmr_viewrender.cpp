@@ -7,6 +7,7 @@
 #include <materialsystem/itexture.h>
 
 #include "c_zmr_player.h"
+#include "c_zmr_skybox.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -252,4 +253,32 @@ void CViewRender::DrawScope( const CViewSetup &cameraView )
 	render->PopView( dummyFrustum );
 
 	pRenderContext->ClearColor4ub( 0, 0, 0, 255 );
+}
+
+//
+// 2D skybox override
+//
+void CViewRender::UpdateZMSkybox()
+{
+    GetZMSkybox().Update();
+}
+
+void CRendering3dView::ZMDrawSkybox()
+{
+	const Vector& viewPos = CurrentViewOrigin();
+	auto& fwd = CurrentViewForward();
+
+	if ( m_DrawFlags & DF_CLIP_SKYBOX )
+	{
+		CMatRenderContextPtr pRenderContext( materials );
+		MaterialHeightClipMode_t clipMode = pRenderContext->GetHeightClipMode();
+		pRenderContext->SetHeightClipMode( MATERIAL_HEIGHTCLIPMODE_DISABLE );
+		GetZMSkybox().Render( viewPos, fwd, fov, zFar );
+		pRenderContext->SetHeightClipMode( clipMode );
+	}
+	else
+	{
+		GetZMSkybox().Render( viewPos, fwd, fov, zFar );
+	}
+	
 }

@@ -246,6 +246,10 @@ protected:
 	virtual bool	ShouldDrawPortals() { return true; }
 #endif
 
+#ifdef ZMR
+	void			ZMDrawSkybox();
+#endif
+
 	void ReleaseLists();
 
 	//-----------------------------------------------
@@ -438,6 +442,7 @@ private:
 
 #ifdef ZMR
 	void			DrawScope( const CViewSetup &cameraView );
+	void			UpdateZMSkybox();
 #endif
 
 	// Drawing primitives

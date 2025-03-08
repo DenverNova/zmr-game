@@ -1424,7 +1424,11 @@ void CViewRender::ViewDrawScene( bool bDrew3dSkybox, SkyboxVisibility_t nSkyboxV
 	}
 
 	bool drawSkybox = r_skybox.GetBool();
+#ifdef ZMR // ZMRCHANGE: We want to control the skybox rendering.
+	if ( bDrew3dSkybox )
+#else
 	if ( bDrew3dSkybox || ( nSkyboxVisible == SKYBOX_NOT_VISIBLE ) )
+#endif
 	{
 		drawSkybox = false;
 	}
@@ -2083,6 +2087,7 @@ void CViewRender::RenderView( const CViewSetup &viewRender, int nClearFlags, int
 
 #ifdef ZMR
 		DrawScope( GetView( STEREO_EYE_MONO ) );
+		UpdateZMSkybox();
 #endif
 
 		g_bRenderingView = true;
@@ -3669,7 +3674,16 @@ void CRendering3dView::DrawWorld( float waterZAdjust )
 		return;
 	}
 
+#ifdef ZMR // ZMRCHANGE: Override skybox rendering.
+	if ( ((m_DrawFlags & DF_DRAWSKYBOX) != 0) && !( m_DrawFlags & (DF_SHADOW_DEPTH_MAP | DF_DRAW_SSAO) ) )
+	{
+		ZMDrawSkybox();
+	}
+
+	unsigned long engineFlags = BuildEngineDrawWorldListFlags( m_DrawFlags & ~( DF_DRAWSKYBOX | DF_CLIP_SKYBOX ) );
+#else
 	unsigned long engineFlags = BuildEngineDrawWorldListFlags( m_DrawFlags );
+#endif
 
 	render->DrawWorldLists( m_pWorldRenderList, engineFlags, waterZAdjust );
 }
