@@ -22,6 +22,8 @@ using namespace vgui;
 */
 CZMListRow::CZMListRow( CZMListSection* parent, int itemId, KeyValues* kv ) : vgui::Panel( parent, "" )
 {
+    Assert( parent );
+
     m_pParentSection = parent;
 
     m_pKvData = kv;
@@ -36,6 +38,15 @@ CZMListRow::CZMListRow( CZMListSection* parent, int itemId, KeyValues* kv ) : vg
 
     SetPaintBackgroundEnabled( false );
     SetMouseInputEnabled( true );
+
+    int nCols = GetItemColumnCount();
+    for ( int i = 0; i < nCols; i++ )
+    {
+        if ( i >= m_vChildren.Count() )
+        {
+            CreateNewChild( i );
+        }
+    }
 }
 
 CZMListRow::~CZMListRow()
@@ -190,7 +201,8 @@ void CZMListRow::LayoutColumnData()
     {
         if ( i >= m_vChildren.Count() )
         {
-            CreateNewChild( i );
+            Assert( 0 );
+            return;
         }
 
         Panel* pChild = m_vChildren[i];
