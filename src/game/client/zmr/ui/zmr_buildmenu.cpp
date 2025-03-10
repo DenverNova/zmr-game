@@ -121,27 +121,27 @@ CZMBuildMenu::CZMBuildMenu( Panel* pParent ) : CZMBuildMenuBase( pParent, "ZMBui
         const char *temp = kv->GetString("shambler", "Shambler");
         int length = 128;
         char *saved = new char[length];
-        Q_strncpy(saved, temp, strlen(temp) + 1);
+        Q_strncpy(saved, temp, length);
         zombiedescriptions[ZMCLASS_SHAMBLER] = saved;
 
         temp = kv->GetString("banshee", "Banshee");
         saved = new char[length];
-        Q_strncpy(saved, temp, strlen(temp) + 1);
+        Q_strncpy(saved, temp, length);
         zombiedescriptions[ZMCLASS_BANSHEE] = saved;
 
         temp = kv->GetString("hulk", "Hulk");
         saved = new char[length];
-        Q_strncpy(saved, temp, strlen(temp) + 1);
+        Q_strncpy(saved, temp, length);
         zombiedescriptions[ZMCLASS_HULK] = saved;
 
         temp = kv->GetString("drifter", "Drifter");
         saved = new char[length];
-        Q_strncpy(saved, temp, strlen(temp) + 1);
+        Q_strncpy(saved, temp, length);
         zombiedescriptions[ZMCLASS_DRIFTER] = saved;
 
         temp = kv->GetString("immolator", "Immolator");
         saved = new char[length];
-        Q_strncpy(saved, temp, strlen(temp) + 1);
+        Q_strncpy(saved, temp, length);
         zombiedescriptions[ZMCLASS_IMMOLATOR] = saved;
     }
     else
