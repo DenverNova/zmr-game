@@ -61,11 +61,11 @@ public:
 
 	void OnDataChanged( DataUpdateType_t type ) OVERRIDE;
 
-    int GetZombieFlags() { return m_fZombieFlags; };
-    const int* GetZombieCosts() { return m_iZombieCosts.Base(); };
+    int GetZombieFlags() const { return m_fZombieFlags; };
+    const int* GetZombieCosts() const { return m_iZombieCosts.Base(); };
 
 	void SetMenu( CZMBuildMenuBase* pMenu ) { m_pBuildMenu = pMenu; };
-	CZMBuildMenuBase* GetMenu() { return m_pBuildMenu; };
+	CZMBuildMenuBase* GetMenu() const { return m_pBuildMenu; };
 
 protected:
     virtual void InitSpriteMat() OVERRIDE;
@@ -89,15 +89,15 @@ public:
 
     void Precache() OVERRIDE;
 
-    inline int GetCost() { return m_nCost; };
-    inline int GetTrapCost() { return m_nTrapCost; };
+    inline int GetCost() const { return m_nCost; };
+    inline int GetTrapCost() const { return m_nTrapCost; };
 
     inline const char* GetDescription() { return m_sDescription; };
 
 	void OnDataChanged( DataUpdateType_t type ) OVERRIDE;
 
 	void SetMenu( CZMManiMenuBase* pMenu ) { m_pManiMenu = pMenu; };
-	CZMManiMenuBase* GetMenu() { return m_pManiMenu; };
+	CZMManiMenuBase* GetMenu() const { return m_pManiMenu; };
 
 protected:
     virtual void InitSpriteMat() OVERRIDE;

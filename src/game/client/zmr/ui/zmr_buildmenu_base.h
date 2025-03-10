@@ -47,14 +47,14 @@ public:
 	virtual void UpdateMenu( C_ZMEntZombieSpawn* pSpawn );
     virtual void UpdateQueue( const ZMQueueSlotData_t q[], int size ) {};
 
-    inline int GetLastSpawnIndex() { return m_iLastSpawnIndex; };
-    inline int GetSpawnIndex() { return m_iSpawnIndex; };
+    inline int GetLastSpawnIndex() const { return m_iLastSpawnIndex; };
+    inline int GetSpawnIndex() const { return m_iSpawnIndex; };
     inline void SetSpawnIndex( int entindex ) { m_iSpawnIndex = entindex; };
 
-    inline int GetZombieFlags() { return m_fSpawnZombieFlags; };
+    inline int GetZombieFlags() const { return m_fSpawnZombieFlags; };
     inline void SetZombieFlags( int flags ) { m_fSpawnZombieFlags = flags; };
 
-    inline int* GetZombieCosts() { return (int*)m_iZombieCosts; };
+    inline int* GetZombieCosts() const { return (int*)m_iZombieCosts; };
     void SetZombieCosts( const int *costs );
 
     int GetAltSpawnAmount() const;

@@ -184,6 +184,10 @@ using namespace vgui;
 //
 CZMBaseCrosshair::CZMBaseCrosshair()
 {
+    m_bDisplayInMenu = false;
+    m_flDotSize = 0.0f;
+    m_flOffsetFromCenter = 0.0f;
+    m_flOutlineSize = 0.0f;
     m_szName = nullptr;
     m_szMenuName = nullptr;
 
@@ -363,6 +367,7 @@ void CZMDotCrosshair::Draw()
 //
 CZMBaseDynamicCrosshair::CZMBaseDynamicCrosshair()
 {
+    m_flDynamicMove = 0.0f;
     m_flOverrideDynamicScale = -1.0f;
 }
 
@@ -563,6 +568,12 @@ void CZMMaterialCrosshair::Draw()
 
 
 //
+CZMAccuracyCrosshair::CZMAccuracyCrosshair()
+{
+    m_flWidth = 0.0f;
+    m_flLength = 0.0f;
+}
+
 void CZMAccuracyCrosshair::LoadValues( KeyValues* kv )
 {
     CZMBaseDynamicCrosshair::LoadValues( kv );

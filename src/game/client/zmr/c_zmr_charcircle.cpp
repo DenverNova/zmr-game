@@ -8,6 +8,32 @@
 #include "tier0/memdbgon.h"
 
 
+CZMCharCircle::CZMCharCircle( const char* material, float size )
+{
+    m_flSize = size;
+    m_vecOrigin = vec3_origin;
+    m_flYaw = 0.0f;
+    for ( int i = 0; i < 4; i++ )
+    {
+        m_flColor[i] = 1.0f;
+    }
+
+    m_pMaterial = materials->FindMaterial( material, TEXTURE_GROUP_CLIENT_EFFECTS );
+    if ( m_pMaterial )
+    {
+        m_pMaterial->IncrementReferenceCount();
+    }
+}
+
+CZMCharCircle::~CZMCharCircle()
+{
+    if ( m_pMaterial )
+    {
+        m_pMaterial->DecrementReferenceCount();
+        m_pMaterial = nullptr;
+    }
+}
+
 void CZMCharCircle::Draw()
 {
     Vector p1( -m_flSize, -m_flSize, 0 );
@@ -77,21 +103,6 @@ void CZMCharCircle::Draw()
 
 	meshBuilder.End();
 	pMesh->Draw();
-}
-
-void CZMCharCircle::SetSize( float size )
-{
-    m_flSize = size;
-}
-
-void CZMCharCircle::SetMaterial( const char* name )
-{
-    m_pMaterial = materials->FindMaterial( name, TEXTURE_GROUP_CLIENT_EFFECTS );
-        
-    if ( m_pMaterial )
-    {
-        m_pMaterial->IncrementReferenceCount();
-    }
 }
 
 void CZMCharCircle::SetPos( const Vector& origin )

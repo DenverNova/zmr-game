@@ -117,6 +117,7 @@ END_DATADESC()
 C_ZMEntZombieSpawn::C_ZMEntZombieSpawn()
 {
     m_fZombieFlags = 0;
+    m_pBuildMenu = nullptr;
 
     for (int i = 0; i < ZMCLASS_MAX; i++)
     {
@@ -168,6 +169,7 @@ C_ZMEntManipulate::C_ZMEntManipulate()
     m_nCost = 10;
     m_nTrapCost = 15;
     m_sDescription[0] = 0;
+    m_pManiMenu = nullptr;
 }
 
 void C_ZMEntManipulate::Precache()
@@ -206,6 +208,8 @@ END_RECV_TABLE()
 
 C_ZMEntPrecipitation::C_ZMEntPrecipitation()
 {
+    m_nPrecipType = PRECIPITATION_TYPE_RAIN;
+    m_flDensity = 0.0f;
 }
 
 C_ZMEntPrecipitation::~C_ZMEntPrecipitation()

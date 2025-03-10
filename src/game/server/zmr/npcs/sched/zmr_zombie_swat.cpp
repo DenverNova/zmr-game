@@ -8,6 +8,14 @@
 #include "tier0/memdbgon.h"
 
 
+CZombieSwatObjSchedule::CZombieSwatObjSchedule()
+{
+    m_vecFaceTowards = vec3_origin;
+    m_SwatAct = ACT_INVALID;
+    m_bDidSwat = false;
+    m_hSwatObject.Set( nullptr );
+}
+
 void CZombieSwatObjSchedule::OnStart()
 {
     m_SwatAct = ACT_INVALID;

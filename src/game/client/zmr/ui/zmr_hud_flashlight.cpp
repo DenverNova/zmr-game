@@ -65,6 +65,11 @@ CZMHudFlashlight::CZMHudFlashlight( const char *pElementName ) : CHudElement( pE
 
     SetPaintBackgroundEnabled( false );
 
+    m_bIsOn = false;
+    m_flAlpha = 0.0f;
+    m_flBattery = 0.0f;
+    m_flLastChange = 0.0f;
+    m_flSize = 0.0f;
 
     m_nTexOnId = surface()->CreateNewTextureID();
     surface()->DrawSetTextureFile( m_nTexOnId, "zmr_effects/flashlight_on", true, false );

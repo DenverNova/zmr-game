@@ -19,6 +19,9 @@ public:
 
     CZMManiMenuBase( const char* name ) : Frame( g_pClientMode->GetViewport(), name )
     {
+        m_nCost = 0;
+        m_nTrapCost = 0;
+        m_iTrapIndex = -1;
     }
     ~CZMManiMenuBase()
     {
@@ -46,12 +49,12 @@ public:
 	virtual void UpdateMenu( C_ZMEntManipulate* pSpawn );
     virtual void SetDescription( const char* ) = 0;
 
-    inline int GetTrapIndex() { return m_iTrapIndex; };
+    inline int GetTrapIndex() const { return m_iTrapIndex; };
     inline void SetTrapIndex( int index ) { m_iTrapIndex = index; };
 
-    inline int GetCost() { return m_nCost; };
+    inline int GetCost() const { return m_nCost; };
     virtual void SetCost( int ) = 0;
-    inline int GetTrapCost() { return m_nTrapCost; };
+    inline int GetTrapCost() const { return m_nTrapCost; };
     virtual void SetTrapCost( int ) = 0;
 
     virtual GameActionSet_t GetPreferredActionSet() OVERRIDE { return GAME_ACTION_SET_NONE; };

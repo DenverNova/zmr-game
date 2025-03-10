@@ -34,6 +34,7 @@ CZMListRow::CZMListRow( CZMListSection* parent, int itemId, KeyValues* kv ) : vg
     m_nItemWidth = -1;
     m_hItemFont = INVALID_FONT;
     m_ItemColor = COLOR_WHITE;
+    m_iLastHovered = -1;
 
 
     SetPaintBackgroundEnabled( false );
@@ -666,6 +667,7 @@ DECLARE_BUILD_FACTORY( CZMListPanel );
 CZMListPanel::CZMListPanel( Panel* parent, const char* name ) : BaseClass( parent, name )
 {
     m_nItemIds = 0;
+    m_nFamilyIds = 0;
     m_vSections.Purge();
     m_pImageList = new CZMImageList();
 

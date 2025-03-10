@@ -39,6 +39,11 @@ class CObjLine
 public:
     ObjArgType_t GetArgType( int i ) { return m_iArgType; };
 
+    CObjLine()
+    {
+        m_bComplete = false;
+        Reset();
+    }
 
     void Reset()
     {

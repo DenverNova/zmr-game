@@ -38,6 +38,7 @@ CZMVision g_ZMVision;
 
 CZMVision::CZMVision()
 {
+    m_bIsOn = false;
     m_Silhouettes.Purge();
     m_FlashlightHandle = CLIENTSHADOW_INVALID_HANDLE;
 }

@@ -135,7 +135,6 @@ public:
 
 private:
     CZMBaseZombie*              m_pAttacker;
-    int                         m_fMask;
     const CTakeDamageInfo*      m_pDmgInfo;
     Vector                      m_vecCenter;
     Vector                      m_vecAttackPos;
@@ -252,12 +251,13 @@ CZMBaseZombie::CZMBaseZombie()
 {
     UseClientSideAnimation();
 
-
-
+    m_iZombieClass = ZMCLASS_INVALID;
     m_hSwatObject.Set( nullptr );
 
     m_flLastCommanded = 0.0f;
-
+    m_flNextAttack = 0.0f;
+    m_pAnimState = nullptr;
+    m_pBlockerScanner = nullptr;
     m_iZombieMode = ZOMBIEMODE_OFFENSIVE;
 
 
@@ -298,8 +298,17 @@ CZMBaseZombie::CZMBaseZombie()
 
 CZMBaseZombie::~CZMBaseZombie()
 {
-    delete m_pAnimState;
-    delete m_pBlockerScanner;
+    if ( m_pAnimState )
+    {
+        delete m_pAnimState;
+        m_pAnimState = nullptr;
+    }
+
+    if ( m_pBlockerScanner )
+    {
+        delete m_pBlockerScanner;
+        m_pBlockerScanner = nullptr;
+    }
 
 
     RemoveFromAmbush( true );

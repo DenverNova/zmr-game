@@ -7,7 +7,11 @@
 struct ObjInputData_t
 {
 public:
-    ObjInputData_t() {};
+    ObjInputData_t()
+    {
+        m_szEntName[0] = '\0';
+        m_szOutput[0] = '\0';
+    }
 
     ObjInputData_t( const char* pszEntName, const char* pszOutput )
     {
@@ -22,7 +26,11 @@ public:
 struct ObjStartInputData_t
 {
 public:
-    ObjStartInputData_t() {};
+    ObjStartInputData_t()
+    {
+        m_szInput[0] = '\0';
+        m_szValue[0] = '\0';
+    }
 
     ObjStartInputData_t( const char* pszInput, const char* pszValue )
     {

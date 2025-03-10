@@ -15,6 +15,13 @@
 
 CZMBuildMenuBase::CZMBuildMenuBase( vgui::Panel* pParent, const char* name ) : BaseClass( pParent, name )
 {
+    m_fSpawnZombieFlags = 0;
+    m_iLastSpawnIndex = -1;
+    m_iSpawnIndex = -1;
+    for ( int i = 0; i < ZMCLASS_MAX; i++ )
+    {
+        m_iZombieCosts[i] = 0;
+    }
 }
 
 CZMBuildMenuBase::~CZMBuildMenuBase()

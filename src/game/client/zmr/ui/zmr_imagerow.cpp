@@ -25,6 +25,8 @@ CZMImageRow::CZMImageRow( Panel* parent, const char* name ) : Panel( parent, nam
     m_nImageSize = -1;
     m_pLayoutFunc = nullptr;
     m_iDirection = DIR_X;
+    m_iLastImageOver = -1;
+    m_pCreateFunc = nullptr;
 }
 
 CZMImageRow::~CZMImageRow()

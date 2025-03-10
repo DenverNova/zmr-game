@@ -32,6 +32,8 @@ private:
 class CZombieSwatObjSchedule : public CBaseZombieSchedule, public CSwatInt
 {
 public:
+    CZombieSwatObjSchedule();
+
     virtual const char* GetName() const OVERRIDE { return "ZombieSwatObj"; }
 
     virtual void OnStart() OVERRIDE;

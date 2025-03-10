@@ -26,7 +26,10 @@ CZMRadialButton::CZMRadialButton( Panel* parent, const char* name ) : Panel( par
     m_pImageFocus = nullptr;
     m_pImageDisabled = nullptr;
     m_pszCommand = nullptr;
-
+    m_flEndFrac = 0.0f;
+    m_flStartFrac = 0.0f;
+    m_flOffset = 0.0f;
+    m_flSize = 0.0f;
     m_bDisabled = false;
 
     m_pTextLabel = new Label( this, "", "" );

@@ -12,6 +12,8 @@
 class CBansheeCeilAmbushSchedule : public CBaseZombieSchedule
 {
 public:
+    CBansheeCeilAmbushSchedule();
+
     virtual const char* GetName() const OVERRIDE { return "BansheeCeilingAmbush"; }
 
     virtual CZMBanshee* GetOuter() const OVERRIDE { return static_cast<CZMBanshee*>( CBaseZombieSchedule::GetOuter() ); }

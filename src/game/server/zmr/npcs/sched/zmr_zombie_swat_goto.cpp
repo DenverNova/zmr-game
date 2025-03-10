@@ -15,6 +15,8 @@ CZombieGotoSwatObjSchedule::CZombieGotoSwatObjSchedule()
     m_bCheckDirection = false;
     m_bCheckForEnemies = false;
     m_flStartExpireTimer = 0.0f;
+    m_vecCurSwatPos = vec3_origin;
+    m_vecStartSwatPos = vec3_origin;
 }
 
 CZombieGotoSwatObjSchedule::~CZombieGotoSwatObjSchedule()

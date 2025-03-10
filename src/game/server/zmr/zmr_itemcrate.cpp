@@ -124,6 +124,7 @@ END_DATADESC()
 
 CZMEntItemCrate::CZMEntItemCrate()
 {
+    m_nItemCount = 0;
     m_iszItemClass = NULL_STRING;
     m_iszTemplateName = NULL_STRING;
     m_iszTemplateData = NULL_STRING;

@@ -95,7 +95,19 @@ CGrabController::CGrabController( void )
     m_shadow.maxAngular = DEFAULT_MAX_ANGULAR;
     m_shadow.maxDampSpeed = m_shadow.maxSpeed*2;
     m_shadow.maxDampAngular = m_shadow.maxAngular;
+    m_attachedAnglesPlayerSpace.Init();
+    m_attachedPositionObjectSpace.Init();
     m_attachedEntity = nullptr;
+    m_timeToArrive = 0.0f;
+    m_errorTime = 0.0f;
+    m_error = 0.0f;
+    m_contactAmount = 0.0f;
+    m_angleAlignment = 0.0f;
+    m_bCarriedEntityBlocksLOS = false;
+    m_bIgnoreRelativePitch = false;
+    m_flLoadWeight = 0.0f;
+    m_controller = nullptr;
+    m_frameCount = 0;
 }
 
 CGrabController::~CGrabController( void )

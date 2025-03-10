@@ -177,7 +177,9 @@ CZMWeaponHands::CZMWeaponHands()
 {
 #ifdef CLIENT_DLL
     m_bResetPhysicsObject = false;
+    m_attachedAnglesPlayerSpace.Init();
 #endif
+    m_bResetOwnerEntity = false;
 
     SetSlotFlag( ZMWEAPONSLOT_NONE );
     SetConfigSlot( ZMWeaponConfig::ZMCONFIGSLOT_FISTSCARRY );

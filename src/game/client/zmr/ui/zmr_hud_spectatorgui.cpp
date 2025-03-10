@@ -33,7 +33,8 @@ CZMHudSpectatorUI::CZMHudSpectatorUI( const char *pElementName ) : CHudElement( 
     m_iOldEntIndex = 0;
     m_nOldObserverMode = OBS_MODE_NONE;
     m_iOldTeam = 0;
-
+    m_hTextFont = INVALID_FONT;
+    m_nOldTargetHealth = 0;
 
     SetProportional( true );
 

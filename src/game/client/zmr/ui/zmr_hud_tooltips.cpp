@@ -60,7 +60,11 @@ CZMHudTooltip::CZMHudTooltip( const char *pElementName ) : CHudElement( pElement
 
     m_nTexId = 0;
     m_nTexSize = 0;
-
+    m_flAlphaMult = 0.0f;
+    m_flNextSound = 0.0f;
+    m_hFont = INVALID_FONT;
+    m_iCurIndex = 0;
+    m_iTeam = 0;
     m_flNextRandomTip = 0.0f;
     m_flNextHide = 0.0f;
     m_bPulse = false;

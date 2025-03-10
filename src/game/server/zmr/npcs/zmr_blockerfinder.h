@@ -30,13 +30,8 @@ public:
     void            ClearTimesBlocked() { m_nTimesBlocked = 0; }
 
 private:
-    //void FindSwatObj();
     void FindBlocker();
-
     bool ShouldUpdateBlocker() const;
-    //bool ShouldUpdateSwatting() const;
-
-    CZMBaseZombie* m_pChar;
 
     CountdownTimer m_NextBlockerCheck;
     int m_nTimesBlocked;

@@ -10,6 +10,8 @@
 CSurvivorAttackCloseRangeSchedule::CSurvivorAttackCloseRangeSchedule()
 {
     m_bAllowMelee = false;
+    m_bMovingOutOfRange = false;
+    m_bMovingToRange = false;
 }
 
 CSurvivorAttackCloseRangeSchedule::~CSurvivorAttackCloseRangeSchedule()

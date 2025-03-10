@@ -130,6 +130,7 @@ CZMClientScoreBoardDialog::CZMClientScoreBoardDialog( IViewPort* pViewPort ) : C
 
 
     m_flNextUpdateTime = 0.0f;
+    m_flLastMouseToggle = 0.0f;
 
     m_nTexBgSideId = surface()->CreateNewTextureID();
     surface()->DrawSetTextureFile( m_nTexBgSideId, "zmr_effects/hud_bg_score_side", true, false );

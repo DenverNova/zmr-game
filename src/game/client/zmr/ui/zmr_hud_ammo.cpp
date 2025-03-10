@@ -89,6 +89,26 @@ DECLARE_HUDELEMENT( CZMHudAmmo );
 //-----------------------------------------------------------------------------
 CZMHudAmmo::CZMHudAmmo( const char *pElementName ) : CHudElement( pElementName ), BaseClass( g_pClientMode->GetViewport(), "ZMHudAmmo" )
 {
+    m_bDisplaySecondary = false;
+    m_iAmmo = 0;
+    m_iAmmo2 = 0;
+    m_flClipBlur = 0.0f;
+    m_flResBlur = 0.0f;
+    m_hFont = INVALID_FONT;
+    m_hGlowFont = INVALID_FONT;
+    m_hShadowFont = INVALID_FONT;
+    m_hResFont = INVALID_FONT;
+    m_hResGlowFont = INVALID_FONT;
+    m_hResShadowFont = INVALID_FONT;
+    m_ClipX = 0.0f;
+    m_ClipY = 0.0f;
+    m_ResX = 0.0f;
+    m_ResY = 0.0f;
+    m_flBgX = 0.0f;
+    m_flBgY = 0.0f;
+    m_flBgSizeX = 0.0f;
+    m_flBgSizeY = 0.0f;
+
     SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT | HIDEHUD_WEAPONSELECTION );
 
     m_nTexPanelBgId = surface()->CreateNewTextureID();

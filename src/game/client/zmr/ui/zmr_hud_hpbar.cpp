@@ -84,6 +84,21 @@ DECLARE_HUD_MESSAGE( CZMHudHPBar, Damage );
 
 CZMHudHPBar::CZMHudHPBar( const char *pElementName ) : CHudElement( pElementName ), BaseClass( g_pClientMode->GetViewport(), "ZMHudHPBar" )
 {
+    m_flBarSize = 0.0f;
+    m_flBarX = 0.0f;
+    m_flBarY = 0.0f;
+    m_flBgSizeX = 0.0f;
+    m_flBgSizeY = 0.0f;
+    m_flBgX = 0.0f;
+    m_flBgY = 0.0f;
+    m_flHealthX = 0.0f;
+    m_flHealthY = 0.0f;
+    m_flBlur = 0.0f;
+    m_hFont = INVALID_FONT;
+    m_hGlowFont = INVALID_FONT;
+    m_hShadowFont = INVALID_FONT;
+    m_nHealth = 0;
+
     SetHiddenBits( HIDEHUD_HEALTH | HIDEHUD_PLAYERDEAD | HIDEHUD_NEEDSUIT );
 
 

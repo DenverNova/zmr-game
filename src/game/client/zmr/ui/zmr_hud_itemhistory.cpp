@@ -28,6 +28,13 @@ CZMHudItemHistory::CZMHudItemHistory( const char* pszElementName ) : CHudElement
     m_wszAmmoFullMsg[0] = L'\0';
     m_bNeedsDraw = false;
     m_iCurrentHistorySlot = 0;
+    m_flHistoryGap = 0.0f;
+    m_flIconInset = 0.0f;
+    m_flTextInset = 0.0f;
+    m_flHistoryGap = 0.0f;
+    m_iHistoryGap = 0;
+    m_hTextFont = vgui::INVALID_FONT;
+    m_hNumberFont = vgui::INVALID_FONT;
 
     SetHiddenBits( HIDEHUD_MISCSTATUS );
 }

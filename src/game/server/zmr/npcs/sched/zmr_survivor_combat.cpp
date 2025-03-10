@@ -17,6 +17,7 @@ CSurvivorCombatSchedule::CSurvivorCombatSchedule()
 
     m_vecLookAt = vec3_origin;
     m_pLastLookArea = nullptr;
+    m_bMovingOutOfRange = false;
 }
 
 CSurvivorCombatSchedule::~CSurvivorCombatSchedule()

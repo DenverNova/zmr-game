@@ -236,6 +236,7 @@ const CZMZombieModelData* CZMZombieModelGroup::RandomModel( ZombieClass_t zclass
 //
 CZMZombieModelGroupSystem::CZMZombieModelGroupSystem() : CAutoGameSystem( "ZMZombieDataSystem" )
 {
+    m_sDefaultModelGroup = NULL_STRING;
 }
 
 CZMZombieModelGroupSystem::~CZMZombieModelGroupSystem()

@@ -84,7 +84,9 @@ CZMHudVote::CZMHudVote( const char *pElementName ) : CHudElement( pElementName )
 {
     m_bDrawVote = false;
     m_flVoteDraw = 0.0f;
-    
+    m_hReasonFont = INVALID_FONT;
+    m_hTextFont = INVALID_FONT;
+    m_hVoteFont = INVALID_FONT;
     m_szDisplay[0] = L'\0';
     m_szHowto[0] = L'\0';
     m_szVote[0] = L'\0';

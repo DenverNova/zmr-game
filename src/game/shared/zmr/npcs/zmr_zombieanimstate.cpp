@@ -34,6 +34,9 @@ CZMZombieAnimState::CZMZombieAnimState( CZMBaseZombie* pZombie )
     m_bModelParamsReady = false;
     m_iMoveSeq = -1;
     m_iMoveRandomSeed = 0;
+    m_iPoseParamMoveX = -1;
+    m_iPoseParamMoveY = -1;
+    m_bIs9Way = false;
 }
 
 CZMZombieAnimState::~CZMZombieAnimState()
@@ -792,7 +795,10 @@ CZMAnimOverlay::CZMAnimOverlay()
     m_iLayerIndex = -1;
 #ifdef CLIENT_DLL
     m_bKillMe = false;
+    m_flKillDelay = 0.0f;
+    m_flKillRate = 0.0f;
 #endif
+    m_bLooping = false;
 }
 
 bool CZMAnimOverlay::IsDying() const

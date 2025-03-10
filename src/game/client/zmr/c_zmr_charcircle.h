@@ -4,13 +4,11 @@
 class CZMCharCircle
 {
 public:
-    CZMCharCircle(){}
-
+    CZMCharCircle( const char* material, float size );
+    ~CZMCharCircle();
 
     void Draw();
 
-    void SetSize( float size );
-    void SetMaterial( const char* name );
     void SetPos( const Vector& origin );
     void SetColor( float r, float g, float b );
     void SetAlpha( float a );
@@ -22,7 +20,4 @@ protected:
     float m_flColor[4];
     IMaterial* m_pMaterial;
     float m_flYaw;
-
-private:
-    Vector m_Points[4];
 };

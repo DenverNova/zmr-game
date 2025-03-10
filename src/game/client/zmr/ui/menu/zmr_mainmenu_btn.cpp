@@ -22,7 +22,8 @@ CZMMainMenuButton::CZMMainMenuButton( Panel* pParent, const char* name ) : BaseC
 {
     m_bOnlyInGame = false;
     m_bOnlyNotInGame = false;
-
+    m_bLayoutHorizontally = false;
+    m_nHorizontalMargin = 0;
     m_nMaxSubTextWidth = 0;
     m_nSubBtnHeight = 0;
     m_flArmedTime = 0.0f;

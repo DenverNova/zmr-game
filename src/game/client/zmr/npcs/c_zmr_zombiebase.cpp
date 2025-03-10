@@ -81,6 +81,8 @@ CLIENTEFFECT_REGISTER_END()
 
 C_ZMBaseZombie::C_ZMBaseZombie()
 {
+    m_iZombieClass = ZMCLASS_INVALID;
+    m_angEyeAttachment.Init();
     m_pAnimState = new CZMZombieAnimState( this );
 
 
@@ -102,15 +104,8 @@ C_ZMBaseZombie::C_ZMBaseZombie()
     
 
     // Always create FX.
-    m_fxHealth = new CZMCharCircle();
-    m_fxHealth->SetYaw( 0.0f );
-    m_fxHealth->SetMaterial( MAT_HPCIRCLE );
-    m_fxHealth->SetSize( 16.0f );
-
-    m_fxInner = new CZMCharCircle();
-    m_fxInner->SetYaw( 0.0f );
-    m_fxInner->SetMaterial( MAT_INNERCIRCLE );
-    m_fxInner->SetSize( 16.0f );
+    m_fxHealth = new CZMCharCircle( MAT_HPCIRCLE, 16.0f );
+    m_fxInner = new CZMCharCircle( MAT_INNERCIRCLE, 16.0f );
 }
 
 C_ZMBaseZombie::~C_ZMBaseZombie()

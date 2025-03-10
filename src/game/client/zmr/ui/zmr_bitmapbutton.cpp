@@ -12,11 +12,13 @@ DECLARE_BUILD_FACTORY( CZMBitMapButton );
 CZMBitMapButton::CZMBitMapButton( vgui::Panel* parent, const char* name, const char* txt ) : CBitmapButton( parent, name, txt )
 {
     m_pszTooltipName = nullptr;
+    m_iTooltipIndex = 0;
 }
 
 CZMBitMapButton::CZMBitMapButton( vgui::Panel* parent, const char* name ) : CBitmapButton( parent, name, "" )
 {
     m_pszTooltipName = nullptr;
+    m_iTooltipIndex = 0;
 }
 
 CZMBitMapButton::~CZMBitMapButton()

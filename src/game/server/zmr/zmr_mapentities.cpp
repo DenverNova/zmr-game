@@ -116,6 +116,7 @@ static bool ShouldMapSystemCreateEntity( const char* pszClassname, CEntityMapDat
 CZMMapEntitiesSystem::CZMMapEntitiesSystem()
 {
     m_bBuildRefList = false;
+    m_iIterator = g_ZMMapEntityRefs.InvalidIndex();
 }
 
 CZMMapEntitiesSystem::~CZMMapEntitiesSystem()

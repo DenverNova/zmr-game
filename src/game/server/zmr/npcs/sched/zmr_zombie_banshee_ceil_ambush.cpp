@@ -17,6 +17,15 @@ extern ConVar zm_sv_banshee_ceilambush_maxheight;
 #define FASTZOMBIE_CLING_JUMPSPEED      700.0f
 
 
+CBansheeCeilAmbushSchedule::CBansheeCeilAmbushSchedule()
+{
+    m_bOnCeiling = false;
+    m_bInLeap = false;
+    m_vecCeilingPos = vec3_origin;
+    m_vecStartPos = vec3_origin;
+    m_flLeapTowardsYaw = 0.0f;
+    m_bDidLeapAttack = false;
+}
 
 void CBansheeCeilAmbushSchedule::OnStart()
 {

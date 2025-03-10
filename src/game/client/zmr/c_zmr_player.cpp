@@ -140,6 +140,9 @@ C_ZMPlayer::C_ZMPlayer() : m_iv_angEyeAngles( "C_ZMPlayer::m_iv_angEyeAngles" )
     m_pFlashlight = nullptr;
     m_iIDEntIndex = 0;
     m_iSpawnInterpCounterCache = 0;
+    m_iAttachmentEyes = -1;
+    m_iAttachmentRH = -1;
+    m_iSpawnInterpCounter = 0;
 
 
     m_pPlayerAnimState = CreateZMPlayerAnimState( this );
@@ -149,18 +152,9 @@ C_ZMPlayer::C_ZMPlayer() : m_iv_angEyeAngles( "C_ZMPlayer::m_iv_angEyeAngles" )
     m_flNextUpMove = 0.0f;
     m_flUpMove = 0.0f;
 
-    m_fxHealth = new CZMCharCircle();
-    m_fxHealth->SetYaw( 0.0f );
-    m_fxHealth->SetMaterial( MAT_HPCIRCLE );
-    m_fxHealth->SetSize( 16.0f );
-
-
-    m_fxInner = new CZMCharCircle();
-    m_fxInner->SetYaw( 0.0f );
-    m_fxInner->SetColor( 1.0f, 1.0f, 1.0f );
+    m_fxHealth = new CZMCharCircle( MAT_HPCIRCLE, 16.0f );
+    m_fxInner = new CZMCharCircle( MAT_INNERFLARE, 22.0f );
     m_fxInner->SetAlpha( 0.8f );
-    m_fxInner->SetMaterial( MAT_INNERFLARE );
-    m_fxInner->SetSize( 22.0f );
 }
 
 C_ZMPlayer::~C_ZMPlayer()

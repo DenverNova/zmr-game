@@ -98,6 +98,7 @@ const ClassData_t CZMMapItemSystem::m_Classes[] =
 
 CZMMapItemSystem::CZMMapItemSystem()
 {
+    m_bIsOldMap = false;
 }
 
 CZMMapItemSystem::~CZMMapItemSystem()
@@ -497,8 +498,8 @@ CZMMapItemActionReplace::CZMMapItemActionReplace()
 {
     m_flChanceFrac = -1.0f;
     m_flReplaceFrac = -1.0f;
-
-
+    m_bOnlyOldMaps = false;
+    m_vecRangeCheckPos.Init();
     m_fFlag = 0;
     m_szClassname[0] = '\0';
 

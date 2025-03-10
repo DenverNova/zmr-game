@@ -119,6 +119,11 @@ BEGIN_DATADESC( CZMEntBaseUsable )
     DEFINE_INPUTFUNC( FIELD_VOID, "Unhide", InputUnhide ),
 END_DATADESC()
 
+CZMEntBaseUsable::CZMEntBaseUsable()
+{
+    m_bActive = false;
+}
+
 void CZMEntBaseUsable::InputToggle( inputdata_t &inputdata )
 {
     m_bActive = !m_bActive;
@@ -260,6 +265,9 @@ CZMEntZombieSpawn::CZMEntZombieSpawn()
     }
 
     m_iZombieNodeCounter = 0;
+    m_sFirstNodeName = NULL_STRING;
+    m_sRallyName = NULL_STRING;
+    m_sZombieModelGroup = NULL_STRING;
 }
 
 void CZMEntZombieSpawn::Precache()
@@ -817,6 +825,11 @@ LINK_ENTITY_TO_CLASS( info_spawnnode, CZMEntSpawnNode );
 PRECACHE_REGISTER( info_spawnnode );
 
 
+CZMEntSpawnNode::CZMEntSpawnNode()
+{
+    m_sNextNodeName = NULL_STRING;
+}
+
 void CZMEntSpawnNode::Precache()
 {
     PrecacheModel( MODEL_SPAWNNODE );
@@ -1053,6 +1066,7 @@ PRECACHE_REGISTER( info_manipulate );
 CZMEntManipulate::CZMEntManipulate()
 {
     m_vTriggers.Purge();
+    m_bRemoveOnTrigger = false;
 }
 
 CZMEntManipulate::~CZMEntManipulate()
@@ -1244,6 +1258,7 @@ public:
     DECLARE_CLASS( CZMEntTriggerPlayerCount, CBaseTrigger )
     DECLARE_DATADESC()
 
+    CZMEntTriggerPlayerCount();
 
     void Spawn();
 
@@ -1258,7 +1273,7 @@ public:
 
 
     void UpdateState( bool );
-    inline bool IsActive() { return m_bActive; };
+    inline bool IsActive() const { return m_bActive; };
 
 private:
     int m_iPercentageToFire;
@@ -1281,6 +1296,12 @@ END_DATADESC()
 
 LINK_ENTITY_TO_CLASS( trigger_playercount, CZMEntTriggerPlayerCount );
 
+
+CZMEntTriggerPlayerCount::CZMEntTriggerPlayerCount()
+{
+    m_iPercentageToFire = 0;
+    m_bActive = false;
+}
 
 void CZMEntTriggerPlayerCount::Spawn()
 {
@@ -1387,6 +1408,7 @@ public:
     DECLARE_CLASS( CZMEntTriggerEntityCount, CBaseTrigger )
     DECLARE_DATADESC()
 
+    CZMEntTriggerEntityCount();
 
     void Spawn();
 
@@ -1430,6 +1452,13 @@ END_DATADESC()
 
 LINK_ENTITY_TO_CLASS( trigger_entitycount, CZMEntTriggerEntityCount );
 
+
+CZMEntTriggerEntityCount::CZMEntTriggerEntityCount()
+{
+    m_iCountToFire = 0;
+    m_iTriggerFlags = 0;
+    m_bActive = false;
+}
 
 void CZMEntTriggerEntityCount::Spawn()
 {
@@ -1555,6 +1584,12 @@ LINK_ENTITY_TO_CLASS( info_loadout, CZMEntLoadout );
 
 CZMEntLoadout::CZMEntLoadout()
 {
+    m_iMethod = LOMETHOD_INVALID;
+    for ( int i = 0; i < LO_MAX; i++ )
+    {
+        m_iCounts[i] = 0;
+        m_iCurRandom[i] = 0;
+    }
 }
 
 CZMEntLoadout::~CZMEntLoadout()
@@ -1593,7 +1628,7 @@ void CZMEntLoadout::Spawn()
 }
 
 // Hack to fix some old maps using this shit wrong.
-CZMEntLoadout::LoadOutMethod_t CZMEntLoadout::GetMethod()
+CZMEntLoadout::LoadOutMethod_t CZMEntLoadout::GetMethod() const
 {
     if ( m_iMethod <= LOMETHOD_INVALID || m_iMethod >= LOMETHOD_MAX )
         return LOMETHOD_RANDOM;
@@ -1804,6 +1839,7 @@ LINK_ENTITY_TO_CLASS( trigger_blockspotcreate, CZMEntTriggerBlockHidden );
 
 CZMEntTriggerBlockHidden::CZMEntTriggerBlockHidden()
 {
+    m_bActive = false;
     g_ZMBlockHidden.AddToTail( this );
 }
 
@@ -1853,6 +1889,7 @@ LINK_ENTITY_TO_CLASS( trigger_blockphysexplosion, CZMEntTriggerBlockPhysExp );
 
 CZMEntTriggerBlockPhysExp::CZMEntTriggerBlockPhysExp()
 {
+    m_bActive = false;
     g_ZMBlockPhysExp.AddToTail( this );
 }
 
@@ -1995,6 +2032,8 @@ ConVar zm_sv_physexp_player_mult( "zm_sv_physexp_player_mult", "0.05", FCVAR_NOT
 
 CZMPhysExplosion::CZMPhysExplosion()
 {
+    m_flMagnitude = 0.0f;
+    m_flRadius = 0.0f;
     m_hSpark = nullptr;
 }
 
@@ -2256,6 +2295,7 @@ public:
     DECLARE_CLASS( CZMEntTeamScore, CServerOnlyPointEntity )
     DECLARE_DATADESC()
 
+    CZMEntTeamScore();
 
     void Spawn() OVERRIDE;
 
@@ -2285,6 +2325,12 @@ BEGIN_DATADESC( CZMEntTeamScore )
 END_DATADESC()
 
 LINK_ENTITY_TO_CLASS( game_score_team, CZMEntTeamScore );
+
+
+CZMEntTeamScore::CZMEntTeamScore()
+{
+    m_nPoints = 0;
+}
 
 void CZMEntTeamScore::Spawn()
 {
@@ -2420,6 +2466,7 @@ LINK_ENTITY_TO_CLASS( env_fog_controller_zm, CZMEntFogController );
 CZMEntFogController::CZMEntFogController()
 {
     m_bNeedsInit = false;
+    m_flSkyboxFarZ = -1.0f;
 }
 
 bool CZMEntFogController::IsEnabled()
@@ -2473,7 +2520,7 @@ LINK_ENTITY_TO_CLASS( trigger_zombiespawnvolume, CZMEntTriggerSpawnVolume );
 
 CZMEntTriggerSpawnVolume::CZMEntTriggerSpawnVolume()
 {
-
+    m_bActive = false;
 }
 
 CZMEntTriggerSpawnVolume::~CZMEntTriggerSpawnVolume()

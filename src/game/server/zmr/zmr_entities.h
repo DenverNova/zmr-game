@@ -65,6 +65,7 @@ public:
     DECLARE_SERVERCLASS()
     DECLARE_DATADESC()
 
+    CZMEntBaseUsable();
 
     void Spawn() OVERRIDE;
 
@@ -194,6 +195,8 @@ class CZMEntSpawnNode : public CZMEntBaseSimple
 public:
 	DECLARE_CLASS( CZMEntSpawnNode, CZMEntBaseSimple )
     DECLARE_DATADESC()
+
+    CZMEntSpawnNode();
 
     void Spawn() OVERRIDE;
     void Precache() OVERRIDE;
@@ -387,7 +390,7 @@ public:
     void DistributeToPlayer( CZMPlayer* pPlayer );
     
 
-    inline LoadOutMethod_t GetMethod();
+    inline LoadOutMethod_t GetMethod() const;
 
 private:
     void GiveWeapon( CZMPlayer* pPlayer, int loadout_wep );

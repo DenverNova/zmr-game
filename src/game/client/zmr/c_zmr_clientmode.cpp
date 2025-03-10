@@ -318,6 +318,8 @@ IViewPortPanel* CZMViewport::CreatePanelByName( const char* szPanelName )
 
 ClientModeZMNormal::ClientModeZMNormal()
 {
+    m_bZMHoldingCtrl = false;
+
     m_pViewport = new CZMViewport();
     m_pViewport->Start( gameuifuncs, gameeventmanager );
 }

@@ -41,6 +41,11 @@ DECLARE_HUDELEMENT( CZMHudBars );
 
 CZMHudBars::CZMHudBars( const char *pElementName ) : CHudElement( pElementName ), BaseClass( g_pClientMode->GetViewport(), "ZMHudBars" )
 {
+    m_flAlpha = 0.0f;
+    m_flTopBarY = 0.0f;
+    m_flBottomBarY = 0.0f;
+    m_flNextHide = 0.0f;
+
     SetPaintBackgroundEnabled( false );
     SetZPos( 9000 );
 

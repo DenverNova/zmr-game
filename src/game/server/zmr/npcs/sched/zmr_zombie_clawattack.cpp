@@ -8,7 +8,8 @@
 
 CZombieClawAttackSched::CZombieClawAttackSched()
 {
-
+    m_bDidAttack = false;
+    m_vecLastFacing = vec3_origin;
 }
 
 CZombieClawAttackSched::~CZombieClawAttackSched()

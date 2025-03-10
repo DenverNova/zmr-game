@@ -96,6 +96,7 @@ public:
     DECLARE_CLASS( CZMProjectileMolotov, CBaseGrenade );
     DECLARE_DATADESC();
 
+    CZMProjectileMolotov();
 
     virtual void Spawn() OVERRIDE;
     virtual void Precache() OVERRIDE;
@@ -123,6 +124,11 @@ END_DATADESC()
 #endif
 
 LINK_ENTITY_TO_CLASS( grenade_molotov, CZMProjectileMolotov );
+
+CZMProjectileMolotov::CZMProjectileMolotov()
+{
+    m_pFireTrail = nullptr;
+}
 
 void CZMProjectileMolotov::Precache()
 {

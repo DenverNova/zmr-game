@@ -82,7 +82,8 @@ CZMBuildMenu::CZMBuildMenu( Panel* pParent ) : CZMBuildMenuBase( pParent, "ZMBui
 
 
 
-    
+    m_iJumpKey = 0;
+    m_iLastFlags = 0;
 
     //we fetch a bunch of pointers to various elements here so we can alter them quickly and easily
     info_image = dynamic_cast<vgui::ImagePanel*>(FindChildByName("ZombieImage"));
@@ -97,6 +98,8 @@ CZMBuildMenu::CZMBuildMenu( Panel* pParent ) : CZMBuildMenuBase( pParent, "ZMBui
     //prepare a list of our spawn buttons etc so we can easily iterate over them
     for (int i=0; i < ZMCLASS_MAX; i++)
     {
+        zombiedescriptions[i] = nullptr;
+
         char buffer[25];
         Q_snprintf(buffer, sizeof(buffer), "z_spawn1_%02d", i);
         spawnbuttons[i] = FindChildByName(buffer);

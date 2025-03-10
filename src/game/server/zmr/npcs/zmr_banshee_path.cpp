@@ -9,6 +9,11 @@
 
 ConVar zm_sv_debug_banshee_path_jump( "zm_sv_debug_banshee_path_jump", "0" );
 
+CZMBansheeFollowPath::CZMBansheeFollowPath()
+{
+    m_flHeight = -1.0f;
+}
+
 bool CZMBansheeFollowPath::Compute( const Vector& vecStart, const Vector& vecGoal, CNavArea* pStartArea, CNavArea* pGoalArea, const NPCR::CBasePathCost& cost )
 {
     Invalidate();

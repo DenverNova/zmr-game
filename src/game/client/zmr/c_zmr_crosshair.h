@@ -154,6 +154,8 @@ public:
 class CZMAccuracyCrosshair : public CZMBaseDynamicCrosshair
 {
 public:
+    CZMAccuracyCrosshair();
+
     virtual void LoadValues( KeyValues* kv ) OVERRIDE;
     virtual void WriteValues( KeyValues* kv ) const OVERRIDE;
 

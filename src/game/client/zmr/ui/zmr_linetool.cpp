@@ -15,6 +15,11 @@ using namespace vgui;
 
 CZMLineTool::CZMLineTool( Panel* pParent ) : Panel( g_pClientMode->GetViewport(), "ZMLineTool" )
 {
+    start_x = 0;
+    start_y = 0;
+    end_x = 0;
+    end_y = 0;
+
     SetParent( pParent->GetVPanel() );
 
     SetPaintBackgroundEnabled( false );

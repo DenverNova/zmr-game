@@ -59,6 +59,21 @@ CZMPlayerAnimState::CZMPlayerAnimState( CBasePlayer* pPlayer, MultiPlayerMovemen
     : CMultiPlayerAnimState( pPlayer, movementData )
 {
     m_pZMPlayer = nullptr;
+    m_bInAirWalk = false;
+    m_flHoldDeployedPoseUntilTime = 0.0f;
+    m_vLookAtTarget = vec3_origin;
+    m_flLastLookAtUpdate = 0.0f;
+    m_headYawPoseParam = -1;
+    m_headPitchPoseParam = -1;
+    m_headYawMin = 0.0f;
+    m_headYawMax = 0.0f;
+    m_headPitchMin = 0.0f;
+    m_headPitchMax = 0.0f;
+    m_flLastBodyYaw = 0.0f;
+    m_flCurrentHeadYaw = 0.0f;
+    m_flCurrentHeadPitch = 0.0f;
+    m_flCurrentAimYaw = 0.0f;
+    m_bIs9Way = false;
 }
 
 //-----------------------------------------------------------------------------

@@ -8,6 +8,13 @@
 #include "tier0/memdbgon.h"
 
 
+CBansheeLeapSchedule::CBansheeLeapSchedule()
+{
+    m_bInLeap = false;
+    m_bLanded = false;
+    m_bDidLeapAttack = false;
+}
+
 void CBansheeLeapSchedule::OnStart()
 {
     CZMBanshee* pOuter = GetOuter();

@@ -6,6 +6,8 @@
 class CZMBansheeFollowPath : public NPCR::CFollowNavPath
 {
 public:
+    CZMBansheeFollowPath();
+
     typedef NPCR::CFollowNavPath BaseClass;
     typedef CZMBansheeFollowPath ThisClass;
 

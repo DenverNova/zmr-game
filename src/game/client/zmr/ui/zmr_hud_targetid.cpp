@@ -63,6 +63,8 @@ CZMHudTargetID::CZMHudTargetID( const char* name ) :
     m_flLastChangeTime = 0;
     m_iLastEntIndex = 0;
     m_nLastHealth = 0;
+    m_hFont = INVALID_FONT;
+    m_wszTargetIdStr[0] = L'\0';
 }
 
 CZMHudTargetID::~CZMHudTargetID()

@@ -13,6 +13,8 @@ extern ConVar zm_sk_banshee_dmg_leap;
 class CBansheeLeapSchedule : public CBaseZombieSchedule
 {
 public:
+    CBansheeLeapSchedule();
+
     virtual const char* GetName() const OVERRIDE { return "BansheeLeap"; }
 
     virtual CZMBanshee* GetOuter() const OVERRIDE { return static_cast<CZMBanshee*>( CBaseZombieSchedule::GetOuter() ); }

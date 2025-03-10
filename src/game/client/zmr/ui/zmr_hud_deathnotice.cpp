@@ -94,6 +94,10 @@ CZMHudDeathNotice::CZMHudDeathNotice( const char* pElementName ) :
 {
     SetParent( g_pClientMode->GetViewport() );
 
+    m_bRightJustify = false;
+    m_flLineHeight = 0.0f;
+    m_flMaxDeathNotices = 0.0f;
+    m_hTextFont = INVALID_FONT;
     m_iconD_headshot = nullptr;
     m_iconD_skull = nullptr;
 

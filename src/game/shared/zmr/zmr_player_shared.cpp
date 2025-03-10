@@ -138,6 +138,9 @@ struct ZMFireBulletsInfo_t
 
         nTraceHullFreq = 0;
         bDoTraceHull = false;
+
+        iPlayerDamage = 0;
+        pWeapon = nullptr;
     }
 
     void ClearPerBulletData()

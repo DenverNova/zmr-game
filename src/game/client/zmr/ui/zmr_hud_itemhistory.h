@@ -73,11 +73,16 @@ private:
 
     struct HistoryData_t
     {
-        HistoryData_t() 
+        HistoryData_t()
         { 
+            slotType = HISTSLOT_EMPTY;
+            nCount = 0;
+            iId = -1;
+            icon = nullptr;
             // init this here, because the code that overwrites previous history items will use this
             // to check to see if the item is empty
             flDisplayTime = 0.0f; 
+            m_hWeapon = nullptr;
         }
 
         ZMItemHistorySlotType_t slotType;
