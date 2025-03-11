@@ -160,24 +160,24 @@ void CZMMainMenu::ReleaseGameUI()
 
 void CZMMainMenu::InitVideoBackground()
 {
-    ReleaseVideoBackground();
+    //ReleaseVideoBackground();
 
-    m_pMaterial = nullptr;
-    m_pVideoMaterial = g_pVideo->CreateVideoMaterial("VideoMaterial",
-                                                     "media/zmr_background01.bik",
-                                                     "MOD",
-                                                     VideoPlaybackFlags::DEFAULT_MATERIAL_OPTIONS,
-                                                     VideoSystem::DETERMINE_FROM_FILE_EXTENSION,
-                                                     false );
-    if ( !m_pVideoMaterial )
-    {
-        return;
-    }
+    //m_pMaterial = nullptr;
+    //m_pVideoMaterial = g_pVideo->CreateVideoMaterial("VideoMaterial",
+    //                                                 "media/zmr_background01.webm",
+    //                                                 "MOD",
+    //                                                 VideoPlaybackFlags::LOOP_VIDEO | VideoPlaybackFlags::NO_AUDIO,
+    //                                                 VideoSystem::DETERMINE_FROM_FILE_EXTENSION,
+    //                                                 false );
+    //if ( !m_pVideoMaterial )
+    //{
+    //    return;
+    //}
 
-    m_pVideoMaterial->SetLooping( true );
-    m_pMaterial = m_pVideoMaterial->GetMaterial();
-    m_pVideoMaterial->GetVideoImageSize( &m_nVideoWidth, &m_nVideoHeight );
-    m_pVideoMaterial->GetVideoTexCoordRange( &m_flVideoU, &m_flVideoV );
+    //m_pVideoMaterial->SetLooping( true );
+    //m_pMaterial = m_pVideoMaterial->GetMaterial();
+    //m_pVideoMaterial->GetVideoImageSize( &m_nVideoWidth, &m_nVideoHeight );
+    //m_pVideoMaterial->GetVideoTexCoordRange( &m_flVideoU, &m_flVideoV );
 }
 
 void CZMMainMenu::ReleaseVideoBackground()
