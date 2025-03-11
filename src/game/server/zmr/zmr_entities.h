@@ -341,38 +341,42 @@ private:
 class CZMEntLoadout : public CServerOnlyPointEntity
 {
 public:
-    enum
+    enum LoadoutWeapon_t
     {
-        LO_PISTOL = 0,
-        LO_SHOTGUN,
-        LO_RIFLE,
-        LO_MAC10,
-        LO_MOLOTOV,
-        LO_SLEDGE,
-        LO_IMPROVISED,
-        LO_REVOLVER,
+        LOADOUTWEAPON_START = 0,
 
-        LO_MAX
+        LOADOUTWEAPON_PISTOL = 0,
+        LOADOUTWEAPON_SHOTGUN,
+        LOADOUTWEAPON_RIFLE,
+        LOADOUTWEAPON_MAC10,
+        LOADOUTWEAPON_MOLOTOV,
+        LOADOUTWEAPON_SLEDGE,
+        LOADOUTWEAPON_IMPROVISED,
+        LOADOUTWEAPON_REVOLVER,
+
+        LOADOUTWEAPON_MAX
     };
 
-    enum LoadOutMethod_t
+    enum LoadoutMethod_t
     {
-        LOMETHOD_INVALID = 0,
+        LOADOUTMETHOD_INVALID = 0,
 
-        LOMETHOD_CATEGORY,
-        LOMETHOD_RANDOM,
+        LOADOUTMETHOD_CATEGORY,
+        LOADOUTMETHOD_RANDOM,
 
-        LOMETHOD_MAX
+        LOADOUTMETHOD_MAX
     };
 
-    enum
+    enum LoadoutLocation_t
     {
-        LOCAT_MELEE = 0,
-        LOCAT_PISTOL,
-        LOCAT_LARGE,
-        LOCAT_EQUIPMENT,
+        LOADOUTLOCATION_START = 0,
 
-        LOCAT_MAX
+        LOADOUTLOCATION_MELEE = 0,
+        LOADOUTLOCATION_PISTOL,
+        LOADOUTLOCATION_LARGE,
+        LOADOUTLOCATION_EQUIPMENT,
+
+        LOADOUTLOCATION_MAX
     };
 
 	DECLARE_CLASS( CZMEntLoadout, CPointEntity )
@@ -390,18 +394,18 @@ public:
     void DistributeToPlayer( CZMPlayer* pPlayer );
     
 
-    inline LoadOutMethod_t GetMethod() const;
+    inline LoadoutMethod_t GetMethod() const;
 
 private:
-    void GiveWeapon( CZMPlayer* pPlayer, int loadout_wep );
+    void GiveWeapon( CZMPlayer* pPlayer, LoadoutWeapon_t loadout_wep );
 
 
-    LoadOutMethod_t m_iMethod;
+    LoadoutMethod_t m_iMethod;
 
-    int m_iCounts[LO_MAX];
+    int m_iCounts[LOADOUTWEAPON_MAX];
 
-    int m_iCurRandom[LO_MAX];
-    CUtlVector<int> m_vCurCat[LOCAT_MAX];
+    int m_iCurRandom[LOADOUTWEAPON_MAX];
+    CUtlVector<LoadoutWeapon_t> m_vCurCat[LOADOUTLOCATION_MAX];
 };
 
 /*

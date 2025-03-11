@@ -1570,22 +1570,22 @@ void CZMEntTriggerEntityCount::InputCount( inputdata_t &inputData )
 */
 BEGIN_DATADESC( CZMEntLoadout )
     DEFINE_KEYFIELD( m_iMethod, FIELD_INTEGER, "Method" ),
-    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LO_PISTOL], FIELD_INTEGER, "Pistols" ),
-    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LO_SHOTGUN], FIELD_INTEGER, "Shotguns" ),
-    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LO_RIFLE], FIELD_INTEGER, "Rifles" ),
-    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LO_MAC10], FIELD_INTEGER, "Mac10s" ),
-    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LO_MOLOTOV], FIELD_INTEGER, "Molotovs" ),
-    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LO_SLEDGE], FIELD_INTEGER, "Sledgehammers" ),
-    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LO_IMPROVISED], FIELD_INTEGER, "Improvised" ),
-    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LO_REVOLVER], FIELD_INTEGER, "Revolvers" ),
+    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LOADOUTWEAPON_PISTOL], FIELD_INTEGER, "Pistols" ),
+    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LOADOUTWEAPON_SHOTGUN], FIELD_INTEGER, "Shotguns" ),
+    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LOADOUTWEAPON_RIFLE], FIELD_INTEGER, "Rifles" ),
+    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LOADOUTWEAPON_MAC10], FIELD_INTEGER, "Mac10s" ),
+    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LOADOUTWEAPON_MOLOTOV], FIELD_INTEGER, "Molotovs" ),
+    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LOADOUTWEAPON_SLEDGE], FIELD_INTEGER, "Sledgehammers" ),
+    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LOADOUTWEAPON_IMPROVISED], FIELD_INTEGER, "Improvised" ),
+    DEFINE_KEYFIELD( m_iCounts[CZMEntLoadout::LOADOUTWEAPON_REVOLVER], FIELD_INTEGER, "Revolvers" ),
 END_DATADESC()
 
 LINK_ENTITY_TO_CLASS( info_loadout, CZMEntLoadout );
 
 CZMEntLoadout::CZMEntLoadout()
 {
-    m_iMethod = LOMETHOD_INVALID;
-    for ( int i = 0; i < LO_MAX; i++ )
+    m_iMethod = LOADOUTMETHOD_INVALID;
+    for ( int i = 0; i < LOADOUTWEAPON_MAX; i++ )
     {
         m_iCounts[i] = 0;
         m_iCurRandom[i] = 0;
@@ -1610,7 +1610,7 @@ void CZMEntLoadout::Spawn()
 
 
     // Make sure we don't give out negative weapons, lul.
-    for ( int i = 0; i < LO_MAX; i++ )
+    for ( int i = 0; i < LOADOUTWEAPON_MAX; i++ )
     {
         if ( m_iCounts[i] < 0 ) m_iCounts[i] = 0;
     }
@@ -1628,10 +1628,10 @@ void CZMEntLoadout::Spawn()
 }
 
 // Hack to fix some old maps using this shit wrong.
-CZMEntLoadout::LoadOutMethod_t CZMEntLoadout::GetMethod() const
+CZMEntLoadout::LoadoutMethod_t CZMEntLoadout::GetMethod() const
 {
-    if ( m_iMethod <= LOMETHOD_INVALID || m_iMethod >= LOMETHOD_MAX )
-        return LOMETHOD_RANDOM;
+    if ( m_iMethod <= LOADOUTMETHOD_INVALID || m_iMethod >= LOADOUTMETHOD_MAX )
+        return LOADOUTMETHOD_RANDOM;
 
     return m_iMethod;
 }
@@ -1640,52 +1640,52 @@ void CZMEntLoadout::Reset()
 {
     switch ( GetMethod() )
     {
-    case LOMETHOD_RANDOM :
+    case LOADOUTMETHOD_RANDOM :
     {
-        for ( int i = 0; i < LO_MAX; i++ )
+        for ( int i = 0; i < LOADOUTWEAPON_MAX; i++ )
         {
             m_iCurRandom[i] = m_iCounts[i];
         }
         break;
 
     }
-    case LOMETHOD_CATEGORY : // My favorite...
+    case LOADOUTMETHOD_CATEGORY : // My favorite...
     default :
     {
-        for ( int i = 0; i < LOCAT_MAX; i++ )
+        for ( int i = 0; i < LOADOUTLOCATION_MAX; i++ )
         {
             m_vCurCat[i].Purge();
         }
 
-        for ( int i = 0; i < m_iCounts[LO_IMPROVISED]; i++)
-            m_vCurCat[LOCAT_MELEE].AddToTail( LO_IMPROVISED );
+        for ( int i = 0; i < m_iCounts[LOADOUTWEAPON_IMPROVISED]; i++)
+            m_vCurCat[LOADOUTLOCATION_MELEE].AddToTail( LOADOUTWEAPON_IMPROVISED );
 
-        for ( int i = 0; i < m_iCounts[LO_SLEDGE]; i++)
-            m_vCurCat[LOCAT_MELEE].AddToTail( LO_SLEDGE );
+        for ( int i = 0; i < m_iCounts[LOADOUTWEAPON_SLEDGE]; i++)
+            m_vCurCat[LOADOUTLOCATION_MELEE].AddToTail( LOADOUTWEAPON_SLEDGE );
 
 
         
-        for ( int i = 0; i < m_iCounts[LO_PISTOL]; i++)
-            m_vCurCat[LOCAT_PISTOL].AddToTail( LO_PISTOL );
+        for ( int i = 0; i < m_iCounts[LOADOUTWEAPON_PISTOL]; i++)
+            m_vCurCat[LOADOUTLOCATION_PISTOL].AddToTail( LOADOUTWEAPON_PISTOL );
 
-        for ( int i = 0; i < m_iCounts[LO_REVOLVER]; i++)
-            m_vCurCat[LOCAT_PISTOL].AddToTail( LO_REVOLVER );
-
-
-
-        for ( int i = 0; i < m_iCounts[LO_MAC10]; i++)
-            m_vCurCat[LOCAT_LARGE].AddToTail( LO_MAC10 );
-
-        for ( int i = 0; i < m_iCounts[LO_SHOTGUN]; i++)
-            m_vCurCat[LOCAT_LARGE].AddToTail( LO_SHOTGUN );
-
-        for ( int i = 0; i < m_iCounts[LO_RIFLE]; i++)
-            m_vCurCat[LOCAT_LARGE].AddToTail( LO_RIFLE );
+        for ( int i = 0; i < m_iCounts[LOADOUTWEAPON_REVOLVER]; i++)
+            m_vCurCat[LOADOUTLOCATION_PISTOL].AddToTail( LOADOUTWEAPON_REVOLVER );
 
 
 
-        for ( int i = 0; i < m_iCounts[LO_MOLOTOV]; i++)
-            m_vCurCat[LOCAT_EQUIPMENT].AddToTail( LO_MOLOTOV );
+        for ( int i = 0; i < m_iCounts[LOADOUTWEAPON_MAC10]; i++)
+            m_vCurCat[LOADOUTLOCATION_LARGE].AddToTail( LOADOUTWEAPON_MAC10 );
+
+        for ( int i = 0; i < m_iCounts[LOADOUTWEAPON_SHOTGUN]; i++)
+            m_vCurCat[LOADOUTLOCATION_LARGE].AddToTail( LOADOUTWEAPON_SHOTGUN );
+
+        for ( int i = 0; i < m_iCounts[LOADOUTWEAPON_RIFLE]; i++)
+            m_vCurCat[LOADOUTLOCATION_LARGE].AddToTail( LOADOUTWEAPON_RIFLE );
+
+
+
+        for ( int i = 0; i < m_iCounts[LOADOUTWEAPON_MOLOTOV]; i++)
+            m_vCurCat[LOADOUTLOCATION_EQUIPMENT].AddToTail( LOADOUTWEAPON_MOLOTOV );
 
         break;
 
@@ -1703,20 +1703,19 @@ void CZMEntLoadout::DistributeToPlayer( CZMPlayer* pPlayer )
 
     switch ( GetMethod() )
     {
-    case LOMETHOD_RANDOM :
+    case LOADOUTMETHOD_RANDOM :
     {
-        CUtlVector<int> vRemaining;
-        vRemaining.Purge();
+        CUtlVector<LoadoutWeapon_t> vRemaining;
 
-        for ( int i = 0; i < LO_MAX; i++ )
+        for ( int i = LOADOUTWEAPON_START; i < LOADOUTWEAPON_MAX; i++ )
         {
             if ( m_iCurRandom[i] > 0 )
-                vRemaining.AddToTail( i );
+                vRemaining.AddToTail( (LoadoutWeapon_t)i );
         }
 
         if ( vRemaining.Count() > 0 )
         {
-            int j = vRemaining[random->RandomInt( 0, vRemaining.Count() - 1 )];
+            LoadoutWeapon_t j = vRemaining[random->RandomInt( 0, vRemaining.Count() - 1 )];
 
             GiveWeapon( pPlayer, j );
 
@@ -1725,10 +1724,10 @@ void CZMEntLoadout::DistributeToPlayer( CZMPlayer* pPlayer )
         break;
     }
     
-    case LOMETHOD_CATEGORY :
+    case LOADOUTMETHOD_CATEGORY :
     default :
     {
-        for ( int i = 0; i < LOCAT_MAX; i++ )
+        for ( int i = LOADOUTLOCATION_START; i < LOADOUTLOCATION_MAX; i++ )
         {
             if ( m_vCurCat[i].Count() > 0 )
             {
@@ -1744,10 +1743,10 @@ void CZMEntLoadout::DistributeToPlayer( CZMPlayer* pPlayer )
     }
 }
 
-void CZMEntLoadout::GiveWeapon( CZMPlayer* pPlayer, int loadout_wep )
+void CZMEntLoadout::GiveWeapon( CZMPlayer* pPlayer, LoadoutWeapon_t loadout_wep )
 {
     // Loadout is a mix of items and item classes.
-    const char* loadouts[LO_MAX] = {
+    const char* loadouts[LOADOUTWEAPON_MAX] = {
         "Pistol",
         "Shotgun",
         "Rifle",
@@ -1758,9 +1757,7 @@ void CZMEntLoadout::GiveWeapon( CZMPlayer* pPlayer, int loadout_wep )
         "BigPistol",
     };
 
-    COMPILE_TIME_ASSERT( ARRAYSIZE( loadouts ) >= LO_MAX );
-
-    Assert( loadout_wep >= 0 && loadout_wep < LO_MAX );
+    COMPILE_TIME_ASSERT( ARRAYSIZE( loadouts ) == LOADOUTWEAPON_MAX );
 
     const char* loadoutClass = loadouts[loadout_wep];
 
@@ -1769,11 +1766,11 @@ void CZMEntLoadout::GiveWeapon( CZMPlayer* pPlayer, int loadout_wep )
 
     switch ( loadout_wep )
     {
-    case LO_PISTOL:
-    case LO_REVOLVER:
-    case LO_RIFLE:
-    case LO_SHOTGUN:
-    case LO_MAC10:
+    case LOADOUTWEAPON_PISTOL:
+    case LOADOUTWEAPON_REVOLVER:
+    case LOADOUTWEAPON_RIFLE:
+    case LOADOUTWEAPON_SHOTGUN:
+    case LOADOUTWEAPON_MAC10:
         ammo = true;
         break;
     default :
