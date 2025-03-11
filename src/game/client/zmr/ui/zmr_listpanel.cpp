@@ -292,7 +292,13 @@ void CZMListRow::ColumnDataLabel( int column, Label* pLabel )
 
         if ( tip && *tip )
         {
-            pLabel->GetTooltip()->SetText( tip );
+            // HACK: Only change if necessary.
+            // Changing text causes the tooltip to change text while showing existing one.
+            if ( Q_strcmp( tip, pLabel->GetTooltip()->GetText() ) != 0 )
+            {
+                pLabel->GetTooltip()->SetText( tip );
+            }
+
             pLabel->SetMouseInputEnabled( true );
         }
         else
