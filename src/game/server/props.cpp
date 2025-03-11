@@ -1900,7 +1900,8 @@ CDynamicProp::CDynamicProp()
     // ZMRCHANGE: Make sure we do not create bone followers if the value isn't defined in the map data.
     // This little fix can save hundreds of edict slots... thanks prop_dynamic ragdolls...
 #ifdef ZMR
-    m_bDisableBoneFollowers = true;
+	m_bDisableBoneFollowersSet = false;
+    m_bDisableBoneFollowers = false;
 #endif
 	m_nPendingSequence = -1;
 	if ( g_pGameRules->IsMultiplayer() )
@@ -1909,6 +1910,18 @@ CDynamicProp::CDynamicProp()
 	}
 	m_iGoalSequence = -1;
 }
+
+#ifdef ZMR
+bool CDynamicProp::KeyValue( const char *szKeyName, const char *szValue )
+{
+	if ( FStrEq( szKeyName, "DisableBoneFollowers" ) )
+	{
+		m_bDisableBoneFollowersSet = true;
+	}
+
+	return BaseClass::KeyValue( szKeyName, szValue );
+}
+#endif
 
 
 //------------------------------------------------------------------------------
@@ -1932,6 +1945,18 @@ void CDynamicProp::Spawn( )
 	}
 
 	BaseClass::Spawn();
+
+#ifdef ZMR // ZMRCHANGE: Bonefollowers off in old maps for ragdolls.
+	if ( !m_bDisableBoneFollowersSet )
+	{
+		const char* pszModelName = modelinfo->GetModelName( GetModel() );
+		if ( Q_strnicmp( pszModelName, "models/zombie", 13 ) == 0 || Q_strnicmp( pszModelName, "models/humans", 13 ) == 0 )
+		{
+			DevMsg( "Disabling bone followers for prop_dynamic: %s\n", pszModelName );
+			m_bDisableBoneFollowers = true;
+		}
+	}
+#endif
 
 	if ( IsMarkedForDeletion() )
 		return;

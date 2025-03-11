@@ -323,6 +323,12 @@ public:
 
 	CNetworkVar( bool, m_bUseHitboxesForRenderBox );
 
+#ifdef ZMR
+	bool KeyValue( const char* szKeyName, const char* szValue );
+private:
+	bool m_bDisableBoneFollowersSet;
+#endif
+
 protected:
 	void FinishSetSequence( int nSequence );
 	void PropSetAnim( const char *szAnim );
