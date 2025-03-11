@@ -1946,18 +1946,6 @@ void CDynamicProp::Spawn( )
 
 	BaseClass::Spawn();
 
-#ifdef ZMR // ZMRCHANGE: Bonefollowers off in old maps for ragdolls.
-	if ( !m_bDisableBoneFollowersSet )
-	{
-		const char* pszModelName = modelinfo->GetModelName( GetModel() );
-		if ( Q_strnicmp( pszModelName, "models/zombie", 13 ) == 0 || Q_strnicmp( pszModelName, "models/humans", 13 ) == 0 )
-		{
-			DevMsg( "Disabling bone followers for prop_dynamic: %s\n", pszModelName );
-			m_bDisableBoneFollowers = true;
-		}
-	}
-#endif
-
 	if ( IsMarkedForDeletion() )
 		return;
 
@@ -2133,6 +2121,18 @@ void CDynamicProp::CreateBoneFollowers()
 		vcollide_t *pCollide = modelinfo->GetVCollide( GetModelIndex() );
 		if ( pCollide && pCollide->solidCount > 1 )
 		{
+#ifdef ZMR // ZMRCHANGE: Bonefollowers off in old maps for ragdolls.
+			if ( !m_bDisableBoneFollowersSet )
+			{
+				const char* pszModelName = modelinfo->GetModelName( GetModel() );
+				if ( Q_strnicmp( pszModelName, "models/zombie", 13 ) == 0 || Q_strnicmp( pszModelName, "models/humans", 13 ) == 0 )
+				{
+					DevMsg( "Disabling bone followers for prop_dynamic: %s\n", pszModelName );
+					m_bDisableBoneFollowers = true; // Don't call again.
+					return;
+				}
+			}
+#endif
 			CreateBoneFollowersFromRagdoll(this, &m_BoneFollowerManager, pCollide);
 		}
 	}
