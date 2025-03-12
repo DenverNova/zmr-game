@@ -372,7 +372,7 @@ void CZMLoadingPanel::PaintBackground()
 
         // Draw the zombie strip 1024x256
         h = YRES( 180 );
-        offset_y = offset_y - h;
+        offset_y = offset_y - h + 15;
 
         nTexHeight = 256;
 
