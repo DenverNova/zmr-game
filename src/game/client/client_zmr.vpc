@@ -18,7 +18,7 @@ $Configuration
 		$PreprocessorDefinitions			"$BASE;HL2MP;HL2_CLIENT_DLL;ZMR"
 		$PreprocessorDefinitions			"$BASE;ZMR_STEAM" [$ZMR_STEAM]
 		$PreprocessorDefinitions			"$BASE;ZMR_FINAL" [$ZMR_FINAL]
-		$PreprocessorDefinitions			"$BASE;_HAS_EXCEPTIONS=0" [$WIN32] // Disable exceptions in STL (Discord RPC thing -_-)
+		$PreprocessorDefinitions			"$BASE;_HAS_EXCEPTIONS=0" [$WINDOWS] // Disable exceptions in STL (Discord RPC thing -_-)
 	}
 }
 
@@ -26,8 +26,8 @@ $Project "Client (ZMR)"
 {
 	$Folder "Libs (ZMR)"
 	{
-		$Lib		discord_game_sdk.dll [$WIN32 && $ZMR_FINAL]
-		$Lib		fmod_vc [$WIN32 && $ZMR_FINAL]
+		$Lib		discord_game_sdk.dll [$WINDOWS && $ZMR_FINAL]
+		$Lib		fmod_vc [$WINDOWS && $ZMR_FINAL]
 		//$Lib		libfmod [$LINUXALL && $ZMR_FINAL]
 		$Lib		raytrace
 	}
@@ -84,7 +84,7 @@ $Project "Client (ZMR)"
 		}
 		$Folder "ZMR"
 		{
-			$Folder "Discord" [$WIN32 && $ZMR_FINAL]
+			$Folder "Discord" [$WINDOWS && $ZMR_FINAL]
 			{
 				$File	"zmr\c_zmr_discord.cpp"
 
@@ -385,16 +385,16 @@ $Project "Client (ZMR)"
 			$File	"zmr\c_zmr_flashlighteffect.h"
 			$File	"zmr\c_zmr_flashlightsystem.cpp"
 			$File	"zmr\c_zmr_flashlightsystem.h"
-			$File	"zmr\c_zmr_fmod.cpp" [$WIN32 && $ZMR_FINAL]
-			$File	"zmr\c_zmr_fmod.h" [$WIN32 &&$ZMR_FINAL]
+			$File	"zmr\c_zmr_fmod.cpp" [$WINDOWS && $ZMR_FINAL]
+			$File	"zmr\c_zmr_fmod.h" [$WINDOWS && $ZMR_FINAL]
 			$File	"zmr\c_zmr_importancesystem.cpp"
 			$File	"zmr\c_zmr_importancesystem.h"
 			$File	"zmr\c_zmr_in_main.cpp"
 			$File	"zmr\c_zmr_in_main.h"
 			$File	"zmr\c_zmr_legacy_objpanel.cpp"
 			$File	"zmr\c_zmr_legacy_objpanel.h"
-			$File	"zmr\c_zmr_music.cpp" [$WIN32 && $ZMR_FINAL]
-			$File	"zmr\c_zmr_music.h" [$WIN32 && $ZMR_FINAL]
+			$File	"zmr\c_zmr_music.cpp" [$WINDOWS && $ZMR_FINAL]
+			$File	"zmr\c_zmr_music.h" [$WINDOWS && $ZMR_FINAL]
 			$File	"zmr\c_zmr_player.cpp"
 			$File	"zmr\c_zmr_player.h"
 			$File	"zmr\c_zmr_player_ragdoll.cpp"
