@@ -15,7 +15,7 @@
 #include "tier0/memdbgon.h"
 
 
-#define VERSION_URL     "http://version.zmreborn.com"
+#define VERSION_URL     "http://version.zombiemaster.dev"
 
 
 void CZMWeb::Get( const char* url, HTTPCallback::func_t func )
