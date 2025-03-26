@@ -77,7 +77,7 @@ CZMCreditsMenu::CZMCreditsMenu( vgui::VPANEL parent ) : BaseClass( nullptr, "ZMC
     LoadControlSettings( "resource/ui/zmcredits.res" );
 
 
-    auto hndl = filesystem->Open( "resource/zmr_credits.txt", "rb", "MOD" );
+    auto hndl = filesystem->Open( "resource/zmcredits.txt", "rb", "MOD" );
     if ( hndl )
     {
         unsigned int size = filesystem->Size( hndl );
