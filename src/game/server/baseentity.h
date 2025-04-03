@@ -1002,6 +1002,9 @@ public:
 	void					TraceBleed( float flDamage, const Vector &vecDir, trace_t *ptr, int bitsDamageType );
 	virtual bool			IsTriggered( CBaseEntity *pActivator ) {return true;}
 	virtual bool			IsNPC( void ) const { return false; }
+#ifdef NEXT_BOT
+	virtual bool			IsNextBot(void) const { return false; }
+#endif
 	CAI_BaseNPC				*MyNPCPointer( void ); 
 	virtual CBaseCombatCharacter *MyCombatCharacterPointer( void ) { return NULL; }
 #ifdef ZMR // ZMRCHANGE: Replace the nextbot shit to not change the vtable.
