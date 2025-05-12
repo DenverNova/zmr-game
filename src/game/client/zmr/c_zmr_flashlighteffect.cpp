@@ -464,13 +464,12 @@ void CZMFlashlightEffect::UpdateLightNew( const Vector& vecPos, const Vector& ve
 #ifndef NO_TOOLFRAMEWORK
     if ( clienttools->IsInRecordingMode() )
     {
-        auto* msg = new KeyValues( "FlashlightState" );
+        KeyValuesAD msg( "FlashlightState" );
         msg->SetFloat( "time", gpGlobals->curtime );
         msg->SetInt( "entindex", m_pPlayer->entindex() );
         msg->SetInt( "flashlightHandle", m_FlashlightHandle );
         msg->SetPtr( "flashlightState", &state );
         ToolFramework_PostToolMessage( HTOOLHANDLE_INVALID, msg );
-        msg->deleteThis();
     }
 #endif
 
@@ -631,13 +630,12 @@ void CZMFlashlightEffect::LightOffNew()
 #ifndef NO_TOOLFRAMEWORK
     if ( clienttools->IsInRecordingMode() )
     {
-        KeyValues *msg = new KeyValues( "FlashlightState" );
+        KeyValuesAD msg( "FlashlightState" );
         msg->SetFloat( "time", gpGlobals->curtime );
         msg->SetInt( "entindex", m_pPlayer->entindex() );
         msg->SetInt( "flashlightHandle", m_FlashlightHandle );
         msg->SetPtr( "flashlightState", nullptr );
         ToolFramework_PostToolMessage( HTOOLHANDLE_INVALID, msg );
-        msg->deleteThis();
     }
 #endif
 

@@ -113,7 +113,7 @@ CZMBuildMenu::CZMBuildMenu( Panel* pParent ) : CZMBuildMenuBase( pParent, "ZMBui
     }
     
 
-    KeyValues *kv = new KeyValues("zombiedesc.res");
+    KeyValuesAD kv("zombiedesc.res");
     if  ( kv->LoadFromFile( (IBaseFileSystem*)filesystem, "resource/zombiedesc.res", "MOD" ) )
     {
         //braaaaaaah, char juggling is pain
@@ -148,9 +148,6 @@ CZMBuildMenu::CZMBuildMenu( Panel* pParent ) : CZMBuildMenuBase( pParent, "ZMBui
     {
         Warning( "No zombiedesc.res exist!\n" );
     }
-
-    //will delete its child keys as well
-    kv->deleteThis();
 
     for (int i=0; i < BM_QUEUE_SIZE; i++)
     {

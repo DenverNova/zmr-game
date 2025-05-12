@@ -65,7 +65,7 @@ void C_ZMImportanceSystem::LevelInitPostEntity()
 
 bool C_ZMImportanceSystem::LoadFromFile()
 {
-    auto* kv = new KeyValues( "ImportantPeople" );
+    KeyValuesAD kv( "ImportantPeople" );
     if ( !kv->LoadFromFile( filesystem, "resource/zmimportantpeople.txt" ) )
     {
         return false;
@@ -112,9 +112,6 @@ bool C_ZMImportanceSystem::LoadFromFile()
 
         m_vPlayerData[i] = (ZMImportance_t)importance;
     }
-
-
-    kv->deleteThis();
 
     return true;
 }

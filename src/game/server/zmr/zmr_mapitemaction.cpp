@@ -158,11 +158,10 @@ void CZMMapItemSystem::ComputeMapVersion()
 
 bool CZMMapItemSystem::LoadActionsFromFile( const char* filename )
 {
-    auto* kv = new KeyValues( "ItemActions" );
+    KeyValuesAD kv( "ItemActions" );
     
     if ( !kv->LoadFromFile( filesystem, filename ) )
     {
-        kv->deleteThis();
         return false;
     }
 
@@ -178,9 +177,6 @@ bool CZMMapItemSystem::LoadActionsFromFile( const char* filename )
             CZMMapItemActionAdd::LoadActions( action, m_vActions );
         }
     }
-
-
-    kv->deleteThis();
 
     return true;
 }

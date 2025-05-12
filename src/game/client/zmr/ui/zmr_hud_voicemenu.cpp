@@ -242,10 +242,9 @@ void CZMHudVoiceMenu::LoadMenus()
 
 bool CZMHudVoiceMenu::LoadMenuTo( ZMVoiceMenu_t& vMenu, const char* path )
 {
-    KeyValues* kv = new KeyValues( "VoiceMenu" );
+    KeyValuesAD kv( "VoiceMenu" );
     if ( !kv->LoadFromFile( filesystem, path ) )
     {
-        kv->deleteThis();
         return false;
     }
 
@@ -268,10 +267,6 @@ bool CZMHudVoiceMenu::LoadMenuTo( ZMVoiceMenu_t& vMenu, const char* path )
         vMenu.m_vItems.AddToTail( new ZMVoiceMenuData_t( pLocal, index ) );
     }
     while ( (data = data->GetNextKey()) != nullptr );
-
-
-
-    kv->deleteThis();
 
     return true;
 }

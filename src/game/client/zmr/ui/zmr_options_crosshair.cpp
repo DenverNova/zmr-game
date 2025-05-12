@@ -36,11 +36,11 @@ CZMOptionsSubCrosshair::CZMOptionsSubCrosshair( Panel* parent ) : BaseClass( par
 
 
     // Copy the crosshairs, so we can safely edit the values without changing the real in-game crosshair.
-    KeyValues* tempkv = new KeyValues( "data" );
+    KeyValuesAD tempkv( "data" );
     CUtlVector<CZMBaseCrosshair*>* crosses = g_ZMCrosshairs.GetCrosshairs();
     for ( int i = 0; i < crosses->Count(); i++ )
     {
-        KeyValues* crossdata = new KeyValues( crosses->Element( i )->GetName() );
+        KeyValuesAD crossdata( crosses->Element( i )->GetName() );
         crosses->Element( i )->WriteValues( crossdata );
 
         CZMBaseCrosshair* pOurCross = CZMCrosshairSystem::CreateCrosshairFromData( crossdata );
@@ -56,12 +56,7 @@ CZMOptionsSubCrosshair::CZMOptionsSubCrosshair( Panel* parent ) : BaseClass( par
                 m_pCrosshairCombo->AddItem( crosses->Element( i )->GetMenuName(), tempkv );
             }
         }
-
-        crossdata->deleteThis();
     }
-
-    tempkv->deleteThis();
-
 
     // Init the panel
     if ( m_vCrosshairs.IsValidIndex( 0 ) )
@@ -98,13 +93,11 @@ void CZMOptionsSubCrosshair::OnApplyChanges()
 
     FOR_EACH_VEC( m_vCrosshairs, i )
     {
-        KeyValues* tempkv = new KeyValues( m_vCrosshairs[i]->GetName() );
+        KeyValuesAD tempkv( m_vCrosshairs[i]->GetName() );
 
         m_vCrosshairs[i]->WriteValues( tempkv );
 
         crosses->Element( i )->LoadValues( tempkv );
-
-        tempkv->deleteThis();
     }
 
     // Write the changes to our config file.
@@ -126,13 +119,11 @@ void CZMOptionsSubCrosshair::OnResetData()
 
     for ( int i = 0; i < crosses->Count(); i++ )
     {
-        KeyValues* tempkv = new KeyValues( crosses->Element( i )->GetName() );
+        KeyValuesAD tempkv( crosses->Element( i )->GetName() );
 
         crosses->Element( i )->WriteValues( tempkv );
 
         m_vCrosshairs[i]->LoadValues( tempkv );
-
-        tempkv->deleteThis();
     }
 }
 
@@ -194,7 +185,7 @@ void CZMOptionsSubCrosshair::UpdateSettings( int index )
     CZMBaseCrosshair* pCross = m_vCrosshairs[index];
 
 
-    KeyValues* kv = new KeyValues( pCross->GetName() );
+    KeyValuesAD kv( pCross->GetName() );
     pCross->WriteValues( kv );
 
 
@@ -216,10 +207,6 @@ void CZMOptionsSubCrosshair::UpdateSettings( int index )
     m_pDynMove->SetValue( kv->GetFloat( "dynamicmove" ), false );
 
     pCross->LoadValues( kv );
-
-
-
-    kv->deleteThis();
 }
 
 void CZMOptionsSubCrosshair::UpdateCrosshair( int index )
@@ -239,7 +226,7 @@ void CZMOptionsSubCrosshair::UpdateCrosshair( int index )
     CZMBaseCrosshair* pCross = m_vCrosshairs[index];
 
 
-    KeyValues* kv = new KeyValues( pCross->GetName() );
+    KeyValuesAD kv( pCross->GetName() );
     pCross->WriteValues( kv );
 
 
@@ -262,9 +249,4 @@ void CZMOptionsSubCrosshair::UpdateCrosshair( int index )
 
 
     pCross->LoadValues( kv );
-
-
-
-    kv->deleteThis();
 }
-

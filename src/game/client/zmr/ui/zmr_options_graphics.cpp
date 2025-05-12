@@ -43,7 +43,7 @@ CZMOptionsSubGraphics::CZMOptionsSubGraphics( Panel* parent ) : BaseClass( paren
     if ( FailedLoad() ) return;
 
 
-    auto* tempkv = new KeyValues( "temp" );
+    KeyValuesAD tempkv( "temp" );
 
     m_pRainBox->AddItem( L"None", tempkv ); // 0
     m_pRainBox->AddItem( L"Low", tempkv ); // 1
@@ -63,8 +63,6 @@ CZMOptionsSubGraphics::CZMOptionsSubGraphics( Panel* parent ) : BaseClass( paren
     m_pFireLightsBox->AddItem( L"2", tempkv );
     m_pFireLightsBox->AddItem( L"5", tempkv );
     m_pFireLightsBox->AddItem( L"10", tempkv );
-
-    tempkv->deleteThis();
 
     m_pSlider_MaxRagdolls->SetRange( 0, 100 );
     m_pSlider_MaxRagdolls->AddActionSignalTarget( this );

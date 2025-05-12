@@ -87,10 +87,9 @@ void CZMVoiceLines::LoadVoiceLines()
     m_vLines.PurgeAndDeleteElements();
 
 
-    KeyValues* kv = new KeyValues( "VoiceLines" );
+    KeyValuesAD kv( "VoiceLines" );
     if ( !kv->LoadFromFile( filesystem, "resource/zmvoicelines.txt" ) )
     {
-        kv->deleteThis();
         return;
     }
 
@@ -116,11 +115,6 @@ void CZMVoiceLines::LoadVoiceLines()
 #endif
     }
     while ( (data = data->GetNextKey()) != nullptr );
-
-
-
-
-    kv->deleteThis();
 }
 
 #ifdef CLIENT_DLL

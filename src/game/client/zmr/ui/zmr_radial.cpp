@@ -277,7 +277,7 @@ void CZMRadialPanel::AddButton( KeyValues* kv )
 
 void CZMRadialPanel::LoadFromFile( const char* file )
 {
-    KeyValues* kv = new KeyValues( "Radial" );
+    KeyValuesAD kv( "Radial" );
     kv->UsesEscapeSequences( true );
 
     if ( kv->LoadFromFile( filesystem, file, "MOD" ) )
@@ -296,8 +296,6 @@ void CZMRadialPanel::LoadFromFile( const char* file )
     {
         Warning( "Couldn't load radial buttons from file (%s)!\n", file );
     }
-
-    kv->deleteThis();
 }
 
 CZMRadialButton* CZMRadialPanel::GetButton( int x, int y )

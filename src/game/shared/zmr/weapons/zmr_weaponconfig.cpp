@@ -897,25 +897,19 @@ CZMBaseWeaponConfig* CZMWeaponConfigSystem::LoadConfigFromFile( const char* szWe
 
 
     char file[256];
-    KeyValues* kv;
-    
-    
+
     Q_snprintf( file, sizeof( file ), CONFIG_DIR"/%s.txt", szWeaponName );
 
-    kv = new KeyValues( "WeaponData" );
-    if ( !kv->LoadFromFile( filesystem, file ) )
+    KeyValuesAD baseKeyValues( "WeaponData" );
+    if ( !baseKeyValues->LoadFromFile( filesystem, file ) )
     {
         Warning( "Couldn't load weapon config '%s'!\n", file );
-
-        kv->deleteThis();
         return nullptr;
     }
 
 
     auto* pConfig = ( fn != nullptr ) ? (fn( szWeaponName, file )) : (new CZMBaseWeaponConfig( szWeaponName, file ));
-    pConfig->LoadFromConfig( kv );
-
-    kv->deleteThis();
+    pConfig->LoadFromConfig( baseKeyValues );
 
     //
     // Override
@@ -936,15 +930,13 @@ CZMBaseWeaponConfig* CZMWeaponConfigSystem::LoadConfigFromFile( const char* szWe
     {
         Q_snprintf( file, sizeof( file ), CONFIG_DIR"/%s%s.txt", szWeaponName, postfixes[i] );
 
-        kv = new KeyValues( "WeaponData" );
-        if ( kv->LoadFromFile( filesystem, file, "MOD" ) )
+        KeyValuesAD overrideKeyValues( "WeaponData" );
+        if ( overrideKeyValues->LoadFromFile( filesystem, file, "MOD" ) )
         {
-            pConfig->OverrideFromConfig( kv );
+            pConfig->OverrideFromConfig( overrideKeyValues );
 
             i = ARRAYSIZE( postfixes ); // Break after this.
         }
-
-        kv->deleteThis();
     }
 
 
@@ -956,11 +948,9 @@ CZMBaseWeaponConfig* CZMWeaponConfigSystem::LoadCustomConfigFromFile( WeaponConf
     DevMsg( "Loading custom weapon config '%s'...\n", filepath );
 
 
-    auto* kv = new KeyValues( "WeaponData" );
+    KeyValuesAD kv( "WeaponData" );
     if ( !kv->LoadFromFile( filesystem, filepath ) )
     {
-        kv->deleteThis();
-
         Warning( "Couldn't load weapon config '%s'!\n", filepath );
         return nullptr;
     }
@@ -970,7 +960,7 @@ CZMBaseWeaponConfig* CZMWeaponConfigSystem::LoadCustomConfigFromFile( WeaponConf
     auto* pBaseConfig = m_pConfigs[baseslot];
     Assert( pBaseConfig );
 
-    auto* basekv = pBaseConfig->ToKeyValues();
+    KeyValuesAD basekv( pBaseConfig->ToKeyValues() );
 
 
     const char* wepname = m_ConfigRegisters[baseslot].pszWeaponName;
@@ -983,11 +973,6 @@ CZMBaseWeaponConfig* CZMWeaponConfigSystem::LoadCustomConfigFromFile( WeaponConf
     pConfig->OverrideFromConfig( kv );
 
     pConfig->OnCustomConfigLoaded();
-
-
-    basekv->deleteThis();
-    kv->deleteThis();
-
 
     return pConfig;
 }

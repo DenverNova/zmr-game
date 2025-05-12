@@ -375,7 +375,7 @@ void CZMTipManager::LoadTips()
     FormatFilePath( filepath, sizeof( filepath ) );
 
 
-    auto* kv = new KeyValues( "Tips" );
+    KeyValuesAD kv( "Tips" );
     kv->UsesEscapeSequences( true );
 
 
@@ -390,8 +390,6 @@ void CZMTipManager::LoadTips()
     {
         Warning( "Couldn't load tips from file!\n" );
     }
-
-    kv->deleteThis();
 }
 
 void CZMTipManager::LoadUsed()
@@ -403,7 +401,7 @@ void CZMTipManager::LoadUsed()
     FormatFilePathUsed( filepath, sizeof( filepath ) );
 
 
-    auto* kv = new KeyValues( "Tips" );
+    KeyValuesAD kv( "Tips" );
 
     if ( kv->LoadFromFile( filesystem, filepath, "MOD" ) )
     {
@@ -417,8 +415,6 @@ void CZMTipManager::LoadUsed()
             }
         }
     }
-
-    kv->deleteThis();
 }
 
 void CZMTipManager::SaveUsed() const
@@ -426,7 +422,7 @@ void CZMTipManager::SaveUsed() const
     DevMsg( "Saving used tips...\n" );
 
 
-    auto* kv = new KeyValues( "Tips" );
+    KeyValuesAD kv( "Tips" );
 
 
     for ( int i = 0; i < m_vTips.Count(); i++ )
@@ -443,9 +439,6 @@ void CZMTipManager::SaveUsed() const
     {
         kv->SaveToFile( filesystem, filepath, "MOD" );
     }
-    
-
-    kv->deleteThis();
 }
 
 void CZMTipManager::FormatFilePath( char* buffer, int len ) const

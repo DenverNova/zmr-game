@@ -101,11 +101,9 @@ void CZMPlayerModelSystem::ParseCustomModels( ZMPlayerModelList_t& list )
 
         *sep = 0;
 
-        KeyValues* kv = CZMPlayerModelData::CreateEmptyModelData( sep + 1, buffer );
+        KeyValuesAD kv( CZMPlayerModelData::CreateEmptyModelData( sep + 1, buffer ) );
 
         list.AddToTail( new CZMPlayerModelData( kv, true ) );
-
-        kv->deleteThis();
     }
 }
 
@@ -186,35 +184,28 @@ int CZMPlayerModelSystem::LoadModelsFromFile()
 
 int CZMPlayerModelSystem::LoadStockModels()
 {
-    KeyValues* kv = new KeyValues( "PlayerModels" );
+    KeyValuesAD kv( "PlayerModels" );
     if ( !kv->LoadFromFile( filesystem, PLAYERMODEL_FILE ) )
     {
-        kv->deleteThis();
         return 0;
     }
 
 
     int ret = LoadModelData( kv, m_vPlayerModels, false );
 
-    kv->deleteThis();
-
     return ret;
 }
 
 int CZMPlayerModelSystem::LoadCustomModels()
 {
-    KeyValues* kv = new KeyValues( "PlayerModels" );
+    KeyValuesAD kv( "PlayerModels" );
     if ( !kv->LoadFromFile( filesystem, PLAYERMODEL_FILE_CUSTOM ) )
     {
-        kv->deleteThis();
         return 0;
     }
 
 
     int ret = LoadModelData( kv, m_vPlayerModels, true );
-
-    kv->deleteThis();
-
 
     if ( IsDebugging() )
     {
@@ -293,11 +284,9 @@ int CZMPlayerModelSystem::LoadModelData( KeyValues* kv, ZMPlayerModelList_t& lis
 
 void CZMPlayerModelSystem::AddFallbackModel()
 {
-    KeyValues* kv = CZMPlayerModelData::CreateEmptyModelData( GetDefaultPlayerModel(), "_DefaultModel" );
+    KeyValuesAD kv( CZMPlayerModelData::CreateEmptyModelData( GetDefaultPlayerModel(), "_DefaultModel" ) );
 
     m_vPlayerModels.AddToTail( new CZMPlayerModelData( kv, false ) );
-
-    kv->deleteThis();
 }
 
 CZMPlayerModelData* CZMPlayerModelSystem::GetRandomPlayerModel() const
@@ -347,4 +336,3 @@ CZMPlayerModelSystem* ZMGetPlayerModels()
     static CZMPlayerModelSystem s_ZMPlayerModels;
     return &s_ZMPlayerModels;
 }
-

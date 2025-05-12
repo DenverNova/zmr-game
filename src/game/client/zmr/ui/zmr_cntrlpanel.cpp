@@ -355,12 +355,11 @@ void CZMHudControlPanel::GroupsListUpdate()
                 char groupName[16];
                 Q_snprintf( groupName, sizeof( groupName ), "Group %i", group );
 
-                KeyValues* kv = new KeyValues( "group" ); //qck: Associate entity serial number with its menu listing under key "serial"
+                KeyValuesAD kv( "group" ); //qck: Associate entity serial number with its menu listing under key "serial"
                 if ( !kv || !m_pZombieGroups ) return;
                 
                 kv->SetInt( "groupnum", group );
                 m_pZombieGroups->AddItem( groupName, kv ); 
-                kv->deleteThis();
 
                 m_ComboBoxItems.AddToTail( group );
             }

@@ -70,30 +70,26 @@ CZMBaseCrosshair* CZMCrosshairSystem::CreateCrosshairFromData( KeyValues* kv )
 
 void CZMCrosshairSystem::LoadFiles()
 {
-    KeyValues* kv;
+    {
+        // Try to load player's customized crosshairs first.
+        KeyValuesAD kv( "Crosshairs" );
+        kv->LoadFromFile( filesystem, CROSSHAIRFILE );
 
-    // Try to load player's customized crosshairs first.
-    kv = new KeyValues( "Crosshairs" );
-    kv->LoadFromFile( filesystem, CROSSHAIRFILE );
+        ReadCrosshairs( kv );
+    }
 
-    ReadCrosshairs( kv );
+    {
+        // Load defaults afterwards.
+        KeyValuesAD kv( "Crosshairs" );
+        kv->LoadFromFile( filesystem, CROSSHAIRFILE_DEFAULT );
 
-    kv->deleteThis();
-
-
-
-    // Load defaults afterwards.
-    kv = new KeyValues( "Crosshairs" );
-    kv->LoadFromFile( filesystem, CROSSHAIRFILE_DEFAULT );
-
-    ReadCrosshairs( kv );
-
-    kv->deleteThis();
+        ReadCrosshairs( kv );
+    }
 }
 
 void CZMCrosshairSystem::WriteCrosshairsToFile() const
 {
-    KeyValues* kv = new KeyValues( "Crosshairs" );
+    KeyValuesAD kv( "Crosshairs" );
 
 
     FOR_EACH_VEC( m_vCrosshairs, i )
@@ -108,8 +104,6 @@ void CZMCrosshairSystem::WriteCrosshairsToFile() const
     {
         Warning( "Couldn't save crosshairs to disk!\n" );
     }
-
-    kv->deleteThis();
 }
 
 void CZMCrosshairSystem::ReadCrosshairs( KeyValues* kv )

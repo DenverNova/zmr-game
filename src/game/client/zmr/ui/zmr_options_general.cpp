@@ -45,9 +45,7 @@ CZMOptionsSubGeneral::CZMOptionsSubGeneral( Panel* parent ) : BaseClass( parent 
     m_pSlider_Border->SetRange( 0, 100 );
 
 
-    KeyValues* kv;
-
-    kv = new KeyValues( "participation" );
+    KeyValuesAD kv( "participation" );
 
     if ( kv->LoadFromFile( filesystem, "resource/zmoptions_participation.txt", "MOD" ) )
     {
@@ -64,8 +62,6 @@ CZMOptionsSubGeneral::CZMOptionsSubGeneral( Panel* parent ) : BaseClass( parent 
     {
         Warning( "Couldn't load participation values from file!\n" );
     }
-
-    kv->deleteThis();
 
     m_pPartBox->ActivateItemByRow( 0 );
 

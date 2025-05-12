@@ -273,7 +273,7 @@ void CZMOptionsSubKeys::ParseKeys()
 		}
 		else // It's a binding, add it as an item.
 		{
-			auto* item = new KeyValues( "Item" );
+			KeyValuesAD item( "Item" );
 			
 			item->SetString( "Action", desc );
 			item->SetString( "Binding", binding );
@@ -281,7 +281,6 @@ void CZMOptionsSubKeys::ParseKeys()
 
 
 			m_pKeyBindList->AddItem( sectionIndex, item );
-			item->deleteThis();
 		}
     }
 

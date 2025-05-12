@@ -132,13 +132,11 @@ void ZMMusic::CZMMusicManager::PostInit()
 
 void ZMMusic::CZMMusicManager::RegisterMusic()
 {
-    auto* kv = new KeyValues( "Music" );
+    KeyValuesAD kv( "Music" );
 
     if ( !kv->LoadFromFile( filesystem, ZMMUSIC_FILE ) )
     {
         Warning( "Failed to load music! Music file '%s' does not exist!\n", ZMMUSIC_FILE );
-
-        kv->deleteThis();
         return;
     }
 
@@ -241,7 +239,6 @@ void ZMMusic::CZMMusicManager::RegisterMusic()
     }
 
     list.RemoveAll();
-    kv->deleteThis();
 
 
     DevMsg( "Registered %i music tracks.\n", m_vpMusic.Count() );

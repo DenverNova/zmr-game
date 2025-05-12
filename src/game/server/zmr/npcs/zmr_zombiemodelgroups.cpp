@@ -269,42 +269,30 @@ void CZMZombieModelGroupSystem::LoadFiles()
 {
     m_vModelGroups.PurgeAndDeleteElements();
 
-    KeyValues* kv;
-
-
-    // Load default settings
-    kv = new KeyValues( "ModelGroups" );
-
-    if ( !kv->LoadFromFile( filesystem, DATAFILE_PATH ) )
     {
-        kv->deleteThis();
-        Warning( "Couldn't open zombie data file! (%s)\n", DATAFILE_PATH );
-        return;
+        // Load default settings
+        KeyValuesAD kv( "ModelGroups" );
+
+        if ( !kv->LoadFromFile( filesystem, DATAFILE_PATH ) )
+        {
+            Warning( "Couldn't open zombie data file! (%s)\n", DATAFILE_PATH );
+            return;
+        }
+
+
+        LoadFromFile( kv );
     }
 
-
-    LoadFromFile( kv );
-
-
-    kv->deleteThis();
-
-
-
-
-    // Load map specific settings
-    kv = new KeyValues( "ModelGroups" );
-    const char* mapname = STRING( gpGlobals->mapname );
-
-    if ( !kv->LoadFromFile( filesystem, UTIL_VarArgs( DATAFILE_PATH_MAP_FORMAT, mapname ) ) )
     {
-        kv->deleteThis();
-        return;
+        // Load map specific settings
+        KeyValuesAD kv( "ModelGroups" );
+        const char* mapname = STRING( gpGlobals->mapname );
+
+        if ( kv->LoadFromFile( filesystem, UTIL_VarArgs( DATAFILE_PATH_MAP_FORMAT, mapname ) ) )
+        {
+            LoadFromFile( kv );
+        }
     }
-
-
-    LoadFromFile( kv );
-
-    kv->deleteThis();
 }
 
 void CZMZombieModelGroupSystem::LoadFromFile( KeyValues* kv )

@@ -160,7 +160,7 @@ void ZMLegacyObjPanel::ShowPanel()
     }
 
 
-    KeyValues* kv = new KeyValues( "I hope nobody will read this... MEMES ARE FUNNY" );
+    KeyValuesAD kv( "I hope nobody will read this... MEMES ARE FUNNY" );
 
     kv->SetString( "title", "Objectives" );
     kv->SetString( "msg", ZM_OBJ_STRINGTABLE_ENTRY );
@@ -170,8 +170,6 @@ void ZMLegacyObjPanel::ShowPanel()
     viewport->SetData( kv );
 
     gViewPortInterface->ShowPanel( viewport, true );
-
-    kv->deleteThis();
 }
 
 CON_COMMAND( zm_showmaptext, "Displays map info (usually objectives)" )

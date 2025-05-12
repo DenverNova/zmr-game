@@ -299,7 +299,7 @@ bool CZMEntObjectivesManager::LoadFromFile()
     CUtlVector<char*> vBuf;
     vBuf.Purge();
 
-    KeyValues* kv = new KeyValues( "Objectives" );
+    KeyValuesAD kv( "Objectives" );
     kv->LoadFromFile( filesystem, UTIL_VarArgs( "maps/%s.zmobj", STRING( gpGlobals->mapname ) ), "GAME" );
 
     pKey = kv->GetFirstSubKey();
@@ -403,7 +403,6 @@ bool CZMEntObjectivesManager::LoadFromFile()
 
 
     vBuf.PurgeAndDeleteElements();
-    kv->deleteThis();
 
     return true;
 }

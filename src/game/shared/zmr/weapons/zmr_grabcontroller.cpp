@@ -269,7 +269,7 @@ bool GetModelPreferredAngles_( CBaseAnimating* pEnt, QAngle& anglesOut )
     auto* pModel = pEnt->GetModel();
     if ( !pModel ) return false;
 
-    auto* kv = new KeyValues( "" );
+    KeyValuesAD kv( "" );
 	if ( kv->LoadFromBuffer( modelinfo->GetModelName( pModel ), modelinfo->GetModelKeyValueText( pModel ) ) )
 	{
 		auto* interactions = kv->FindKey( "physgun_interactions" );
@@ -279,13 +279,11 @@ bool GetModelPreferredAngles_( CBaseAnimating* pEnt, QAngle& anglesOut )
 			if ( pszAngles && *pszAngles )
 			{
 				UTIL_StringToVector( anglesOut.Base(), pszAngles );
-				kv->deleteThis();
 				return true;
 			}
 		}
 	}
 
-	kv->deleteThis();
 	return false;
 }
 
