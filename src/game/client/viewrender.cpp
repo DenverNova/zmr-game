@@ -2113,6 +2113,7 @@ void CViewRender::RenderView( const CViewSetup &viewRender, int nClearFlags, int
 		}
 		SafeRelease( pSkyView );
 
+#ifndef ZMR // ZMRCHANGE: We do the clearing.
 		// Force it to clear the framebuffer if they're in solid space.
 		if ( ( nClearFlags & VIEW_CLEAR_COLOR ) == 0 )
 		{
@@ -2121,6 +2122,7 @@ void CViewRender::RenderView( const CViewSetup &viewRender, int nClearFlags, int
 				nClearFlags |= VIEW_CLEAR_COLOR;
 			}
 		}
+#endif
 
 		// Render world and all entities, particles, etc.
 		if( !g_pIntroData )
@@ -4982,7 +4984,11 @@ bool CSkyboxView::Setup( const CViewSetup &viewRender, int *pClearFlags, SkyboxV
 	BaseClass::Setup( viewRender );
 
 	// The skybox might not be visible from here
+#ifdef ZMR
+	*pSkyboxVisible = ZMSkyboxVisibility();
+#else
 	*pSkyboxVisible = ComputeSkyboxVisibility();
+#endif
 	m_pSky3dParams = PreRender3dSkyboxWorld( *pSkyboxVisible );
 
 	if ( !m_pSky3dParams )

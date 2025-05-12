@@ -248,6 +248,7 @@ protected:
 
 #ifdef ZMR
 	void			ZMDrawSkybox();
+	SkyboxVisibility_t ZMSkyboxVisibility() const;
 #endif
 
 	void ReleaseLists();

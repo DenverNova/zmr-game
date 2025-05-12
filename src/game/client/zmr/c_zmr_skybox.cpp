@@ -118,22 +118,33 @@ void CZMSkybox::Update()
 		}
 	}
 
-	if ( bOutsideWorld )
+	if ( m_previousValidVisibility != SKYBOX_NOT_VISIBLE )
 	{
-		m_flSolidAlpha += gpGlobals->frametime * 1.0f;
-		m_flSolidAlpha = min( m_flSolidAlpha, 1.0f );
+		m_flSolidAlpha = 0.0f;
+	}
+	else if ( m_visibility == SKYBOX_NOT_VISIBLE )
+	{
+		m_flSolidAlpha = 1.0f;
 	}
 	else
 	{
-		m_flSolidAlpha -= gpGlobals->frametime * 0.5f;
-		m_flSolidAlpha = max( m_flSolidAlpha, 0.0f );
+		// ZMRTODO: Unused?
+		if ( bOutsideWorld )
+		{
+			m_flSolidAlpha += gpGlobals->frametime * 1.0f;
+			m_flSolidAlpha = min( m_flSolidAlpha, 1.0f );
+		}
+		else
+		{
+			m_flSolidAlpha -= gpGlobals->frametime * 0.5f;
+			m_flSolidAlpha = max( m_flSolidAlpha, 0.0f );
+		}
 	}
 
 	if ( !bOutsideWorld )
 	{
 		m_previousValidVisibility = m_visibility;
 	}
-    
 }
 
 void CZMSkybox::RenderSkybox( const Vector& viewPos, const Vector& forward, const float fov, const float farZ )

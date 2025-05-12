@@ -22,6 +22,18 @@ public:
     void Render( const Vector& viewPos, const Vector& forward, const float fov, const float farZ );
 	void Update();
 
+	SkyboxVisibility_t GetSkyboxVisibility() const
+	{
+		SkyboxVisibility_t visibility = m_visibility;
+
+		if ( visibility == SKYBOX_NOT_VISIBLE )
+		{
+			visibility = m_previousValidVisibility;
+		}
+
+		return visibility;
+	}
+
 private:
     const char* GetSkyboxMaterialName();
     bool IsSkyboxDirty();

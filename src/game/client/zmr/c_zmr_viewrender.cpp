@@ -263,6 +263,11 @@ void CViewRender::UpdateZMSkybox()
     GetZMSkybox().Update();
 }
 
+SkyboxVisibility_t CRendering3dView::ZMSkyboxVisibility() const
+{
+	return GetZMSkybox().GetSkyboxVisibility();
+}
+
 void CRendering3dView::ZMDrawSkybox()
 {
 	const Vector& viewPos = CurrentViewOrigin();
