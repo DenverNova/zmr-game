@@ -63,7 +63,7 @@ ConVar	sv_maxspeed		( "sv_maxspeed", "320", FCVAR_NOTIFY | FCVAR_REPLICATED);
 #if defined( CSTRIKE_DLL ) || defined( HL1MP_DLL )
 	ConVar	sv_accelerate	( "sv_accelerate", "10", FCVAR_NOTIFY | FCVAR_REPLICATED);
 #elif defined( ZMR )
-	ConVar	sv_accelerate	( "sv_accelerate", "6", FCVAR_NOTIFY | FCVAR_REPLICATED );
+	ConVar	sv_accelerate	( "sv_accelerate", "8.5", FCVAR_NOTIFY | FCVAR_REPLICATED );
 #else
 	ConVar	sv_accelerate	( "sv_accelerate", "10", FCVAR_NOTIFY | FCVAR_REPLICATED);
 #endif // CSTRIKE_DLL
