@@ -138,6 +138,70 @@ void ZM_RoundRestart( const CCommand &args )
 
 static ConCommand roundrestart( "roundrestart", ZM_RoundRestart, "Restart the round as ZM." );
 
+void ZM_MoveToSurvivor( const CCommand& args )
+{
+    CZMPlayer* pPlayer = ToZMPlayer( UTIL_GetCommandClient() );
+    if ( !pPlayer || !( pPlayer->IsZM() || pPlayer->GetTeamNumber() == ZMTEAM_SPECTATOR ) )
+    {
+        return;
+    }
+
+    CUtlVector<CZMPlayer*> vSurvivors;
+    for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+    {
+        CZMPlayer* pLoop = ToZMPlayer( UTIL_PlayerByIndex( i ) );
+
+        if ( pLoop && pLoop != pPlayer && pLoop->IsHuman() && pLoop->IsAlive() )
+        {
+            vSurvivors.AddToTail( pLoop );
+        }
+    }
+
+    if ( vSurvivors.IsEmpty() )
+    {
+        return;
+    }
+
+    vSurvivors.Sort( []( CZMPlayer* const* p1, CZMPlayer* const* p2 )
+    {
+        float a = ( *p1 )->GetAbsOrigin().x;
+        float b = ( *p2 )->GetAbsOrigin().x;
+        if ( a < b ) return -1;
+        if ( a > b ) return 1;
+        return 0;
+    } );
+    
+    Vector myPos = pPlayer->GetAbsOrigin();
+
+
+    const float flMinDistSqr = 512.0f * 512.0f;
+
+    int closestIndex = -1;
+    float closestDistSqr = FLT_MAX;
+    FOR_EACH_VEC( vSurvivors, i )
+    {
+        CZMPlayer* pSurvivor = vSurvivors[i];
+        float distSqr = pSurvivor->GetAbsOrigin().DistToSqr( myPos );
+        if ( distSqr < closestDistSqr && distSqr < flMinDistSqr )
+        {
+            closestIndex = i;
+            closestDistSqr = distSqr;
+        }
+    }
+
+    int nextIndex = closestIndex + 1;
+    if ( !vSurvivors.IsValidIndex( nextIndex ) )
+    {
+        nextIndex = 0;
+    }
+
+
+    Vector pos = vSurvivors[nextIndex]->EyePosition();
+    pPlayer->Teleport( &pos, nullptr, nullptr );
+}
+
+static ConCommand zm_movetosurvivor( "zm_movetosurvivor", ZM_MoveToSurvivor, "Move yourself to a survivor. Cycles to the next one when executed rapidly." );
+
 
 void ZM_ObserveZombie( const CCommand &args )
 {
