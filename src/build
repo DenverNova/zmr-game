@@ -1,0 +1,10 @@
+#!/bin/bash
+
+pushd `dirname $0`
+
+# Actual build
+export VPC_NINJA_BUILD_MODE="release"
+solution_out="_vpc_/ninja/$1_$VPC_NINJA_BUILD_MODE"
+ninja -f "$solution_out.ninja" -j$(nproc)
+
+popd

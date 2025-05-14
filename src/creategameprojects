@@ -1,9 +1,9 @@
 #!/bin/bash
 
 pushd `dirname $0`
+
 export VPC_NINJA_BUILD_MODE="release"
 solution_out="_vpc_/ninja/game_$VPC_NINJA_BUILD_MODE"
-
 devtools/bin/vpc /zmr /linux64 /ninja +game /mksln "$solution_out" $@
 # Generate compile commands.
 ninja -f "$solution_out.ninja" -t compdb > compile_commands.json
@@ -11,5 +11,4 @@ ninja -f "$solution_out.ninja" -t compdb > compile_commands.json
 sed -i 's/-fpredictive-commoning//g; s/-fvar-tracking-assignments//g' compile_commands.json
 sed -i 's|/my_mod/src|.|g' compile_commands.json
 
-ninja -f "$solution_out.ninja" -j$(nproc)
 popd

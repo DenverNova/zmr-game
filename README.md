@@ -21,9 +21,11 @@ You should use the Steam Runtime SDK to compile. Here's an example using Docker:
 docker run --rm -v .:/build/ -it "registry.gitlab.steamos.cloud/steamrt/sniper/sdk" /bin/bash
 # You should now have a shell in the container.
 
-# Create build files & build.
 cd /build/src
 ./creategameprojects
+./build game
+# Optionally strip debug symbols
+./strip_debug_symbols
 ```
 
 ## Running

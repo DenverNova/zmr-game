@@ -1,0 +1,36 @@
+#!/bin/bash
+
+pushd "../game/zombie_master_reborn/bin/linux64" > /dev/null
+
+strip_all=("client.so" "game_shader_generic_zmr.so")
+strip_debug=("server.so")
+
+for file in "${strip_all[@]}"
+do
+    res=$(file "$file" | grep "not stripped")
+    if [[ -z $res ]]; then
+        echo "$file is already stripped."
+        continue
+    fi
+
+    echo "Stripping (all) $file..."
+    strip --strip-all -o "$file.stripped" "$file"
+    mv "$file" "$file.dbg"
+    mv "$file.stripped" "$file"
+done
+
+for file in "${strip_debug[@]}"
+do
+    res=$(file "$file" | grep "with debug_info")
+    if [[ -z $res ]]; then
+        echo "$file is already stripped."
+        continue
+    fi
+
+    echo "Stripping (symbols) $file..."
+    strip --strip-debug -o "$file.stripped" "$file"
+    mv "$file" "$file.dbg"
+    mv "$file.stripped" "$file"
+done
+
+popd > /dev/null

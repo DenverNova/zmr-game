@@ -1,4 +1,6 @@
 creategameprojects text eol=lf
+src/build text eol=lf
+src/strip_debug_symbols text eol=lf
 vpc binary
 
 *.sh text eol=lf
