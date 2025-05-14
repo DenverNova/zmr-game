@@ -1,7 +1,4 @@
-createallprojects text eol=lf
-creatededicated text eol=lf
 creategameprojects text eol=lf
-createshaderproject text eol=lf
 vpc binary
 
 *.sh text eol=lf
