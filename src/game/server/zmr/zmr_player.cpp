@@ -1789,7 +1789,28 @@ void CZMPlayer::SetHandsData( CZMPlayerModelData* pData )
         pVM->SetModel( pszArms );
     }
 
-
+    // Bodygroups
+    KeyValues* pBodyGroupKV = pData->GetArmBodygroups();
+    if ( pBodyGroupKV )
+    {
+        for ( KeyValues* pValue = pBodyGroupKV->GetFirstValue(); pValue; pValue = pValue->GetNextValue() )
+        {
+            const char* pszBodygroupName = pValue->GetName();
+            int bodygroupValue = pValue->GetInt( nullptr, -1 );
+            if ( pszBodygroupName && *pszBodygroupName && bodygroupValue >= 0 )
+            {
+                int bodygroupIndex = pVM->FindBodygroupByName( pszBodygroupName );
+                if ( bodygroupIndex >= 0 )
+                {
+                    pVM->SetBodygroup( bodygroupIndex, bodygroupValue );
+                }
+                else
+                {
+                    Warning( "Player model's arms '%s' body group '%s' does not exist?\n", pszArms, pszBodygroupName );
+                }
+            }
+        }
+    }
 
     int skin = pData->GetArmSkin();
     if ( skin >= 0 && skin < MAXSTUDIOSKINS )

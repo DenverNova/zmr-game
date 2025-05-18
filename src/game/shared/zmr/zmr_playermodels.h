@@ -14,6 +14,7 @@ public:
     KeyValues*  GetModelData() const { return m_pKvData; }
     int         GetGender() const { return GetModelData()->GetInt( "gender" ); }
     const char* GetArmModel() const { return GetModelData()->GetString( "armsmodel" ); }
+    KeyValues*  GetArmBodygroups() const;
     int         GetArmSkin() const { return GetModelData()->GetInt( "armsskin" ); }
     Color       GetArmColor() const { return GetModelData()->GetColor( "armscolor" ); }
     bool        IsCustom() const { return m_bIsCustom; }

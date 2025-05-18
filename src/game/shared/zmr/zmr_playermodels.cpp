@@ -47,6 +47,19 @@ KeyValues* CZMPlayerModelData::CreateEmptyModelData( const char* model, const ch
 
     return kv;
 }
+
+KeyValues* CZMPlayerModelData::GetArmBodygroups() const
+{
+    for ( KeyValues* pKV = GetModelData()->GetFirstTrueSubKey(); pKV; pKV = pKV->GetNextTrueSubKey() )
+    {
+        if ( FStrEq( pKV->GetName(), "armsbodygroups" ) )
+        {
+            return pKV;
+        }
+    }
+    
+    return nullptr;
+}
 //
 
 
