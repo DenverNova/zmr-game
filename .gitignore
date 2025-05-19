@@ -511,3 +511,5 @@ src/public/fmod/
 .ninja_deps
 .ninja_log
 compile_commands.json
+# Shaders
+*.vcs
