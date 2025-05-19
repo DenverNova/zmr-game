@@ -44,7 +44,7 @@ PixelShaderLightInfo cLightInfo[3]              : register(PSREG_LIGHT_INFO_ARRA
 const float4 g_BaseColor                        : register(PSREG_SELFILLUMTINT);
 
 #if PARALLAXOCCLUSION
-const float4 g_ParallaxParms                    : register( c40 );
+const float4 g_ParallaxParms                    : register( c27 );
 #define PARALLAX_DEPTH                          g_ParallaxParms.r
 #define PARALLAX_CENTER                         g_ParallaxParms.g
 #endif
@@ -95,8 +95,8 @@ float4 main(PS_INPUT i) : COLOR
 
 #if PARALLAXOCCLUSION
     float3 outgoingLightRay = g_EyePos.xyz - i.worldPos;
-       float3 outgoingLightDirectionTS = worldToRelative( outgoingLightRay, surfTangent, surfBase, surfNormal);
-    float2 correctedTexCoord = parallaxCorrect(i.baseTexCoord, outgoingLightDirectionTS , NormalTextureSampler , PARALLAX_DEPTH , PARALLAX_CENTER);
+    float3 outgoingLightDirectionTS = worldToRelative( outgoingLightRay, surfTangent, surfBase, surfNormal);
+    float2 correctedTexCoord = parallaxCorrect(i.baseTexCoord, outgoingLightDirectionTS , outgoingLightRay, i.worldNormal, NormalTextureSampler , PARALLAX_DEPTH , PARALLAX_CENTER);
 #else
     float2 correctedTexCoord = i.baseTexCoord;
 #endif
@@ -136,7 +136,7 @@ float4 main(PS_INPUT i) : COLOR
     {
         float3 diffuseIrradiance = ambientLookup(normal, EnvAmbientCube, textureNormal, i.lightmapTexCoord1And2, i.lightmapTexCoord3, LightmapSampler, g_DiffuseModulation);
         // return float4(diffuseIrradiance, 1); // testing diffuse irraciance
-        float3 ambientLightingFresnelTerm = fresnelSchlick(fresnelReflectance, lightDirectionAngle); // F
+        float3 ambientLightingFresnelTerm = fresnelSchlickRoughness(fresnelReflectance, lightDirectionAngle, roughness); // F
 #if SPECULAR
         float3 diffuseContributionFactor = 1 - ambientLightingFresnelTerm; // kd
 #else

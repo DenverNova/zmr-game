@@ -82,7 +82,7 @@ VS_OUTPUT main( const VS_INPUT v )
     o.projPos = vProjPos.xyz;
     o.fog = CalcFog(worldPos, vProjPos.xyz, g_FogType);
 
-    // Needed for water fog alpha and diffuse lighting 
+    // Needed for water fog alpha and diffuse ligghting 
     o.worldPos = worldPos;
     o.worldNormal = normalize(worldNormal);
     //o.worldTangent = float4(worldTangentS.xyz, vTangent.w);
@@ -111,7 +111,6 @@ VS_OUTPUT main( const VS_INPUT v )
     // Base texture coordinate transform
     o.baseTexCoord.x = dot(v.vTexCoord0, cBaseTexCoordTransform[0].xy);
     o.baseTexCoord.y = dot(v.vTexCoord0, cBaseTexCoordTransform[1].xy);
-    o.baseTexCoord = v.vTexCoord0;
 
     return o;
 }
