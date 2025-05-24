@@ -4,6 +4,9 @@
 #include "zmr_weaponconfig.h"
 #include "zmr_base.h"
 
+#ifndef CLIENT_DLL
+#include "zmr_baseprojectile.h"
+#endif
 
 #ifdef CLIENT_DLL
 #define CZMBaseThrowableWeapon C_ZMBaseThrowableWeapon
@@ -43,6 +46,12 @@ public:
 
     Vector vecAngularVel_Min;
     Vector vecAngularVel_Max;
+
+    // Cook the projectile?
+    bool bArmOnReady;
+
+    // How long until detonating after arming.
+    float flDetonationTime;
 };
 
 
@@ -64,8 +73,11 @@ public:
 
     virtual void ItemPostFrame() OVERRIDE;
 
-    void Equip( CBaseCombatCharacter* pCharacter ) OVERRIDE;
-    bool Deploy() OVERRIDE;
+    virtual bool CanHolster() const OVERRIDE { return GetThrowState() <= THROWSTATE_ARMING; }
+    virtual bool CanBeDropped() const OVERRIDE { return CanHolster(); }
+
+    virtual void Equip( CBaseCombatCharacter* pCharacter ) OVERRIDE;
+    virtual bool Deploy() OVERRIDE;
 
 #ifndef CLIENT_DLL
     void Drop( const Vector& vecVelocity ) OVERRIDE;
@@ -84,12 +96,30 @@ public:
 
 
     ZMThrowState_t GetThrowState() const { return m_iThrowState; }
+
+#ifndef CLIENT_DLL
+    void OnProjectileExplode();
+#endif
+
 protected:
     void SetThrowState( ZMThrowState_t state ) { m_iThrowState = state; }
 
-    virtual void PostThrow( CZMPlayer* pPlayer, CBaseEntity* pProjectile );
+    virtual void PostThrow( CZMPlayer* pPlayer, CBaseEntity* pProjectile ) {}
 
+#ifndef CLIENT_DLL
+    CZMBaseProjectile* CreateProjectile() const;
+    CZMBaseProjectile* GetCookedProjectile() const { return m_hCookedProjectile.Get(); }
+    void PostThrowCleanup();
+#endif
 
 private:
     CNetworkVar( ZMThrowState_t, m_iThrowState );
+
+#ifndef CLIENT_DLL
+    void TryArmOnReady();
+    void UnfollowCookedProjectile();
+    void DropCookedProjectile();
+
+    CHandle<CZMBaseProjectile> m_hCookedProjectile;
+#endif
 };

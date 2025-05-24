@@ -1,5 +1,6 @@
 #include "cbase.h"
-#include "basegrenade_shared.h"
+
+#include "zmr_baseprojectile.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -9,10 +10,10 @@
 
 #define RINGTONE_SND        "Weapon_Pipebomb_ZM.Ringtone"
 
-class CZMProjectilePipebomb : public CBaseGrenade
+class CZMProjectilePipebomb : public CZMBaseProjectile
 {
 public:
-    DECLARE_CLASS( CZMProjectilePipebomb, CBaseGrenade );
+    DECLARE_CLASS( CZMProjectilePipebomb, CZMBaseProjectile );
 
 
     CZMProjectilePipebomb();
@@ -21,9 +22,11 @@ public:
     virtual void Spawn() OVERRIDE;
     virtual void Precache() OVERRIDE;
 
-    void PipebombThink();
+    virtual void OnThrow() OVERRIDE;
 
     virtual bool IsCombatItem() const OVERRIDE;
+
+    virtual void Detonate() OVERRIDE;
 };
 
 LINK_ENTITY_TO_CLASS( grenade_pipebomb, CZMProjectilePipebomb );
@@ -43,31 +46,29 @@ void CZMProjectilePipebomb::Precache()
     PrecacheScriptSound( RINGTONE_SND );
 }
 
+void CZMProjectilePipebomb::OnThrow()
+{
+    VPhysicsInitNormal( SOLID_BBOX, 0, false );
+}
+
 void CZMProjectilePipebomb::Spawn()
 {
     Precache();
 
     SetModel( PIPEBOMB_MODEL );
 
-
-    VPhysicsInitNormal( SOLID_BBOX, 0, false );
-
-    
-    SetThink( &CZMProjectilePipebomb::PipebombThink );
-    SetNextThink( gpGlobals->curtime + 3.0f );
+    OnThrow();
 
     BaseClass::Spawn();
 
     EmitSound( RINGTONE_SND );
 }
 
-void CZMProjectilePipebomb::PipebombThink()
+void CZMProjectilePipebomb::Detonate()
 {
-    Detonate();
-
-    UTIL_Remove( this );
-
     StopSound( RINGTONE_SND );
+
+    BaseClass::Detonate();
 }
 
 bool CZMProjectilePipebomb::IsCombatItem() const

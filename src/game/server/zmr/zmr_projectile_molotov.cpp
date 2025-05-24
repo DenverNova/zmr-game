@@ -1,9 +1,10 @@
 #include "cbase.h"
-#include "basegrenade_shared.h"
 #include "gib.h"
 #include "props_shared.h"
 #include "smoke_trail.h"
 #include "fire.h"
+
+#include "zmr_baseprojectile.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -90,10 +91,10 @@ void CFlamingGib::Spawn()
 //
 //
 //
-class CZMProjectileMolotov : public CBaseGrenade
+class CZMProjectileMolotov : public CZMBaseProjectile
 {
 public:
-    DECLARE_CLASS( CZMProjectileMolotov, CBaseGrenade );
+    DECLARE_CLASS( CZMProjectileMolotov, CZMBaseProjectile );
     DECLARE_DATADESC();
 
     CZMProjectileMolotov();
@@ -106,6 +107,8 @@ public:
     virtual void Detonate() OVERRIDE;
 
     void CreateFlyingChunk( const Vector& pos );
+
+    virtual void OnThrow() OVERRIDE;
 
 
     virtual bool IsCombatItem() const OVERRIDE;
@@ -138,21 +141,11 @@ void CZMProjectileMolotov::Precache()
     PrecacheScriptSound( "Grenade_Molotov.Detonate2" );
 }
 
-void CZMProjectileMolotov::Spawn()
+void CZMProjectileMolotov::OnThrow()
 {
-    Precache();
-
     SetMoveType( MOVETYPE_FLYGRAVITY, MOVECOLLIDE_FLY_BOUNCE );
-    SetSolid( SOLID_BBOX ); 
+    SetSolid( SOLID_BBOX );
     SetCollisionGroup( COLLISION_GROUP_PROJECTILE );
-    RemoveEffects( EF_NOINTERP );
-
-    SetModel( MOLOTOV_MODEL );
-
-
-    SetTouch( &CZMProjectileMolotov::MolotovTouch );
-    SetThink( &CZMProjectileMolotov::MolotovThink );
-
 
     CFireTrail* fire = CFireTrail::CreateFireTrail();
 
@@ -165,6 +158,18 @@ void CZMProjectileMolotov::Spawn()
         //fire->m_StartSize = random->RandomFloat(1.0f, 2.0f);
         //fire->m_EndSize = random->RandomFloat(3.5f, 5.0f);
     }
+
+    SetNextThink( gpGlobals->curtime );
+    SetTouch( &CZMProjectileMolotov::MolotovTouch );
+    SetThink( &CZMProjectileMolotov::MolotovThink );
+}
+
+void CZMProjectileMolotov::Spawn()
+{
+    Precache();
+    SetModel( MOLOTOV_MODEL );
+
+    BaseClass::Spawn();
 }
 
 void CZMProjectileMolotov::MolotovTouch( CBaseEntity* pOther )
@@ -265,6 +270,8 @@ void CZMProjectileMolotov::Detonate()
 
 
     UTIL_Remove( this );
+
+    PostExplode();
 }
 
 void CZMProjectileMolotov::CreateFlyingChunk( const Vector& pos )

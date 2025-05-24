@@ -29,6 +29,9 @@ END_PREDICTION_DATA()
 CZMBaseThrowableWeapon::CZMBaseThrowableWeapon()
 {
     m_iThrowState = THROWSTATE_IDLE;
+#ifndef CLIENT_DLL
+    m_hCookedProjectile.Set( nullptr );
+#endif
 }
 
 CZMBaseThrowableWeapon::~CZMBaseThrowableWeapon()
@@ -55,9 +58,7 @@ void CZMBaseThrowableWeapon::ItemPostFrame()
 #ifndef CLIENT_DLL
     if ( GetThrowState() == THROWSTATE_THROWN && IsViewModelSequenceFinished() )
     {
-        pPlayer->Weapon_Drop( this, nullptr, nullptr );
-
-        UTIL_Remove( this );
+        PostThrowCleanup();
         return;
     }
 #endif
@@ -72,6 +73,9 @@ void CZMBaseThrowableWeapon::ItemPostFrame()
     if ( GetThrowState() == THROWSTATE_DRAW_BACK && IsViewModelSequenceFinished() )
     {
         SetThrowState( THROWSTATE_READYTOTHROW );
+#ifndef CLIENT_DLL
+        TryArmOnReady();
+#endif
     }
 
 
@@ -96,7 +100,7 @@ void CZMBaseThrowableWeapon::ItemPostFrame()
     //
     if ( GetThrowState() < THROWSTATE_READYTOTHROW )
     {
-    WeaponIdle();
+        WeaponIdle();
     }
 }
 
@@ -133,6 +137,13 @@ void CZMBaseThrowableWeapon::Drop( const Vector& vecVelocity )
         pPlayer->RemoveAmmo( 1, GetPrimaryAmmoType() );
     }
 
+    auto* pProjectile = GetCookedProjectile();
+    if ( pProjectile )
+    {
+        DropCookedProjectile();
+        UTIL_Remove( this );
+    }
+
     BaseClass::Drop( vecVelocity );
 }
 
@@ -149,6 +160,77 @@ void CZMBaseThrowableWeapon::Operator_HandleAnimEvent( animevent_t* pEvent, CBas
 		BaseClass::Operator_HandleAnimEvent( pEvent, pOperator );
 		break;
 	}
+}
+
+void CZMBaseThrowableWeapon::OnProjectileExplode()
+{
+    // Cleanup after explosion (if handheld)
+    if ( GetThrowState() != THROWSTATE_THROWN )
+    {
+        PostThrowCleanup();
+    }
+}
+
+void CZMBaseThrowableWeapon::PostThrowCleanup()
+{
+    auto* pPlayer = GetPlayerOwner();
+    
+    if ( pPlayer )
+    {
+        pPlayer->Weapon_Drop( this, nullptr, nullptr );
+    }
+
+    UTIL_Remove( this );
+}
+
+void CZMBaseThrowableWeapon::UnfollowCookedProjectile()
+{
+    auto* pProjectile = m_hCookedProjectile.Get();
+    if ( pProjectile )
+    {
+        pProjectile->StopFollowingEntity();
+        pProjectile->RemoveEffects( EF_NODRAW );
+    }
+}
+
+void CZMBaseThrowableWeapon::DropCookedProjectile()
+{
+    auto* pProjectile = m_hCookedProjectile.Get();
+    if ( !pProjectile )
+    {
+        return;
+    }
+
+    UnfollowCookedProjectile();
+
+    auto* pOwner = GetOwner();
+    if ( pOwner )
+    {
+        pProjectile->Teleport( nullptr, nullptr, &pOwner->GetAbsVelocity() );
+    }
+
+    m_hCookedProjectile.Set( nullptr );
+}
+
+void CZMBaseThrowableWeapon::TryArmOnReady()
+{
+    if ( !GetBaseThrowableConfig()->bArmOnReady )
+    {
+        return;
+    }
+
+    auto* pProjectile = CreateProjectile();
+    if ( !pProjectile )
+    {
+        return;
+    }
+
+    pProjectile->Teleport( &GetAbsOrigin(), nullptr, nullptr );
+
+    pProjectile->FollowEntity( this, true );
+    pProjectile->AddEffects( EF_NODRAW );
+
+    m_hCookedProjectile.Set( pProjectile );
 }
 #endif
 
@@ -217,25 +299,34 @@ void CZMBaseThrowableWeapon::Throw( CZMPlayer* pPlayer )
     Vector pos = GetThrowPos( pPlayer );
     Vector vel = pPlayer->GetAbsVelocity() + GetThrowDirection( pPlayer ) * GetThrowVelocity();
 
-    auto* pszProjectileClassname = GetProjectileClassname();
+    auto* pExistingProjectile = GetCookedProjectile();
 
-    auto* pProjectile = CBaseEntity::Create( pszProjectileClassname, pos, vec3_angle, pPlayer );
-
-    if ( !pProjectile )
+    CZMBaseProjectile* pProjectile;
+    if ( pExistingProjectile )
     {
-        Warning( "Couldn't create grenade entity '%s'!\n", pszProjectileClassname );
-        return;
+        pProjectile = pExistingProjectile;
+        UnfollowCookedProjectile();
     }
+    else
+    {
+        pProjectile = CreateProjectile();
+        if ( !pProjectile )
+        {
+            return;
+        }
+    }
+
+    pProjectile->Teleport( &pos, nullptr, nullptr );
+
+    pProjectile->OnThrow();
 
     AngularImpulse impulse;
     QAngleToAngularImpulse( GetThrowAngularVelocity(), impulse );
 
-    //pProjectile->SetThrower( pPlayer );
-    pProjectile->SetOwnerEntity( pPlayer );
     pProjectile->ApplyAbsVelocityImpulse( vel );
-    pProjectile->m_takedamage = DAMAGE_EVENTS_ONLY;
     pProjectile->ApplyLocalAngularVelocityImpulse( impulse );
 
+    m_hCookedProjectile.Set( nullptr );
     PostThrow( pPlayer, pProjectile );
 #endif
 
@@ -244,17 +335,32 @@ void CZMBaseThrowableWeapon::Throw( CZMPlayer* pPlayer )
     //WeaponSound( SINGLE );
 }
 
-void CZMBaseThrowableWeapon::PostThrow( CZMPlayer* pPlayer, CBaseEntity* pProjectile )
+#ifndef CLIENT_DLL
+CZMBaseProjectile* CZMBaseThrowableWeapon::CreateProjectile() const
 {
-    auto* pGrenade = dynamic_cast<CBaseGrenade*>( pProjectile );
-    if ( pGrenade )
-    {
-        pGrenade->SetDamage( GetBaseThrowableConfig()->flProjectileDamage );
-        pGrenade->SetDamageRadius( GetBaseThrowableConfig()->flProjectileRadius );
+    auto* pPlayer = GetPlayerOwner();
+    auto* pszProjectileClassname = GetProjectileClassname();
+    auto* pProjectile = dynamic_cast<CZMBaseProjectile*>( CBaseEntity::CreateNoSpawn( pszProjectileClassname, vec3_origin, vec3_angle ) );
 
-        pGrenade->SetThrower( pPlayer );
+    if ( !pProjectile )
+    {
+        Warning( "Couldn't create projectile entity '%s'!\n", pszProjectileClassname );
+        return nullptr;
     }
+
+    pProjectile->SetOwnerEntity( pPlayer );
+    pProjectile->SetDamage( GetBaseThrowableConfig()->flProjectileDamage );
+    pProjectile->SetDamageRadius( GetBaseThrowableConfig()->flProjectileRadius );
+    pProjectile->SetDetonationTime( GetBaseThrowableConfig()->flDetonationTime );
+    pProjectile->SetThrower( pPlayer );
+    pProjectile->m_takedamage = DAMAGE_EVENTS_ONLY;
+    pProjectile->AddEffects( EF_BONEMERGE_FASTCULL );
+
+    DispatchSpawn( pProjectile );
+
+    return pProjectile;
 }
+#endif
 
 //
 //
@@ -279,6 +385,10 @@ void CZMBaseThrowableConfig::LoadFromConfig( KeyValues* kv )
 
     CopyVector( kv->GetString( "angvel_min" ), vecAngularVel_Min );
     CopyVector( kv->GetString( "angvel_max" ), vecAngularVel_Max );
+
+    bArmOnReady = kv->GetBool( "arm_on_ready", false );
+
+    flDetonationTime = kv->GetFloat( "detonation_time", 3.0f );
 }
 
 bool CZMBaseThrowableConfig::OverrideFromConfig( KeyValues* kv )
@@ -288,6 +398,15 @@ bool CZMBaseThrowableConfig::OverrideFromConfig( KeyValues* kv )
     OVERRIDE_FROM_WEPCONFIG_F( kv, throw_velocity, flThrowVelocity );
     OVERRIDE_FROM_WEPCONFIG_F( kv, projectile_damage, flProjectileDamage );
     OVERRIDE_FROM_WEPCONFIG_F( kv, projectile_radius, flProjectileRadius );
+    
+    bool bGotDefault = false;
+    auto bArmOnReady_ = kv->GetBool( "arm_on_ready", false, &bGotDefault );
+    if ( !bGotDefault )
+    {
+        kv->SetBool( "arm_on_ready", bArmOnReady_ );
+    }
+
+    OVERRIDE_FROM_WEPCONFIG_F( kv, detonation_time, flDetonationTime );
 
     // ZMRTODO: Override angular velocity.
 
@@ -304,6 +423,9 @@ KeyValues* CZMBaseThrowableConfig::ToKeyValues() const
 
     VectorToKv( kv, "angvel_min", vecAngularVel_Min );
     VectorToKv( kv, "angvel_max", vecAngularVel_Max );
+
+    kv->SetBool( "arm_on_ready", bArmOnReady );
+    kv->SetFloat( "detonation_time", flDetonationTime );
 
     return kv;
 }

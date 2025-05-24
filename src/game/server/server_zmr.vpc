@@ -217,6 +217,8 @@ $Project "Server (ZMR)"
 			}
 			$Folder "Projectiles"
 			{
+				$File	"zmr\zmr_baseprojectile.cpp"
+				$File	"zmr\zmr_baseprojectile.h"
 				$File	"zmr\zmr_projectile_molotov.cpp"
 				$File	"zmr\zmr_projectile_pipebomb.cpp"
 			}

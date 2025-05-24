@@ -60,8 +60,6 @@ public:
     void PrimaryAttack() OVERRIDE;
     bool Deploy() OVERRIDE;
     bool Holster( CBaseCombatWeapon* pSwitchTo = nullptr ) OVERRIDE;
-    bool CanHolster() const OVERRIDE { return GetThrowState() <= THROWSTATE_ARMING; }
-    bool CanBeDropped() const OVERRIDE { return CanHolster(); }
 
     void HandleAnimEventLight();
     
