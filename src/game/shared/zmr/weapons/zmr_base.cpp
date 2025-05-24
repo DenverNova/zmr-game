@@ -14,6 +14,7 @@
 
 
 #include "zmr_gamerules.h"
+#include "zmr_handedness.h"
 #include "zmr_viewmodel.h"
 #include "zmr_ammodef.h"
 #include "weapons/zmr_base.h"
@@ -695,7 +696,22 @@ const char* CZMBaseWeapon::GetViewModel( int vmIndex ) const
     }
 #endif
 
-    return GetWeaponConfig()->pszModel_View;
+
+    const char* pszModel = GetWeaponConfig()->pszModel_View;
+
+#ifndef CLIENT_DLL
+    CZMPlayer* pOwner = GetPlayerOwner();
+    if ( pOwner && GetZMHandednessSystem().UsesLeftHanded( pOwner->entindex() ) )
+    {
+        const char* pszLH = GetZMHandednessSystem().GetLeftHandedModelName( pszModel );
+        if ( pszLH && *pszLH )
+        {
+            pszModel = pszLH;
+        }
+    }
+#endif
+
+    return pszModel;
 }
 
 const char* CZMBaseWeapon::GetWorldModel() const
@@ -1297,6 +1313,8 @@ void CZMBaseWeapon::Precache()
 #endif
 #ifdef GAME_DLL
         m_iViewModelIndex = PrecacheModel( GetWeaponConfig()->pszModel_View );
+
+        GetZMHandednessSystem().PrecacheLeftHanded( GetWeaponConfig()->pszModel_View );
 #endif
     }
 
@@ -1841,6 +1859,14 @@ void CZMBaseWeapon::Equip( CBaseCombatCharacter* pCharacter )
 
     ReleaseConstraint();
     RemoveSpawnFlags( SF_WEAPON_START_CONSTRAINED );
+
+    // HACK: We might change the model based on the current player. (handedness)
+    SetOwner( pCharacter );
+    int modelIndex = modelinfo->GetModelIndex( GetViewModel( VMINDEX_WEP ) );
+    if ( modelIndex != -1 )
+    {
+        m_iViewModelIndex = modelIndex;
+    }
 #endif
 
     BaseClass::Equip( pCharacter );
