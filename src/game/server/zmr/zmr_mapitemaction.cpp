@@ -50,6 +50,7 @@ ItemBaseData_t const CZMMapItemSystem::m_ItemData[] =
     ITEMDATA( weapon_zm_pipebomb, CLASS_WEAPON|CLASS_THROWABLE ),
 
     ITEMDATA( weapon_zm_improvised, CLASS_WEAPON|CLASS_MELEE|CLASS_MELEE_MEDIUM ),
+    ITEMDATA( weapon_zm_baseballbat, CLASS_WEAPON|CLASS_MELEE|CLASS_MELEE_MEDIUM ),
     ITEMDATA( weapon_zm_sledge, CLASS_WEAPON|CLASS_MELEE|CLASS_MELEE_BIG ),
     ITEMDATA( weapon_zm_fireaxe, CLASS_WEAPON|CLASS_MELEE|CLASS_MELEE_BIG ),
 
