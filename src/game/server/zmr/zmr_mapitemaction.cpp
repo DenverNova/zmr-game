@@ -83,6 +83,8 @@ const ClassData_t CZMMapItemSystem::m_Classes[] =
     CLASSDATA( BigPistol, CLASS_BIGPISTOL ),
 
     CLASSDATA( Melee, CLASS_MELEE ),
+    CLASSDATA( MeleeMedium, CLASS_MELEE_MEDIUM ),
+    CLASSDATA( MeleeBig, CLASS_MELEE_BIG ),
 
     // Ammo
     CLASSDATA( Ammo, CLASS_AMMO ),

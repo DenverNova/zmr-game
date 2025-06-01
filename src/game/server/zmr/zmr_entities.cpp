@@ -1751,9 +1751,9 @@ void CZMEntLoadout::GiveWeapon( CZMPlayer* pPlayer, LoadoutWeapon_t loadout_wep 
         "Shotgun",
         "Rifle",
         "SMG",
-        "weapon_zm_molotov",
-        "weapon_zm_sledge",
-        "weapon_zm_improvised",
+        "Throwable",
+        "MeleeBig",
+        "MeleeMedium",
         "BigPistol",
     };
 
