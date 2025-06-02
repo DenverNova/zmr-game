@@ -974,6 +974,32 @@ float CZMBaseWeapon::GetFirstInstanceOfAnimEventTime( int iSeq, int iAnimEvent, 
     return -1.0f;
 }
 
+Activity CZMBaseWeapon::GetActivityOrFallback( Activity act, Activity fallback ) const
+{
+    CZMPlayer* pOwner = GetPlayerOwner();
+    if ( !pOwner )
+    {
+        return act;
+    }
+
+    CZMViewModel* pVM = pOwner->GetViewModel( m_nViewModelIndex );
+    if ( !pVM )
+    {
+        return act;
+    }
+
+    bool found = ::SelectHeaviestSequence( pVM->GetModelPtr(), act ) != ACTIVITY_NOT_AVAILABLE;
+
+#ifdef DEBUG
+    bool foundFallback = ::SelectHeaviestSequence( pVM->GetModelPtr(), fallback ) != ACTIVITY_NOT_AVAILABLE;
+    if ( !foundFallback )
+    {
+        Warning( "Failed to find fallback activity %i for main activity %i\n", fallback, act );
+    }
+#endif
+
+    return found ? act : fallback;
+}
 
 void CZMBaseWeapon::PrimaryAttack()
 {

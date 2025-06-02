@@ -210,7 +210,7 @@ public:
 
 
     float           GetFirstInstanceOfAnimEventTime( int iSeq, int iAnimEvent, bool bReturnOption = false ) const;
-
+    Activity        GetActivityOrFallback( Activity act, Activity fallback ) const;
 
     inline int GetSlotFlag() const { return m_iSlotFlag; }
 #ifndef CLIENT_DLL

@@ -21,8 +21,8 @@ public:
     CZMWeaponShotgun();
     
 
-    virtual Activity GetReloadStartAct() const OVERRIDE { return ACT_SHOTGUN_RELOAD_START; }
-    virtual Activity GetReloadEndAct() const OVERRIDE { return ACT_SHOTGUN_RELOAD_FINISH; }
+    virtual Activity GetReloadStartAct() const OVERRIDE;
+    virtual Activity GetReloadEndAct() const OVERRIDE;
     virtual Activity GetPumpAct() const OVERRIDE { return ACT_SHOTGUN_PUMP; }
 };
 
@@ -48,4 +48,14 @@ CZMWeaponShotgun::CZMWeaponShotgun()
 {
     SetSlotFlag( ZMWEAPONSLOT_LARGE );
     SetConfigSlot( ZMWeaponConfig::ZMCONFIGSLOT_SHOTGUN );
+}
+
+Activity CZMWeaponShotgun::GetReloadStartAct() const
+{
+    return GetActivityOrFallback( ACT_SHOTGUN_RELOAD_START, ACT_VM_RELOAD_START );
+}
+
+Activity CZMWeaponShotgun::GetReloadEndAct() const
+{
+    return GetActivityOrFallback( ACT_SHOTGUN_RELOAD_FINISH, ACT_VM_RELOAD_FINISH );
 }
