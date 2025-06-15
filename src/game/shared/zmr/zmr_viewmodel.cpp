@@ -340,12 +340,12 @@ void C_ZMViewModel::GetScopeEndPosition( Vector& pos, QAngle& ang )
     GetAttachment( m_iAttachmentScopeEnd, pos, ang );
 }
 
-ConVar zm_cl_bob_lag_angle_mult( "zm_cl_bob_lag_angle_mult", "0.07" );
-ConVar zm_cl_bob_lag_angle_move_mult( "zm_cl_bob_lag_angle_move_mult", "0.01" );
+ConVar zm_cl_bob_lag_angle_mult( "zm_cl_bob_lag_angle_mult", "-0.08" );
+ConVar zm_cl_bob_lag_angle_move_mult( "zm_cl_bob_lag_angle_move_mult", "0.02" );
 //ConVar zm_cl_bob_lag_movement_fwd_pitch_mult( "zm_cl_bob_lag_movement_fwd_pitch_mult", "0.1" );
 ConVar zm_cl_bob_lag_movement_side_roll_mult( "zm_cl_bob_lag_movement_side_roll_mult", "2.5" );
-ConVar zm_cl_bob_lag_movement_side_yaw_mult( "zm_cl_bob_lag_movement_side_yaw_mult", "1" );
-ConVar zm_cl_bob_lag_movement_side_move_mult( "zm_cl_bob_lag_movement_side_move_mult", "0.5" );
+ConVar zm_cl_bob_lag_movement_side_yaw_mult( "zm_cl_bob_lag_movement_side_yaw_mult", "-1" );
+ConVar zm_cl_bob_lag_movement_side_move_mult( "zm_cl_bob_lag_movement_side_move_mult", "0.6" );
 
 bool C_ZMViewModel::PerformLag( Vector& vecPos, QAngle& ang, const Vector& origPos, const QAngle& origAng )
 {
