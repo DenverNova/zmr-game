@@ -34,14 +34,13 @@ cd /build/src
 - Make sure you have cloned the game-folder submodule (`game/zombie_master_reborn`).
 
 
-You can create a symbolic link of `game/zombie_master_reborn` in your `<Steam>/steamapps/common/Source SDK Base 2013 Multiplayer`-folder and then run `hl2.exe` with arguments `-game zombie_master_reborn`
+### Windows
 
-Or you can use the script below.
-
-### Windows Script
-Run `zmr_dev_setup.ps1` inside `game/zombie_master_reborn`. There should now be a `zmr_dev.bat`-batch file in your `Source SDK Base 2013 Multiplayer`-folder which you can run to start the mod.
+Launch with the debugger (F5) in Visual Studio. :)
 
 ### Linux
+
+You can create a symbolic link of `game/zombie_master_reborn` in your `<Steam>/steamapps/common/Source SDK Base 2013 Multiplayer`-folder and then run `hl2.exe` with arguments `-game zombie_master_reborn`
 
 Start hl2 with the Steam runtime.
 `~/.local/share/Steam/ubuntu12_32/steam-runtime/run.sh ./hl2.sh -game zombie_master_reborn`
