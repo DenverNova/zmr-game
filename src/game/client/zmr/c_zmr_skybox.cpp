@@ -207,10 +207,13 @@ void CZMSkybox::RenderSkybox( const Vector& viewPos, const Vector& forward, cons
 		{ 1, 0 }
 	};
 
+	// If the far z is a super big number, you can see some clipping when looking at the corners.
+	float limitedFarZ = MIN( farZ, 50000.0f );
 	// Will clip to far z otherwise.
-	const float distance = farZ * ( 1.0f / sqrtf( 3.0f ) );
+	const float distance = limitedFarZ * ( 1.0f / sqrtf( 3.0f ) );
 
-	const float fovcheck = -cos( DEG2RAD( fov + 0.001f ) );
+	// So the corners don't clip when looking at oblique angles (and low fov).
+	const float fovcheck = -cos( DEG2RAD( fov + sqrtf( 45.0f * 45.0f + 45.0f * 45.0f ) ) );
 	for ( int i = SKYDIRECTION_FIRST; i <= SKYDIRECTION_LAST; i++ )
 	{
 		auto* pMaterial = GetSkyboxMaterial( (SkyboxDirection_t)i, dirty );
