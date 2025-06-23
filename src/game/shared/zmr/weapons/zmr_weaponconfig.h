@@ -189,7 +189,7 @@ namespace ZMWeaponConfig
 
 
         //
-        bool bUseHands;
+        bool bUseArms;
         //
 
 

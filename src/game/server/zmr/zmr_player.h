@@ -106,8 +106,8 @@ public:
     virtual void    SetAnimation( PLAYER_ANIM playerAnim ) OVERRIDE;
     bool            SetPlayerModel();
     void            UpdatePlayerFOV();
-    void            SetHandsModel( const char* model );
-    void            SetHandsData( CZMPlayerModelData* pData );
+    void            SetArmsModel( const char* model );
+    void            SetArmsData( CZMPlayerModelData* pData );
     virtual void    CreateViewModel( int index = 0 ) OVERRIDE;
 
 

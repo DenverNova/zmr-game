@@ -329,11 +329,11 @@ void C_ZMPlayer::OnSpawn()
 {
     if ( IsLocalPlayer() )
     {
-        // By default display hands.
+        // By default display arms.
         // This hack has to be here because SetWeaponVisible isn't called on client when the player spawns.
-        C_ZMViewModel* pHands = static_cast<C_ZMViewModel*>( GetViewModel( VMINDEX_HANDS, false ) );
-        if ( pHands )
-            pHands->SetDrawVM( true );
+        C_ZMViewModel* pArms = static_cast<C_ZMViewModel*>( GetViewModel( VMINDEX_ARMS, false ) );
+        if ( pArms )
+            pArms->SetDrawVM( true );
     }
 }
 

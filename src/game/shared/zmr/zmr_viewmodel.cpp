@@ -114,7 +114,7 @@ CBaseCombatWeapon* CZMViewModel::GetOwningWeapon()
 
 
     // Arm viewmodel does not have an owning. Ask our brother.
-    if ( ViewModelIndex() == VMINDEX_HANDS )
+    if ( ViewModelIndex() == VMINDEX_ARMS )
     {
         auto* pPlayer = static_cast<C_ZMPlayer*>( GetOwner() );
 
@@ -809,7 +809,7 @@ bool C_ZMViewModel::ShouldReceiveProjectedTextures( int flags )
 
 C_BaseAnimating* C_ZMViewModel::FindFollowedEntity()
 {
-    if ( ViewModelIndex() == VMINDEX_HANDS )
+    if ( ViewModelIndex() == VMINDEX_ARMS )
     {
         C_ZMPlayer* pPlayer = static_cast<C_ZMPlayer*>( GetOwner() );
 

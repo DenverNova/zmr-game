@@ -164,7 +164,7 @@ enum ZMChatNotifyType_t
 
 // m_hViewModel
 #define VMINDEX_WEP         0
-#define VMINDEX_HANDS       1
+#define VMINDEX_ARMS        1
 
 
 

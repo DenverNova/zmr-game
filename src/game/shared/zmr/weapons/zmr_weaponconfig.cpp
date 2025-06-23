@@ -134,6 +134,8 @@ CZMBaseWeaponConfig::CZMBaseWeaponConfig( const char* wepname, const char* confi
 
 
     fFlags = WEPFLAG_NONE;
+
+    bUseArms = true;
 }
 
 CZMBaseWeaponConfig::~CZMBaseWeaponConfig()
@@ -241,7 +243,7 @@ void CZMBaseWeaponConfig::LoadFromConfig( KeyValues* kv )
 
 
 
-    bUseHands = kv->GetBool( "usenewhands", true );
+    bUseArms = kv->GetBool( "usenewhands", true );
 
 
 
@@ -348,7 +350,7 @@ KeyValues* CZMBaseWeaponConfig::ToKeyValues() const
     
 
 
-    kv->SetBool( "usenewhands", bUseHands );
+    kv->SetBool( "usenewhands", bUseArms );
 
     kv->SetBool( "attackonladder", (fFlags & WEPFLAG_ATTACK_ONLADDER) ? true : false );
     kv->SetBool( "reloadonladder", (fFlags & WEPFLAG_RELOAD_ONLADDER) ? true : false );
@@ -541,7 +543,7 @@ bool CZMBaseWeaponConfig::OverrideFromConfig( KeyValues* kv )
 
     int hands = kv->GetInt( "usenewhands", -1 );
     if ( hands != -1 )
-        bUseHands = ( hands > 0 ) ? true : false;
+        bUseArms = ( hands > 0 ) ? true : false;
 #endif
 
 

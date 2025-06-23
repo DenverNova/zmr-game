@@ -32,7 +32,7 @@
 #include "tier0/memdbgon.h"
 
 
-#define VMHANDS_FALLBACKMODEL   "models/weapons/c_arms_citizen.mdl"
+#define VMARMS_FALLBACKMODEL   "models/weapons/c_arms_citizen.mdl"
 
 
 
@@ -184,7 +184,7 @@ void CZMPlayer::Precache()
     // Needs to be precached for thirdperson flashlight beam.
     PrecacheModel ( "sprites/glow01.vmt" );
 
-    PrecacheModel( VMHANDS_FALLBACKMODEL );
+    PrecacheModel( VMARMS_FALLBACKMODEL );
 
     PrecacheScriptSound( "ZMPlayer.PickupWeapon" );
     PrecacheScriptSound( "ZMPlayer.PickupAmmo" );
@@ -1125,9 +1125,9 @@ void CZMPlayer::RemoveAllItems( bool removeSuit )
     {
         GetViewModel()->AddEffects( EF_NODRAW );
     }
-    if ( GetViewModel( VMINDEX_HANDS ) )
+    if ( GetViewModel( VMINDEX_ARMS ) )
     {
-        GetViewModel( VMINDEX_HANDS )->AddEffects( EF_NODRAW );
+        GetViewModel( VMINDEX_ARMS )->AddEffects( EF_NODRAW );
     }
 }
 
@@ -1213,7 +1213,7 @@ bool CZMPlayer::SetPlayerModel()
 
     if ( changed )
     {
-        SetHandsData( ZMGetPlayerModels()->GetPlayerModelData( szModelName ) );
+        SetArmsData( ZMGetPlayerModels()->GetPlayerModelData( szModelName ) );
     }
 
     m_flNextModelChangeTime = gpGlobals->curtime + zm_sv_modelchangedelay.GetFloat();
@@ -1757,21 +1757,21 @@ void CZMPlayer::InputIgnoreFallDamageWithoutReset( inputdata_t& data )
     m_bIgnoreFallDamageResetAfterImpact = false;
 }
 
-void CZMPlayer::SetHandsModel( const char* model )
+void CZMPlayer::SetArmsModel( const char* model )
 {
     if ( !model || !(*model) ) return;
 
-    CBaseViewModel* pVM = GetViewModel( VMINDEX_HANDS );
+    CBaseViewModel* pVM = GetViewModel( VMINDEX_ARMS );
     if ( !pVM ) return;
 
     pVM->SetModel( model );
 }
 
-void CZMPlayer::SetHandsData( CZMPlayerModelData* pData )
+void CZMPlayer::SetArmsData( CZMPlayerModelData* pData )
 {
     if ( !pData ) return;
 
-    CZMViewModel* pVM = static_cast<CZMViewModel*>( GetViewModel( VMINDEX_HANDS ) );
+    CZMViewModel* pVM = static_cast<CZMViewModel*>( GetViewModel( VMINDEX_ARMS ) );
     if ( !pVM ) return;
 
 
@@ -1780,7 +1780,7 @@ void CZMPlayer::SetHandsData( CZMPlayerModelData* pData )
     const char* pszArms = pData->GetArmModel();
     if ( !pszArms || !(*pszArms) )
     {
-        pszArms = VMHANDS_FALLBACKMODEL;
+        pszArms = VMARMS_FALLBACKMODEL;
     }
 
     int modelIndex = modelinfo->GetModelIndex( pszArms );
@@ -1833,9 +1833,9 @@ void CZMPlayer::CreateViewModel( int index )
 
     if ( GetViewModel( VMINDEX_WEP ) != nullptr )
     {
-        if ( GetViewModel( VMINDEX_HANDS ) == nullptr )
+        if ( GetViewModel( VMINDEX_ARMS ) == nullptr )
         {
-            Warning( "Weapon viewmodel exists but hands don't!!\n" );
+            Warning( "Weapon viewmodel exists but arms don't!!\n" );
         }
 
         return;
@@ -1854,21 +1854,21 @@ void CZMPlayer::CreateViewModel( int index )
         m_hViewModel.Set( VMINDEX_WEP, vm );
 
 
-        CZMViewModel* vmhands = static_cast<CZMViewModel*>( CreateEntityByName( "zm_viewmodel" ) );
+        CZMViewModel* vmarms = static_cast<CZMViewModel*>( CreateEntityByName( "zm_viewmodel" ) );
     
-        if ( vmhands )
+        if ( vmarms )
         {
-            vmhands->SetAbsOrigin( GetAbsOrigin() );
-            vmhands->SetOwner( this );
-            vmhands->SetIndex( VMINDEX_HANDS );
-            DispatchSpawn( vmhands );
-            vmhands->FollowEntity( vm, true ); // Sets moveparent.
-            m_hViewModel.Set( VMINDEX_HANDS, vmhands );
+            vmarms->SetAbsOrigin( GetAbsOrigin() );
+            vmarms->SetOwner( this );
+            vmarms->SetIndex( VMINDEX_ARMS );
+            DispatchSpawn( vmarms );
+            vmarms->FollowEntity( vm, true ); // Sets moveparent.
+            m_hViewModel.Set( VMINDEX_ARMS, vmarms );
         }
     }
 
-    SetHandsModel( VMHANDS_FALLBACKMODEL );
-    SetHandsData( ZMGetPlayerModels()->GetPlayerModelData( STRING( GetModelName() ) ) );
+    SetArmsModel( VMARMS_FALLBACKMODEL );
+    SetArmsData( ZMGetPlayerModels()->GetPlayerModelData( STRING( GetModelName() ) ) );
 }
 
 bool CZMPlayer::BumpWeapon( CBaseCombatWeapon *pWeapon )

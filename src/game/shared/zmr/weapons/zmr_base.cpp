@@ -1196,13 +1196,13 @@ void CZMBaseWeapon::SecondaryAttack()
 void CZMBaseWeapon::SetWeaponVisible( bool visible )
 {
     CBaseViewModel* vm = nullptr;
-    CZMViewModel* vmhands = nullptr;
+    CZMViewModel* vmarms = nullptr;
 
     CZMPlayer* pOwner = GetPlayerOwner();
     if ( pOwner )
     {
         vm = pOwner->GetViewModel( VMINDEX_WEP );
-        vmhands = static_cast<CZMViewModel*>( pOwner->GetViewModel( VMINDEX_HANDS ) );
+        vmarms = static_cast<CZMViewModel*>( pOwner->GetViewModel( VMINDEX_ARMS ) );
 
 #ifndef CLIENT_DLL
         Assert( vm == pOwner->GetViewModel( m_nViewModelIndex ) );
@@ -1214,19 +1214,19 @@ void CZMBaseWeapon::SetWeaponVisible( bool visible )
         RemoveEffects( EF_NODRAW );
 
         if ( vm ) vm->RemoveEffects( EF_NODRAW );
-        if ( vmhands )
+        if ( vmarms )
         {
-            if ( GetWeaponConfig()->bUseHands )
+            if ( GetWeaponConfig()->bUseArms )
             {
-                vmhands->RemoveEffects( EF_NODRAW );
-#ifdef CLIENT_DLL // Let client override this if they are using a custom viewmodel that doesn't use the new hands system.
-                vmhands->SetDrawVM( true );
+                vmarms->RemoveEffects( EF_NODRAW );
+#ifdef CLIENT_DLL // Let client override this if they are using a custom viewmodel that doesn't use the new arms system.
+                vmarms->SetDrawVM( true );
 #endif
             }
             else
             {
 #ifdef CLIENT_DLL
-                vmhands->SetDrawVM( false );
+                vmarms->SetDrawVM( false );
 #endif
             }
 
@@ -1237,7 +1237,7 @@ void CZMBaseWeapon::SetWeaponVisible( bool visible )
         AddEffects( EF_NODRAW );
 
         if ( vm ) vm->AddEffects( EF_NODRAW );
-        if ( vmhands ) vmhands->AddEffects( EF_NODRAW );
+        if ( vmarms ) vmarms->AddEffects( EF_NODRAW );
     }
 }
 
