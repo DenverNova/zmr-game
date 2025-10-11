@@ -106,8 +106,7 @@ public:
     virtual void    SetAnimation( PLAYER_ANIM playerAnim ) OVERRIDE;
     bool            SetPlayerModel();
     void            UpdatePlayerFOV();
-    void            SetArmsModel( const char* model );
-    void            SetArmsData( CZMPlayerModelData* pData );
+    void            UpdateArms( int iArmVersion );
     virtual void    CreateViewModel( int index = 0 ) OVERRIDE;
 
 
@@ -282,6 +281,8 @@ protected:
     virtual void CheckTrainUpdate() OVERRIDE;
 
 private:
+    void SetArmsData( CZMPlayerModelData* pData, int iArmVersion = -1 );
+
     void HandleDamagesFromUserCmd();
     ZMServerWepData_t m_ServerWepData;
 

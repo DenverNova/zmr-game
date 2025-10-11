@@ -1793,71 +1793,83 @@ void CZMPlayer::InputIgnoreFallDamageWithoutReset( inputdata_t& data )
     m_bIgnoreFallDamageResetAfterImpact = false;
 }
 
-void CZMPlayer::SetArmsModel( const char* model )
+void CZMPlayer::UpdateArms( int iArmVersion )
 {
-    if ( !model || !(*model) ) return;
-
-    CBaseViewModel* pVM = GetViewModel( VMINDEX_ARMS );
-    if ( !pVM ) return;
-
-    pVM->SetModel( model );
+    SetArmsData( ZMGetPlayerModels()->GetPlayerModelData( STRING( GetModelName() ) ), iArmVersion );
 }
 
-void CZMPlayer::SetArmsData( CZMPlayerModelData* pData )
+void CZMPlayer::SetArmsData( CZMPlayerModelData* pData, int iArmVersion )
 {
-    if ( !pData ) return;
-
     CZMViewModel* pVM = static_cast<CZMViewModel*>( GetViewModel( VMINDEX_ARMS ) );
-    if ( !pVM ) return;
-
-
-
-    // Set the model
-    const char* pszArms = pData->GetArmModel();
-    if ( !pszArms || !(*pszArms) )
+    if ( !pVM )
     {
-        pszArms = VMARMS_FALLBACKMODEL;
+        return;
     }
 
+    int skin = 0;
+    const char* pszArms = VMARMS_FALLBACKMODEL;
+    bool bUsingPlayerModelArms = false;
+
+    if ( iArmVersion != ZMWeaponConfig::ARMVERSION_CITIZEN && pData )
+    {
+        const char* playerModelArms = pData->GetArmModel();
+        if ( playerModelArms && *playerModelArms )
+        {
+            pszArms = playerModelArms;
+            bUsingPlayerModelArms = true;
+        }
+    }
+
+    // Change model before setting skin, bodygroup, etc.
     int modelIndex = modelinfo->GetModelIndex( pszArms );
     if ( modelIndex != -1 && pVM->GetModelIndex() != modelIndex )
     {
         pVM->SetModel( pszArms );
     }
 
-    // Bodygroups
-    KeyValues* pBodyGroupKV = pData->GetArmBodygroups();
-    if ( pBodyGroupKV )
+    if ( pData )
     {
-        for ( KeyValues* pValue = pBodyGroupKV->GetFirstValue(); pValue; pValue = pValue->GetNextValue() )
+        if ( bUsingPlayerModelArms )
         {
-            const char* pszBodygroupName = pValue->GetName();
-            int bodygroupValue = pValue->GetInt( nullptr, -1 );
-            if ( pszBodygroupName && *pszBodygroupName && bodygroupValue >= 0 )
+            KeyValues* pBodyGroupKV = pData->GetArmBodygroups();
+            if ( pBodyGroupKV )
             {
-                int bodygroupIndex = pVM->FindBodygroupByName( pszBodygroupName );
-                if ( bodygroupIndex >= 0 )
+                for ( KeyValues* pValue = pBodyGroupKV->GetFirstValue(); pValue; pValue = pValue->GetNextValue() )
                 {
-                    pVM->SetBodygroup( bodygroupIndex, bodygroupValue );
-                }
-                else
-                {
-                    Warning( "Player model's arms '%s' body group '%s' does not exist?\n", pszArms, pszBodygroupName );
+                    const char* pszBodygroupName = pValue->GetName();
+                    int bodygroupValue = pValue->GetInt( nullptr, -1 );
+                    if ( pszBodygroupName && *pszBodygroupName && bodygroupValue >= 0 )
+                    {
+                        int bodygroupIndex = pVM->FindBodygroupByName( pszBodygroupName );
+                        if ( bodygroupIndex >= 0 )
+                        {
+                            pVM->SetBodygroup( bodygroupIndex, bodygroupValue );
+                        }
+                        else
+                        {
+                            Warning( "Player model's arms '%s' body group '%s' does not exist?\n", pszArms, pszBodygroupName );
+                        }
+                    }
                 }
             }
+
+            int playerModelSkin = pData->GetArmSkin();
+            if ( playerModelSkin >= 0 && playerModelSkin < MAXSTUDIOSKINS )
+            {
+                skin = playerModelSkin;
+            }
+        }
+
+        Color clr = pData->GetArmColor();
+        if ( clr[0] != 0 || clr[1] != 0 || clr[2] != 0 )
+        {
+            pVM->SetModelColor2( clr[0] / 255.0f, clr[1] / 255.0f, clr[2] / 255.0f );
         }
     }
 
-    int skin = pData->GetArmSkin();
-    if ( skin >= 0 && skin < MAXSTUDIOSKINS )
+    if ( pVM->m_nSkin != skin )
     {
         pVM->m_nSkin = skin;
-    }
-
-    Color clr = pData->GetArmColor();
-    if ( clr[0] != 0 || clr[1] != 0 || clr[2] != 0 )
-    {
-        pVM->SetModelColor2( clr[0] / 255.0f, clr[1] / 255.0f, clr[2] / 255.0f );
     }
 }
 
@@ -1903,7 +1915,6 @@ void CZMPlayer::CreateViewModel( int index )
         }
     }
 
-    SetArmsModel( VMARMS_FALLBACKMODEL );
     SetArmsData( ZMGetPlayerModels()->GetPlayerModelData( STRING( GetModelName() ) ) );
 }
 

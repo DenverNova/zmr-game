@@ -1206,6 +1206,8 @@ void CZMBaseWeapon::SetWeaponVisible( bool visible )
 
 #ifndef CLIENT_DLL
         Assert( vm == pOwner->GetViewModel( m_nViewModelIndex ) );
+
+        pOwner->UpdateArms( GetWeaponConfig()->iArmVersion );
 #endif
     }
 

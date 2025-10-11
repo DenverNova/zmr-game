@@ -136,6 +136,7 @@ CZMBaseWeaponConfig::CZMBaseWeaponConfig( const char* wepname, const char* confi
     fFlags = WEPFLAG_NONE;
 
     bUseArms = true;
+    iArmVersion = ARMVERSION_CITIZEN;
 }
 
 CZMBaseWeaponConfig::~CZMBaseWeaponConfig()
@@ -244,6 +245,7 @@ void CZMBaseWeaponConfig::LoadFromConfig( KeyValues* kv )
 
 
     bUseArms = kv->GetBool( "usenewhands", true );
+    iArmVersion = kv->GetInt( "viewmodel_armversion", ARMVERSION_CITIZEN );
 
 
 

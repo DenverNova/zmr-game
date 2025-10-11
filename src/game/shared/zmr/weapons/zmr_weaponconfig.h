@@ -85,6 +85,14 @@ namespace ZMWeaponConfig
     //
 
     //
+    enum ArmVersion_t
+    {
+        ARMVERSION_CITIZEN = 0, // MaxOfS2D arms, from beta 6 and downwards.
+        ARMVERSION_NEW, // Yeckoh's new arms
+    };
+    //
+
+    //
 #define OVERRIDE_FROM_WEPCONFIG(kv, name, value) if ( kv->GetInt( #name, -1337 ) != -1337 ) { value = kv->GetInt( #name, -1337 ); }
 #define OVERRIDE_FROM_WEPCONFIG_F(kv, name, value) if ( kv->GetFloat( #name, -1337.0f ) != -1337.0f ) { value = kv->GetFloat( #name, -1337.0f ); }
     //
@@ -190,6 +198,7 @@ namespace ZMWeaponConfig
 
         //
         bool bUseArms;
+        int iArmVersion;
         //
 
 
