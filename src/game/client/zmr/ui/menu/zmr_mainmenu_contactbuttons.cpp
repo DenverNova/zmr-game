@@ -72,7 +72,7 @@ CZMMainMenuContactButton::CZMMainMenuContactButton(
     }
     else
     {
-        m_pszUrl = "";
+        m_pszUrl = nullptr;
     }
     
 
@@ -88,11 +88,16 @@ CZMMainMenuContactButton::CZMMainMenuContactButton(
 
 CZMMainMenuContactButton::~CZMMainMenuContactButton()
 {
+    if ( m_pszUrl )
+    {
+        delete[] m_pszUrl;
+        m_pszUrl = nullptr;
+    }
 }
 
 void CZMMainMenuContactButton::OnMousePressed( vgui::MouseCode code )
 {
-    if ( *m_pszUrl && m_flNextClick <= gpGlobals->curtime )
+    if ( m_pszUrl && *m_pszUrl && m_flNextClick <= gpGlobals->curtime )
     {
         auto* pSteamFriends = steamapicontext->SteamFriends();
         auto* pSteamUtils = steamapicontext->SteamUtils();
