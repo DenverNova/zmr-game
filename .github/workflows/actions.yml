@@ -9,7 +9,6 @@ on:
     - sdk_update
     paths:
     - src/**
-    - build/**
     - forcebuild.txt
     - .github/workflows/*
 
