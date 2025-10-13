@@ -185,11 +185,6 @@ void CZMBaseZombie::SetZombieClass( ZombieClass_t zclass )
     m_iZombieClass = zclass;
 }
 
-int CZMBaseZombie::GetPopCost() const
-{
-    return GetPopCost( GetZombieClass() );
-}
-
 int CZMBaseZombie::GetCost() const
 {
     return GetCost( GetZombieClass() );

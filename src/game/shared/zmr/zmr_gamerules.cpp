@@ -915,15 +915,35 @@ const char* CZMRules::SetDefaultPlayerTeam( CBasePlayer* pPlayer )
     return "";
 }
 
-void CZMRules::IncPopCount( ZombieClass_t zclass )
+int CZMRules::IncPopCount( ZombieClass_t zclass )
 {
     CZMRules* pRules = ZMRules();
     Assert( pRules );
 
-    if ( !pRules ) return;
+    if ( !pRules )
+    {
+        return 0;
+    }
 
+    int cost = CZMBaseZombie::GetPopCost( zclass );
 
-    pRules->SetZombiePop( pRules->GetZombiePop() + CZMBaseZombie::GetPopCost( zclass ) );
+    pRules->SetZombiePop( pRules->GetZombiePop() + cost );
+
+    return cost;
+}
+
+void CZMRules::DecPopCount( int cost )
+{
+    CZMRules* pRules = ZMRules();
+    Assert( pRules );
+
+    if ( !pRules )
+    {
+        return;
+    }
+
+    int pop = pRules->GetZombiePop() - cost;
+    pRules->SetZombiePop( MAX( 0, pop ) );
 }
 
 void CZMRules::InitDefaultAIRelationships()

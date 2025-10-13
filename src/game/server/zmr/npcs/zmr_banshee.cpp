@@ -78,12 +78,8 @@ bool CZMBansheeMotor::ShouldAdjustVelocity() const
 IMPLEMENT_SERVERCLASS_ST( CZMBanshee, DT_ZM_Banshee )
 END_SEND_TABLE()
 
-CZMBanshee::CZMBanshee()
+CZMBanshee::CZMBanshee() : CZMBaseZombie( ZMCLASS_BANSHEE )
 {
-    SetZombieClass( ZMCLASS_BANSHEE );
-    CZMRules::IncPopCount( GetZombieClass() );
-
-
     m_flNextLeapAttack = 0.0f;
     m_nMeleeAttacks = 0;
 

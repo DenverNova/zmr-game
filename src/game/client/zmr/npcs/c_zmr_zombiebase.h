@@ -72,7 +72,6 @@ public:
     void                    SetSelector( C_ZMPlayer* pPlayer );
     void                    SetSelector( int index );
     ZombieClass_t           GetZombieClass() const;
-    int                     GetPopCost() const;
     int                     GetCost() const;
     bool                    DoAnimationEvent( int iEvent, int nData );
     virtual int             GetAnimationRandomSeed() OVERRIDE;

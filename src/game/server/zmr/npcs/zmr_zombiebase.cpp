@@ -247,11 +247,11 @@ float CZMBaseZombieMotor::GetYawRate( float delta ) const
 }
 
 
-CZMBaseZombie::CZMBaseZombie()
+CZMBaseZombie::CZMBaseZombie( ZombieClass_t zclass )
 {
     UseClientSideAnimation();
 
-    m_iZombieClass = ZMCLASS_INVALID;
+    m_iZombieClass = zclass;
     m_hSwatObject.Set( nullptr );
 
     m_flLastCommanded = 0.0f;
@@ -294,6 +294,8 @@ CZMBaseZombie::CZMBaseZombie()
     g_ZombieManager.AddZombie( this );
 
     m_MyCommandStyle = ZCOMMANDSTYLE_DEFAULT;
+
+    m_nPopCost = CZMRules::IncPopCount( GetZombieClass() );
 }
 
 CZMBaseZombie::~CZMBaseZombie()
@@ -315,14 +317,7 @@ CZMBaseZombie::~CZMBaseZombie()
 
     g_ZombieManager.RemoveZombie( this );
 
-
-
-    // It's safe to remove pop count here.
-    CZMRules* pRules = ZMRules();
-    if ( pRules )
-    {
-        pRules->SetZombiePop( pRules->GetZombiePop() - GetPopCost() );
-    }
+    CZMRules::DecPopCount( GetPopCost() );
 }
 
 bool CZMBaseZombie::CreateComponents()

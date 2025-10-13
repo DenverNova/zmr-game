@@ -164,7 +164,8 @@ public:
     virtual bool FAllowNPCs() OVERRIDE;
 
 
-    static void IncPopCount( ZombieClass_t );
+    static int IncPopCount( ZombieClass_t );
+    static void DecPopCount( int cost );
 
     void OnClientFinishedPutInServer( CZMPlayer* pPlayer );
 
@@ -184,8 +185,6 @@ public:
 
 
     static int GetNumAliveHumans();
-
-    inline void SetZombiePop( int n ) { m_nZombiePop = n; };
 
     inline CZMEntLoadout* GetLoadoutEnt() const { return m_pLoadoutEnt; };
     inline void SetLoadoutEnt( CZMEntLoadout* pEnt ) { m_pLoadoutEnt = pEnt; }
@@ -219,6 +218,8 @@ private:
     
 
 #ifndef CLIENT_DLL
+    inline void SetZombiePop( int n ) { m_nZombiePop = n; };
+
     void RewardPoints( ZMRoundEndReason_t reason );
 
     CZMPlayer* ChooseZM();

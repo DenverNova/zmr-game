@@ -25,10 +25,8 @@ PRECACHE_REGISTER( npc_zombie );
 IMPLEMENT_SERVERCLASS_ST( CZMShambler, DT_ZM_Shambler )
 END_SEND_TABLE()
 
-CZMShambler::CZMShambler()
+CZMShambler::CZMShambler() : CZMBaseZombie( ZMCLASS_SHAMBLER )
 {
-    SetZombieClass( ZMCLASS_SHAMBLER );
-    CZMRules::IncPopCount( GetZombieClass() );
 }
 
 CZMShambler::~CZMShambler()

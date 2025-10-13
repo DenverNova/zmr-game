@@ -27,10 +27,8 @@ PRECACHE_REGISTER( npc_poisonzombie );
 IMPLEMENT_SERVERCLASS_ST( CZMHulk, DT_ZM_Hulk )
 END_SEND_TABLE()
 
-CZMHulk::CZMHulk()
+CZMHulk::CZMHulk() : CZMBaseZombie( ZMCLASS_HULK )
 {
-    SetZombieClass( ZMCLASS_HULK );
-    CZMRules::IncPopCount( GetZombieClass() );
 }
 
 CZMHulk::~CZMHulk()

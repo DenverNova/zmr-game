@@ -25,10 +25,8 @@ PRECACHE_REGISTER( npc_dragzombie );
 IMPLEMENT_SERVERCLASS_ST( CZMDrifter, DT_ZM_Drifter )
 END_SEND_TABLE()
 
-CZMDrifter::CZMDrifter()
+CZMDrifter::CZMDrifter() : CZMBaseZombie( ZMCLASS_DRIFTER )
 {
-    SetZombieClass( ZMCLASS_DRIFTER );
-    CZMRules::IncPopCount( GetZombieClass() );
 }
 
 CZMDrifter::~CZMDrifter()

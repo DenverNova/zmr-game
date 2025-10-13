@@ -34,12 +34,8 @@ PRECACHE_REGISTER( npc_burnzombie );
 IMPLEMENT_SERVERCLASS_ST( CZMImmolator, DT_ZM_Immolator )
 END_SEND_TABLE()
 
-CZMImmolator::CZMImmolator()
+CZMImmolator::CZMImmolator() : CZMBaseZombie( ZMCLASS_IMMOLATOR )
 {
-    SetZombieClass( ZMCLASS_IMMOLATOR );
-    CZMRules::IncPopCount( GetZombieClass() );
-
-
     m_flNextBurnDamageTime = 0.0f;
 }
 
