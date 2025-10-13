@@ -295,6 +295,7 @@ CZMBaseZombie::CZMBaseZombie( ZombieClass_t zclass )
 
     m_MyCommandStyle = ZCOMMANDSTYLE_DEFAULT;
 
+    m_nResourceCost = 0;
     m_nPopCost = CZMRules::IncPopCount( GetZombieClass() );
 }
 

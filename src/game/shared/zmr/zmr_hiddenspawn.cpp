@@ -279,6 +279,7 @@ HiddenSpawnError_t CZMHiddenSpawnSystem::Spawn( ZombieClass_t zclass, CZMPlayer*
     pZombie->Activate();
 
     pZM->IncResources( -iResCost );
+    pZombie->InitCost( iResCost );
 #endif
 
     return HSERROR_OK;

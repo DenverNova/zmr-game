@@ -346,6 +346,7 @@ void ZM_Cmd_SelectMult( const CCommand &args )
 static ConCommand zm_cmd_selectmult( "zm_cmd_selectmult", ZM_Cmd_SelectMult, "Select multiple zombies.", FCVAR_HIDDEN );
 
 
+ConVar zm_sv_delete_refund_frac( "zm_sv_delete_refund_frac", "0.5", FCVAR_NOTIFY, "How much of the deleted zombie's resource cost is returned to the ZM?" );
 ConVar zm_sv_gibdelete( "zm_sv_gibdelete", "1", FCVAR_NOTIFY, "Does deleting zombies gib them?" );
 
 void ZM_Cmd_DeleteZombies( const CCommand &args )
@@ -362,9 +363,14 @@ void ZM_Cmd_DeleteZombies( const CCommand &args )
     
     int dmgtype = zm_sv_gibdelete.GetBool() ? DMG_ALWAYSGIB : DMG_GENERIC;
 
-
-    g_ZombieManager.ForEachSelectedZombie( pPlayer, [ &dmg, dmgtype, pPlayer ]( CZMBaseZombie* pZombie )
+    int deletedCost = 0;
+    g_ZombieManager.ForEachSelectedZombie( pPlayer, [ & ]( CZMBaseZombie* pZombie )
     {
+        if ( !pZombie->IsAlive() )
+        {
+            return;
+        }
+
         dmg.SetDamageType( dmgtype );
 
         dmg.SetAttacker( pPlayer );
@@ -376,7 +382,18 @@ void ZM_Cmd_DeleteZombies( const CCommand &args )
 
 
         pZombie->TakeDamage( dmg );
+
+        if ( !pZombie->IsAlive() )
+        {
+            deletedCost += pZombie->GetCost();
+        }
     } );
+
+    float refundFrac = zm_sv_delete_refund_frac.GetFloat();
+    if ( deletedCost > 0 && refundFrac > 0.0f )
+    {
+        pPlayer->IncResources( (int)(deletedCost * refundFrac), true );
+    }
 }
 
 static ConCommand zm_cmd_delete( "zm_cmd_delete", ZM_Cmd_DeleteZombies, "Delete selected zombies." );

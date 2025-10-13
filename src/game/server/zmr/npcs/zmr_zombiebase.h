@@ -128,7 +128,6 @@ public:
     void                    SetSelector( CZMPlayer* pPlayer );
     void                    SetSelector( int index );
     ZombieClass_t           GetZombieClass() const;
-    int                     GetCost() const;
     bool                    DoAnimationEvent( int iEvent, int nData = 0 );
     virtual int             GetAnimationRandomSeed() OVERRIDE;
     virtual bool            CanBePenetrated() const;
@@ -203,6 +202,8 @@ public:
     ZombieMode_t    GetZombieMode() const { return m_iZombieMode; }
     void            SetZombieMode( ZombieMode_t mode ) { m_iZombieMode = mode; }
 
+    inline void     InitCost( int cost ) { m_nResourceCost = cost; };
+    inline int      GetCost() const { return m_nResourceCost; };
     inline int      GetPopCost() const { return m_nPopCost; };
 
 
@@ -258,6 +259,7 @@ private:
     ZombieMode_t m_iZombieMode;
     ZombieClass_t m_iZombieClass;
     int m_nPopCost;
+    int m_nResourceCost;
 
 
     CNetworkVar( int, m_iSelectorIndex );

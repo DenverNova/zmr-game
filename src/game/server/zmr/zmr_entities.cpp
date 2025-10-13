@@ -548,26 +548,31 @@ void CZMEntZombieSpawn::SpawnThink()
         bCreate = false;
 
     
-    if ( bCreate && CreateZombie( zclass, pPlayer ) )
+    if ( bCreate )
     {
-        queue.m_nCount--;
-
-
-        // We no longer have zombies in this slot, remove us.
-        if ( !queue.m_nCount )
+        CZMBaseZombie* pZombie = CreateZombie( zclass, pPlayer );
+        if ( pZombie )
         {
-            m_vSpawnQueue.Remove( 0 );
+            queue.m_nCount--;
+
+
+            // We no longer have zombies in this slot, remove us.
+            if ( !queue.m_nCount )
+            {
+                m_vSpawnQueue.Remove( 0 );
+            }
+            
+
+            if ( pPlayer )
+            {
+                pPlayer->IncResources( -cost );
+                pZombie->InitCost( cost );
+            }
+
+
+            // Tell everyone that has this menu open that a zombie has been spawned.
+            SendMenuUpdate();
         }
-        
-
-        if ( pPlayer )
-        {
-            pPlayer->IncResources( -cost );
-        }
-
-
-        // Tell everyone that has this menu open that a zombie has been spawned.
-        SendMenuUpdate();
     }
 
 

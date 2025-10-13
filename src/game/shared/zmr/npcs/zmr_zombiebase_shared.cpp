@@ -185,11 +185,6 @@ void CZMBaseZombie::SetZombieClass( ZombieClass_t zclass )
     m_iZombieClass = zclass;
 }
 
-int CZMBaseZombie::GetCost() const
-{
-    return GetCost( GetZombieClass() );
-}
-
 #ifndef CLIENT_DLL
 void TE_ZombieAnimEvent( CZMBaseZombie* pZombie, ZMZombieAnimEvent_t anim, int nData );
 #endif
