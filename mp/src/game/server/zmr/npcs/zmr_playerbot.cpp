@@ -44,7 +44,7 @@ public:
         }
     }
 
-    virtual int GetSoundMask() const OVERRIDE { return SOUND_COMBAT | SOUND_DANGER; }
+    virtual int GetSoundMask() const OVERRIDE { return SOUND_COMBAT | SOUND_DANGER | SOUND_BULLET_IMPACT | SOUND_PLAYER | SOUND_WORLD; }
 };
 
 
@@ -136,7 +136,8 @@ static const char* g_szBotNamesFemale[] =
     "Kate", "Lena", "Mia", "Eva", "Nina"
 };
 
-ConVar zm_sv_bot_default_behavior( "zm_sv_bot_default_behavior", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI Survivor default behavior. 0=Follow Random, 1=Explore, 2=Defend Spawn, 3=Complete Objectives" );
+ConVar zm_sv_bot_default_behavior( "zm_sv_bot_default_behavior", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI Survivor default behavior. 0=Follow Random, 1=Explore, 2=Defend Spawn, 3=Mixed Mode" );
+ConVar zm_sv_bot_weapon_search_range( "zm_sv_bot_weapon_search_range", "1024", FCVAR_NOTIFY | FCVAR_ARCHIVE, "How far AI survivors search for weapons and ammo (units)." );
 ConVar zm_sv_bot_help_range( "zm_sv_bot_help_range", "1024", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Range for Help voice command to call AI survivors." );
 ConVar zm_sv_bot_taunt_chance( "zm_sv_bot_taunt_chance", "8", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Percent chance for AI survivor to taunt after a kill (0=never)." );
 

@@ -13,7 +13,7 @@ The server can now run a fully automated Zombie Master when no human player volu
 - `zm_sv_ai_zm 2` — Use AI ZM only when no human volunteers (fallback)
 - `zm_sv_ai_zm 0` — Disabled (default)
 
-**Persistence:** The AI ZM persists across rounds automatically. It will only be replaced if a human player volunteers to be ZM.
+**Persistence:** The AI ZM persists across rounds automatically. When a human player volunteers to be ZM, the AI ZM bot is kicked and a fresh survivor bot is spawned to fill the slot.
 
 **Dynamic plan system:** The AI builds concrete multi-step spawn plans and executes them wave by wave. Each plan distributes spawns across all active spawners on the map using round-robin selection, so zombies appear from different locations and all players see action. Each wave picks a different zombie class than the previous one to keep the pressure varied. Cheap zombie types (shamblers) can appear in groups up to 25, while expensive types (banshees, hulks, etc.) are capped at 5 per wave.
 
@@ -58,11 +58,12 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 **Bot behavior:**
 - Bots follow the nearest **human** player by default, spreading out in a fan formation to avoid stacking. Bots never follow other bots. If no human survivors are alive (e.g. the only human is the ZM), bots automatically switch to defending the spawn area
 - Press **E** while looking directly at a bot to toggle between **Following** and **Staying**. One press stays, one press follows — the bot shows a HUD message confirming the state
-- Bots automatically search for weapons and ammo on the ground within 512 units, prioritizing missing loadout slots over ammo and higher-tier weapons over lower-tier
-- Bots equip the best available weapon for the situation (ranged over melee when enemies are present)
+- Bots automatically search for weapons and ammo on the ground (range configurable via `zm_sv_bot_weapon_search_range`), prioritizing missing loadout slots over ammo and higher-tier weapons over lower-tier
+- Bots equip the best available weapon for the situation. When a ranged weapon runs out of ammo mid-combat, bots automatically switch to melee weapons or fists instead of disengaging
 - Bots look around naturally when idle — each bot waits a random delay after stopping before turning, and faces a different direction from its neighbors
 - While following, bots periodically scan for nearby zombies (within 600 units) and turn to face threats
-- Bots react to nearby sounds (gunshots, zombie attacks, combat) by looking toward the source when not already in combat
+- Bots react to all nearby sounds (gunshots, zombie attacks, combat, footsteps, world sounds, bullet impacts) by looking toward the source when not already in combat
+- Bots can shoot while moving when following a player (run-and-gun) instead of stopping to engage
 - Bots engage enemies at appropriate range and fall back when enemies are too close
 - Dead human players can possess a bot by pressing **USE** while spectating it (requires `zm_sv_bot_possess 1`)
 
@@ -75,10 +76,11 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 | ConVar | Default | Description |
 |--------|---------|-------------|
 | `zm_sv_bot_survivors` | `0` | Number of AI survivor bots to spawn per round |
-| `zm_sv_bot_default_behavior` | `0` | Default bot mode: 0=Follow nearest player |
+| `zm_sv_bot_default_behavior` | `0` | Default bot mode: 0=Follow, 1=Explore, 2=Defend, 3=Mixed Mode |
 | `zm_sv_bot_help_range` | `1024` | Range for Help voice command to affect bots |
 | `zm_sv_bot_taunt_chance` | `8` | Percent chance for bots to play taunt sounds |
 | `zm_sv_bot_possess` | `1` | Allow spectators to possess bots with USE key |
+| `zm_sv_bot_weapon_search_range` | `1024` | How far bots search for weapons and ammo (units) |
 
 ---
 
@@ -98,7 +100,7 @@ Scale zombie stats globally for difficulty tuning.
 | ConVar | Default | Description |
 |--------|---------|-------------|
 | `zm_sv_resource_multiplier` | `1.0` | Multiplier applied to all ZM resource income |
-| `zm_sv_resource_per_player_mult` | `1.0` | Additional resource scaling per human player count |
+| `zm_sv_resource_per_player_mult` | `0.0` | Extra resource fraction per survivor beyond the first (0.1 = +10% each, 1.0 = +100% each) |
 
 ---
 
@@ -117,6 +119,7 @@ By default, physics explosions (barrels, etc.) do not hurt players. This can be 
 | ConVar | Default | Description |
 |--------|---------|-------------|
 | `zm_sv_physexp_player_damage` | `0` | Max damage a physics explosion can deal to players (0 = disabled) |
+| `zm_sv_physexp_ignite_barrels` | `0` | ZM blast detonates explosive barrels and breakable props in radius |
 
 ---
 
@@ -130,7 +133,7 @@ A dedicated **ZMR Settings** tab is available in the Create Server dialog, expos
 
 The ZM's hidden spawn power (place a zombie where no survivor can see) now supports all zombie types.
 
-**For human ZMs:** While in hidden spawn mode, use the **scroll wheel** to cycle through zombie types from cheapest to most expensive. The cursor shows the selected class name and cost. Non-shambler types are only available when the server setting is enabled.
+**For human ZMs:** While in hidden spawn mode, use the **scroll wheel** to cycle through zombie types from cheapest to most expensive. The cursor shows the correct zombie model for the selected class and displays friendly names (Shambler, Banshee, Hulk, Drifter, Immolator) with cost. Non-shambler types are only available when the server setting is enabled.
 
 **For AI ZMs:** The AI automatically picks a random class when using hidden spawn.
 
@@ -140,6 +143,18 @@ The ZM's hidden spawn power (place a zombie where no survivor can see) now suppo
 |--------|---------|-------------|
 | `zm_sv_hidden_allclasses` | `0` | Allow all zombie types for hidden spawn (0=Shamblers only) |
 | `zm_sv_hidden_cost_mult` | `0.25` | Extra cost multiplier for non-shambler hidden spawns |
+
+---
+
+## Kill Feed
+
+When a human player is the Zombie Master, zombie kills now display the ZM player's actual name in the kill feed instead of just the zombie class name.
+
+---
+
+## Mixed Mode (Bot Behavior)
+
+The "Mixed Mode" bot behavior option (value 3) randomly assigns each bot one of three behaviors at spawn: Follow a player, Explore the map, or Defend the spawn area. This creates more varied and realistic bot movement patterns.
 
 ---
 

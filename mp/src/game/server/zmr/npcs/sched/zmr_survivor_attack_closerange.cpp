@@ -72,10 +72,17 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
     }
 
 
-    if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_MELEE ) && !pOuter->WeaponHasAmmo( pOuter->GetActiveWeapon() ) )
+    if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_MELEE ) && !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) && !pOuter->WeaponHasAmmo( pOuter->GetActiveWeapon() ) )
     {
-        End( "No ammo left!" );
-        return;
+        // Try to switch to melee or fists before giving up
+        if ( !pOuter->EquipBestWeapon() )
+        {
+            End( "No ammo left!" );
+            return;
+        }
+        // If we switched to melee/fists, allow melee attacks
+        if ( pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_MELEE ) || pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) )
+            m_bAllowMelee = true;
     }
 
 

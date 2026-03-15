@@ -9,6 +9,7 @@
 #include "tier0/memdbgon.h"
 
 extern ConVar zm_sv_bot_default_behavior;
+extern ConVar zm_sv_bot_weapon_search_range;
 
 
 CSurvivorFollowSchedule::CSurvivorFollowSchedule()
@@ -17,6 +18,7 @@ CSurvivorFollowSchedule::CSurvivorFollowSchedule()
     m_vecDefendPos = vec3_origin;
     m_bHasDefendPos = false;
     m_vecHeardLookAt = vec3_origin;
+    m_iMixedBehavior = -1;
 }
 
 CSurvivorFollowSchedule::~CSurvivorFollowSchedule()
@@ -61,7 +63,7 @@ void CSurvivorFollowSchedule::OnUpdate()
     // Periodically scan for threats in peripheral vision (zombie near follow target or us)
     if ( !m_NextPeripheralScan.HasStarted() || m_NextPeripheralScan.IsElapsed() )
     {
-        m_NextPeripheralScan.Start( random->RandomFloat( 1.5f, 3.0f ) );
+        m_NextPeripheralScan.Start( random->RandomFloat( 0.8f, 1.5f ) );
 
         CBaseEntity* pClosestThreat = nullptr;
         float flThreatDistSqr = 600.0f * 600.0f;
@@ -135,8 +137,8 @@ void CSurvivorFollowSchedule::OnUpdate()
     case 2: // Defend Spawn
         UpdateDefendMode();
         return;
-    case 3: // Objectives
-        UpdateObjectiveMode();
+    case 3: // Mixed Mode - each bot gets a random behavior
+        UpdateMixedMode();
         return;
     default: // 0 = Follow nearest player
         break;
@@ -177,6 +179,9 @@ void CSurvivorFollowSchedule::OnSpawn()
     // Save spawn position for defend mode
     m_vecDefendPos = GetOuter()->GetAbsOrigin();
     m_bHasDefendPos = true;
+
+    // Re-randomize mixed mode behavior each round
+    m_iMixedBehavior = -1;
 }
 
 void CSurvivorFollowSchedule::OnHeardSound( CSound* pSound )
@@ -187,9 +192,8 @@ void CSurvivorFollowSchedule::OnHeardSound( CSound* pSound )
     int soundType = pSound->SoundType();
     bool bInteresting = false;
 
-    if ( soundType & ( SOUND_COMBAT | SOUND_BULLET_IMPACT ) )
-        bInteresting = true;
-    if ( soundType & SOUND_DANGER )
+    // React to combat, gunfire, danger, and any NPC/world sounds (zombie growls, attacks, etc.)
+    if ( soundType & ( SOUND_COMBAT | SOUND_BULLET_IMPACT | SOUND_DANGER | SOUND_PLAYER | SOUND_WORLD ) )
         bInteresting = true;
     if ( !bInteresting )
         return;
@@ -206,7 +210,7 @@ void CSurvivorFollowSchedule::OnHeardSound( CSound* pSound )
         m_vecHeardLookAt = pSound->GetSoundOrigin();
     }
 
-    m_NextHeardLook.Start( random->RandomFloat( 2.5f, 4.5f ) );
+    m_NextHeardLook.Start( random->RandomFloat( 1.0f, 2.0f ) );
 }
 
 //NPCR::QueryResult_t CSurvivorFollowSchedule::IsBusy() const
@@ -216,8 +220,8 @@ void CSurvivorFollowSchedule::OnHeardSound( CSound* pSound )
 
 NPCR::QueryResult_t CSurvivorFollowSchedule::ShouldChase( CBaseEntity* pEnemy ) const
 {
-    auto* pFollow = m_hFollowTarget.Get();
-    return pFollow && m_Path.IsValid() && ShouldMoveCloser( pFollow ) ? NPCR::RES_NO : NPCR::RES_NONE;
+    // Always allow engaging enemies, even while following - bots should run and gun
+    return NPCR::RES_NONE;
 }
 
 //void CSurvivorFollowSchedule::OnMoveSuccess( NPCR::CBaseNavPath* pPath )
@@ -452,114 +456,44 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
     }
 }
 
-void CSurvivorFollowSchedule::UpdateObjectiveMode()
+void CSurvivorFollowSchedule::UpdateMixedMode()
 {
-    CZMPlayerBot* pOuter = GetOuter();
-
-    // Periodically scan for usable entities
-    if ( !m_NextObjectiveScan.HasStarted() || m_NextObjectiveScan.IsElapsed() )
+    // Assign a random behavior on first call (per bot, persists for the round)
+    if ( m_iMixedBehavior < 0 )
     {
-        m_NextObjectiveScan.Start( 3.0f );
-
-        CBaseEntity* pTarget = FindNearestUsableEntity();
-        if ( pTarget && pTarget != m_hObjectiveTarget.Get() )
-        {
-            m_hObjectiveTarget.Set( pTarget );
-            m_ObjPath.Invalidate();
-
-            Vector vecMyPos = pOuter->GetAbsOrigin();
-            Vector vecTarget = pTarget->GetAbsOrigin();
-            CNavArea* pStart = pOuter->GetLastKnownArea();
-            CNavArea* pGoal = TheNavMesh->GetNearestNavArea( vecTarget, true, 512.0f, false );
-
-            if ( pStart && pGoal )
-            {
-                m_PathCost.SetStepHeight( pOuter->GetMotor()->GetStepHeight() );
-                m_PathCost.SetStartPos( vecMyPos, pStart );
-                m_ObjPath.Compute( vecMyPos, vecTarget, pStart, pGoal, m_PathCost );
-            }
-        }
+        m_iMixedBehavior = random->RandomInt( 0, 2 );
     }
 
-    auto* pTarget = m_hObjectiveTarget.Get();
-    if ( !pTarget )
+    switch ( m_iMixedBehavior )
     {
-        // No objective found - explore instead
+    case 1:
         UpdateExploreMode();
         return;
-    }
-
-    // If close enough to the target, try to USE it
-    float flDist = pOuter->GetAbsOrigin().DistTo( pTarget->GetAbsOrigin() );
-    if ( flDist < 96.0f )
+    case 2:
+        UpdateDefendMode();
+        return;
+    default:
     {
-        pOuter->GetMotor()->FaceTowards( pTarget->GetAbsOrigin() );
-        pOuter->PressUse( 0.15f );
-
-        m_hObjectiveTarget.Set( nullptr );
-        m_ObjPath.Invalidate();
-        m_NextObjectiveScan.Start( 5.0f );
+        // Follow mode - same logic as the default follow behavior
+        auto* pFollow = m_hFollowTarget.Get();
+        if ( (pFollow && !IsValidFollowTarget( pFollow )) || m_NextFollowTarget.IsElapsed() )
+        {
+            NextFollow();
+            pFollow = m_hFollowTarget.Get();
+        }
+        if ( !pFollow )
+        {
+            UpdateDefendMode();
+            return;
+        }
+        bool bBusy = GetOuter()->IsBusy() == NPCR::RES_YES;
+        if ( m_Path.IsValid() && pFollow && !bBusy && ShouldMoveCloser( pFollow ) )
+        {
+            m_Path.Update( GetOuter(), pFollow, m_PathCost );
+        }
         return;
     }
-
-    // Navigate toward the objective
-    bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
-    if ( m_ObjPath.IsValid() && !bBusy )
-    {
-        pOuter->GetMotor()->FaceTowards( pTarget->GetAbsOrigin() );
-        m_ObjPath.Update( pOuter );
     }
-}
-
-CBaseEntity* CSurvivorFollowSchedule::FindNearestUsableEntity() const
-{
-    CZMPlayerBot* pOuter = GetOuter();
-    Vector myPos = pOuter->GetAbsOrigin();
-
-    CBaseEntity* pBest = nullptr;
-    float flBestDist = FLT_MAX;
-    float flMaxRange = 2048.0f;
-
-    // Scan for func_button entities
-    CBaseEntity* pEnt = nullptr;
-    while ( (pEnt = gEntList.FindEntityByClassname( pEnt, "func_button" )) != nullptr )
-    {
-        if ( !pEnt->HasSpawnFlags( 256 ) ) // SF_BUTTON_TOUCH_ACTIVATES - skip touch-only buttons
-        {
-            float dist = myPos.DistTo( pEnt->GetAbsOrigin() );
-            if ( dist < flMaxRange && dist < flBestDist )
-            {
-                flBestDist = dist;
-                pBest = pEnt;
-            }
-        }
-    }
-
-    // Scan for func_rot_button
-    pEnt = nullptr;
-    while ( (pEnt = gEntList.FindEntityByClassname( pEnt, "func_rot_button" )) != nullptr )
-    {
-        float dist = myPos.DistTo( pEnt->GetAbsOrigin() );
-        if ( dist < flMaxRange && dist < flBestDist )
-        {
-            flBestDist = dist;
-            pBest = pEnt;
-        }
-    }
-
-    // Scan for momentary_rot_button (levers)
-    pEnt = nullptr;
-    while ( (pEnt = gEntList.FindEntityByClassname( pEnt, "momentary_rot_button" )) != nullptr )
-    {
-        float dist = myPos.DistTo( pEnt->GetAbsOrigin() );
-        if ( dist < flMaxRange && dist < flBestDist )
-        {
-            flBestDist = dist;
-            pBest = pEnt;
-        }
-    }
-
-    return pBest;
 }
 
 void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
@@ -618,7 +552,7 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
 
     Vector myPos = pOuter->GetAbsOrigin();
     Vector eyePos = pOuter->EyePosition();
-    float flBestDist = 512.0f;
+    float flBestDist = zm_sv_bot_weapon_search_range.GetFloat();
     CBaseEntity* pBestWeapon = nullptr;
     int nBestPriority = 0;
 

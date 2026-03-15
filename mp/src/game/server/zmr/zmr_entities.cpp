@@ -1992,6 +1992,7 @@ ConVar zm_sv_physexp_debug( "zm_sv_physexp_debug", "0" );
 ConVar zm_sv_physexp_disorientateplayer( "zm_sv_physexp_disorientateplayer", "10", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Maximum angular disorientation applied to players." );
 ConVar zm_sv_physexp_player_mult( "zm_sv_physexp_player_mult", "0.05", FCVAR_NOTIFY | FCVAR_ARCHIVE, "How much players are pushed." );
 ConVar zm_sv_physexp_player_damage( "zm_sv_physexp_player_damage", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Damage dealt to survivors by ZM blast. 0 = no damage." );
+ConVar zm_sv_physexp_ignite_barrels( "zm_sv_physexp_ignite_barrels", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "ZM blast detonates explosive barrels/props in radius. 0 = off, 1 = on." );
 
 
 CZMPhysExplosion::CZMPhysExplosion()
@@ -2196,6 +2197,15 @@ void CZMPhysExplosion::Push()
             }
 
             pEnt->VPhysicsTakeDamage( info );
+
+            // If barrel detonation is enabled, apply extra lethal damage to explosive/breakable props
+            if ( zm_sv_physexp_ignite_barrels.GetBool() )
+            {
+                CTakeDamageInfo breakInfo( this, this, 1000.0f, DMG_BLAST );
+                breakInfo.SetDamagePosition( src );
+                breakInfo.SetDamageForce( dir * 1000.0f );
+                pEnt->TakeDamage( breakInfo );
+            }
         }
     }
 }

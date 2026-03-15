@@ -20,7 +20,7 @@ ConVar zm_sv_resource_refill_max( "zm_sv_resource_refill_max", "1200", FCVAR_NOT
 ConVar zm_sv_resource_refill_usehighest( "zm_sv_resource_refill_usehighest", "1", FCVAR_NOTIFY | FCVAR_REPLICATED, "Is refilling based on current human count or count at the start of the round." );
 ConVar zm_sv_resource_max( "zm_sv_resource_max", "5000", FCVAR_NOTIFY | FCVAR_REPLICATED );
 ConVar zm_sv_resource_multiplier( "zm_sv_resource_multiplier", "1.0", FCVAR_NOTIFY | FCVAR_REPLICATED, "Global multiplier on ZM resource gain rate. 1.0 = default." );
-ConVar zm_sv_resource_per_player_mult( "zm_sv_resource_per_player_mult", "1.0", FCVAR_NOTIFY | FCVAR_REPLICATED, "Per-player scaling factor for ZM resources. Each additional survivor adds this fraction of base rate. 1.0 = +10% per extra survivor." );
+ConVar zm_sv_resource_per_player_mult( "zm_sv_resource_per_player_mult", "0.0", FCVAR_NOTIFY | FCVAR_REPLICATED, "Additional resource fraction per survivor beyond the first. 0.1 = +10% per extra survivor, 1.0 = +100%. 0.0 = disabled." );
 
 CZMResourceSystem::CZMResourceSystem()
 {
@@ -199,10 +199,13 @@ float CZMResourceSystem::GetResourcesPerMinute() const
     // Apply global resource multiplier
     baseRPM *= zm_sv_resource_multiplier.GetFloat();
 
-    // Apply per-player scaling: each extra survivor beyond the first adds 10% * per_player_mult
+    // Apply per-player scaling: each extra survivor beyond the first adds perPlayerMult fraction
     float perPlayerMult = zm_sv_resource_per_player_mult.GetFloat();
-    int nExtraSurvivors = MAX( 0, GetRealSurvivorCount() - 1 );
-    baseRPM *= ( 1.0f + nExtraSurvivors * perPlayerMult * 0.1f );
+    if ( perPlayerMult > 0.0f )
+    {
+        int nExtraSurvivors = MAX( 0, GetRealSurvivorCount() - 1 );
+        baseRPM *= ( 1.0f + nExtraSurvivors * perPlayerMult );
+    }
 
     return baseRPM;
 }

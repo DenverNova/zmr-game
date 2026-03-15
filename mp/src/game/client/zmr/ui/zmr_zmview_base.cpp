@@ -1143,7 +1143,14 @@ bool CZMViewBase::UsesZMView()
 
 const char* CZMViewBase::GetTempHiddenSpawnModel( ZombieClass_t zclass ) const
 {
-    return TEMPHIDDENSPAWN_MODEL;
+    switch ( zclass )
+    {
+    case ZMCLASS_BANSHEE :   return "models/zombie/zm_fast.mdl";
+    case ZMCLASS_HULK :      return "models/zombie/hulk.mdl";
+    case ZMCLASS_DRIFTER :   return "models/humans/zm_draggy.mdl";
+    case ZMCLASS_IMMOLATOR : return "models/zombie/burnzie.mdl";
+    default :                return TEMPHIDDENSPAWN_MODEL;
+    }
 }
 
 C_ZMTempModel* CZMViewBase::CreateTempHiddenZombie() const
@@ -1212,11 +1219,16 @@ void CZMViewBase::UpdateHiddenSpawnSpot( int mx, int my )
 
     auto res = g_ZMHiddenSpawn.Spawn( m_iHiddenSpawnClass, pLocal, tr.endpos, &rescost );
 
-    // Build class name for display
-    const char* pClassName = CZMBaseZombie::ClassToName( m_iHiddenSpawnClass );
-    // Strip "npc_" prefix for display
-    if ( Q_strnicmp( pClassName, "npc_", 4 ) == 0 )
-        pClassName += 4;
+    // Build class name for display using proper names
+    const char* pClassName = "Shambler";
+    switch ( m_iHiddenSpawnClass )
+    {
+    case ZMCLASS_BANSHEE :   pClassName = "Banshee"; break;
+    case ZMCLASS_HULK :      pClassName = "Hulk"; break;
+    case ZMCLASS_DRIFTER :   pClassName = "Drifter"; break;
+    case ZMCLASS_IMMOLATOR : pClassName = "Immolator"; break;
+    default : break;
+    }
 
     wchar_t wszClassName[32];
     g_pVGuiLocalize->ConvertANSIToUnicode( pClassName, wszClassName, sizeof( wszClassName ) );

@@ -52,8 +52,7 @@ private:
 
     void UpdateExploreMode();
     void UpdateDefendMode();
-    void UpdateObjectiveMode();
-    CBaseEntity* FindNearestUsableEntity() const;
+    void UpdateMixedMode();
     void TryPickupNearbyWeapons();
 
     NPCR::CChaseNavPath m_Path;
@@ -70,8 +69,8 @@ private:
     Vector m_vecHeardLookAt;               // Direction to look toward after hearing something
 
     CHandle<CBasePlayer> m_hFollowTarget;
-    CHandle<CBaseEntity> m_hObjectiveTarget;
     Vector m_vecFormationOffset;
     Vector m_vecDefendPos;
     bool m_bHasDefendPos;
+    int m_iMixedBehavior;    // Randomly assigned behavior for Mixed Mode (0=follow, 1=explore, 2=defend)
 };

@@ -151,8 +151,8 @@ void CSurvivorCombatSchedule::OnUpdate()
         if ( m_bWasMoving )
         {
             m_bWasMoving = false;
-            // Random per-bot delay before starting to look around (2-6s), offset by entindex
-            float flDelay = random->RandomFloat( 2.0f, 6.0f ) + ( (pOuter->entindex() * 3) % 7 ) * 0.3f;
+            // Short per-bot delay before starting to look around, offset by entindex
+            float flDelay = random->RandomFloat( 0.5f, 1.5f ) + ( (pOuter->entindex() * 3) % 7 ) * 0.1f;
             m_flIdleSince = gpGlobals->curtime + flDelay;
             m_NextLookAround.Invalidate();
         }
@@ -166,7 +166,7 @@ void CSurvivorCombatSchedule::OnUpdate()
             {
                 // Pick a new independent random look direction for this bot
                 // Use entindex as part of the seed offset so bots don't sync
-                float flInterval = random->RandomFloat( 5.0f, 12.0f ) + ( pOuter->entindex() % 5 ) * 0.7f;
+                float flInterval = random->RandomFloat( 3.0f, 6.0f ) + ( pOuter->entindex() % 5 ) * 0.3f;
                 m_NextLookAround.Start( flInterval );
 
                 CNavArea* pMyArea = pOuter->GetLastKnownArea();
@@ -213,8 +213,8 @@ void CSurvivorCombatSchedule::OnHeardSound( CSound* pSound )
 {
     if ( !m_bMovingOutOfRange && (!m_NextHeardLook.HasStarted() || m_NextHeardLook.IsElapsed()) )
     {
-        m_NextHeardLook.Start( 5.0f );
-        m_NextLookAround.Start( 3.0f );
+        m_NextHeardLook.Start( 2.0f );
+        m_NextLookAround.Start( 2.0f );
 
 
         auto* pOwner = pSound->m_hOwner.Get();
@@ -229,6 +229,7 @@ void CSurvivorCombatSchedule::OnHeardSound( CSound* pSound )
         }
         else
         {
+            // Look directly at the sound origin (zombie growls, attacks, world sounds, etc.)
             m_vecLookAt = pSound->GetSoundOrigin();
         }
             

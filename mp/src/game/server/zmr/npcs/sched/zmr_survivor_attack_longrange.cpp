@@ -47,8 +47,13 @@ void CSurvivorAttackLongRangeSchedule::OnUpdate()
 
     if ( !pOuter->WeaponHasAmmo( pOuter->GetActiveWeapon() ) )
     {
-        End( "No ammo left!" );
-        return;
+        // Try to switch to melee or fists before giving up
+        if ( !pOuter->EquipBestWeapon() )
+        {
+            End( "No ammo left!" );
+            return;
+        }
+        // Switched to melee/fists - fall through to close-range intercept below
     }
 
 

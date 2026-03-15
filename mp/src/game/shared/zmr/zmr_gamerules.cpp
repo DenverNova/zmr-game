@@ -415,6 +415,20 @@ void CZMRules::DeathNotice( CBasePlayer* pVictim, const CTakeDamageInfo& info )
             killer_weapon_name = pInflictor->GetClassname();
         }
 
+        // If the killer is a zombie NPC and the ZM is a human player, attribute the kill to them
+        if ( !pScorer && pKiller && strncmp( pKiller->GetClassname(), "npc_", 4 ) == 0 )
+        {
+            for ( int idx = 1; idx <= gpGlobals->maxClients; idx++ )
+            {
+                CZMPlayer* pCheck = ToZMPlayer( UTIL_PlayerByIndex( idx ) );
+                if ( pCheck && pCheck->IsZM() && !pCheck->IsBot() )
+                {
+                    killer_ID = pCheck->GetUserID();
+                    break;
+                }
+            }
+        }
+
         // strip the NPC_* or weapon_* from the inflictor's classname
         if ( strncmp( killer_weapon_name, "weapon_", 7 ) == 0 )
         {
@@ -1355,6 +1369,23 @@ void CZMRules::ResetWorld()
 
     // Choose ZM and begin the round!
     CZMPlayer* pZM = ChooseZM();
+
+    // If a human was chosen as ZM, kick any existing AI ZM bot so it doesn't
+    // get moved to survivors with the "Zombie Master" name
+    if ( pZM && !pZM->IsBot() )
+    {
+        for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+        {
+            CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( UTIL_PlayerByIndex( i ) );
+            if ( pBot && pBot->IsZM() )
+            {
+                Msg( "Kicking AI ZM bot '%s' - human player taking over.\n", pBot->GetPlayerName() );
+                engine->ServerCommand( UTIL_VarArgs( "kickid %i\n", pBot->GetUserID() ) );
+                engine->ServerExecute();
+                break;
+            }
+        }
+    }
 
     // If no human ZM was chosen and AI ZM is enabled, reuse or create a bot ZM
     if ( !pZM && zm_sv_ai_zm.GetInt() > 0 )
