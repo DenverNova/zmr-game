@@ -37,4 +37,6 @@ private:
     vgui::ComboBox*     m_pMuzzleflashBox;
     vgui::CheckButton*  m_pCheck_CinematicBars;
     vgui::ComboBox*     m_pFireLightsBox;
+    vgui::Slider*       m_pSlider_UIScale;
+    vgui::TextEntry*    m_pTextEntry_UIScale;
 };

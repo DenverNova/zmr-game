@@ -154,6 +154,13 @@ void ZM_Cmd_CreateHidden( const CCommand &args )
 
     ZombieClass_t zclass = ZMCLASS_SHAMBLER;
 
+    if ( args.ArgC() >= 5 )
+    {
+        ZombieClass_t requested = static_cast<ZombieClass_t>( atoi( args.Arg( 4 ) ) );
+        if ( CZMBaseZombie::IsValidClass( requested ) )
+            zclass = requested;
+    }
+
     
     g_ZMHiddenSpawn.Spawn( zclass, pPlayer, pos );
 }

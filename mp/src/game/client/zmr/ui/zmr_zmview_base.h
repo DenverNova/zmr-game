@@ -74,10 +74,13 @@ public:
 
     void UpdateHiddenSpawnSpot( int mx, int my );
     const char* GetTempHiddenSpawnModel( ZombieClass_t zclass ) const;
+    void CycleHiddenSpawnClass( int direction );
+    ZombieClass_t GetHiddenSpawnClass() const { return m_iHiddenSpawnClass; }
 private:
     float m_flLastHiddenSpawnUpdate;
     wchar_t m_wszHiddenSpawnTxt[64];
     Color m_HiddenSpawnTxtColor;
+    ZombieClass_t m_iHiddenSpawnClass;
 public:
 
 

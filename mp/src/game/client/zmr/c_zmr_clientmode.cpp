@@ -14,6 +14,7 @@
 #include "c_zmr_util.h"
 #include "c_zmr_player.h"
 #include "c_zmr_teamkeys.h"
+#include "c_playerresource.h"
 #include "c_zmr_clientmode.h"
 
 
@@ -222,6 +223,18 @@ void ClientModeZMNormal::PostRender()
 int ClientModeZMNormal::KeyInput( int down, ButtonCode_t keynum, const char* pszCurrentBinding )
 {
     C_ZMPlayer* pPlayer = C_ZMPlayer::GetLocalPlayer();
+
+    // Bot possession: USE key while spectating a bot
+    if ( down && pPlayer && pPlayer->IsObserver() && pPlayer->GetTeamNumber() == ZMTEAM_HUMAN
+        && pszCurrentBinding && Q_stricmp( pszCurrentBinding, "+use" ) == 0 )
+    {
+        C_BaseEntity* pTarget = pPlayer->GetObserverTarget();
+        if ( pTarget && pTarget->IsPlayer() && g_PR && g_PR->IsFakePlayer( pTarget->entindex() ) )
+        {
+            engine->ClientCmd_Unrestricted( "zm_cmd_possess_bot" );
+            return 0;
+        }
+    }
 
     const bool bIsZM = pPlayer && pPlayer->IsZM();
 

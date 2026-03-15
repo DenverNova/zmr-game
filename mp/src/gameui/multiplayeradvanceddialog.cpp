@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -39,7 +39,12 @@ using namespace vgui;
 //-----------------------------------------------------------------------------
 CMultiplayerAdvancedDialog::CMultiplayerAdvancedDialog(vgui::Panel *parent) : BaseClass(NULL, "MultiplayerAdvancedDialog")
 {
-	SetBounds(0, 0, 372, 160);
+	// Scale dialog for 4K support
+	int screenW, screenH;
+	vgui::surface()->GetScreenSize( screenW, screenH );
+	float flScale = (float)screenH / 480.0f;
+	if ( flScale < 1.0f ) flScale = 1.0f;
+	SetBounds( 0, 0, (int)( 372 * flScale ), (int)( 160 * flScale ) );
 	SetSizeable( false );
 
 	SetTitle("#GameUI_MultiplayerAdvanced", true);
@@ -285,7 +290,7 @@ void CMultiplayerAdvancedDialog::CreateControls()
 		}
 
 		pCtrl->pScrObj = pObj;
-		pCtrl->SetSize( 100, 28 );
+		int sw2, sh2; vgui::surface()->GetScreenSize( sw2, sh2 ); float flItemScale = (float)sh2 / 480.0f; if ( flItemScale < 1.0f ) flItemScale = 1.0f; pCtrl->SetSize( (int)( 100 * flItemScale ), (int)( 28 * flItemScale ) );
 		//pCtrl->SetBorder( scheme()->GetBorder(1, "DepressedButtonBorder") );
 		m_pListPanel->AddItem( pCtrl );
 

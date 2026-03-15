@@ -21,9 +21,7 @@ $Project "client"
 
 $Project "gameui"
 {
-	// Uncomment when we need to override gameui.
-	//"gameui\gameui_base.vpc"		[($WIN32||$POSIX) && !$ZMR]
-	//"gameui\gameui_zmr.vpc"		[($WIN32||$POSIX) && $ZMR && $ZMR_STEAM]
+	"gameui\gameui_zmr.vpc"		[($WIN32||$POSIX) && $ZMR]
 }
 
 $Project "fgdlib"

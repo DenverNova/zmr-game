@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ? 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -9,10 +9,12 @@
 #include "CreateMultiplayerGameServerPage.h"
 #include "CreateMultiplayerGameGameplayPage.h"
 #include "CreateMultiplayerGameBotPage.h"
+#include "createmultiplayergamezmrpage.h"
 
 #include "EngineInterface.h"
 #include "ModInfo.h"
 #include "GameUI_Interface.h"
+#include <vgui/ISurface.h>
 
 #include <stdio.h>
 
@@ -33,7 +35,8 @@ CCreateMultiplayerGameDialog::CCreateMultiplayerGameDialog(vgui::Panel *parent) 
 {
 	m_bBotsEnabled = false;
 	SetDeleteSelfOnClose(true);
-	SetSize(348, 460);
+	SetProportional( false );
+	SetSize( 348, 460 );
 	
 	SetTitle("#GameUI_CreateServer", true);
 	SetOKButtonText("#GameUI_Start");
@@ -49,6 +52,9 @@ CCreateMultiplayerGameDialog::CCreateMultiplayerGameDialog(vgui::Panel *parent) 
 
 	AddPage(m_pServerPage, "#GameUI_Server");
 	AddPage(m_pGameplayPage, "#GameUI_Game");
+
+	m_pZMRPage = new CCreateMultiplayerGameZMRPage(this, "ZMRPage");
+	AddPage(m_pZMRPage, "ZMR Settings");
 
 	// create KeyValues object to load/save config options
 	m_pSavedData = new KeyValues( "ServerConfig" );

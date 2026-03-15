@@ -36,6 +36,24 @@ bool NPCR::CPlayerMotor::ShouldDoFullMove() const
     return GetOuter()->GetWaterLevel() >= 2;
 }
 
+void NPCR::CPlayerMotor::Approach( const Vector& vecDesiredGoal )
+{
+    // Snap yaw instantly to movement direction so Move() decomposes correctly.
+    // Smooth facing is fine for enemies; for movement it causes sideways walking.
+    Vector vecDir = vecDesiredGoal - GetOuter()->GetAbsOrigin();
+    vecDir.z = 0.0f;
+    if ( vecDir.LengthSqr() > 1.0f )
+    {
+        QAngle angMove;
+        VectorAngles( vecDir, angMove );
+        QAngle angCur = GetNPC()->GetEyeAngles();
+        angCur.y = angMove.y;
+        GetNPC()->SetEyeAngles( angCur );
+    }
+
+    BaseClass::Approach( vecDesiredGoal );
+}
+
 void NPCR::CPlayerMotor::Update()
 {
     Move();

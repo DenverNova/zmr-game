@@ -26,6 +26,8 @@ ConVar zm_sv_hidden_cost_shambler( "zm_sv_hidden_cost_shambler", "100", FCVAR_NO
 ConVar zm_sv_hidden_mindistance( "zm_sv_hidden_mindistance", "144", FCVAR_NOTIFY | FCVAR_REPLICATED, "The closest distance (in units) to survivors that the ZM can spawn zombies in." );
 ConVar zm_sv_hidden_zombiedistmult( "zm_sv_hidden_zombiedistmult", "256", FCVAR_NOTIFY | FCVAR_REPLICATED, "Zombie further away than this will have minimum cost." );
 ConVar zm_sv_hidden_mincost( "zm_sv_hidden_mincost", "10", FCVAR_NOTIFY | FCVAR_REPLICATED, "The minimum amount a hidden spawn will cost." );
+ConVar zm_sv_hidden_allclasses( "zm_sv_hidden_allclasses", "0", FCVAR_NOTIFY | FCVAR_REPLICATED, "Allow all zombie types for hidden spawn. 0=Shamblers only, 1=All types." );
+ConVar zm_sv_hidden_cost_mult( "zm_sv_hidden_cost_mult", "0.25", FCVAR_NOTIFY | FCVAR_REPLICATED, "Extra cost multiplier for non-shambler hidden spawns. Applied on top of the zombie's base cost." );
 
 
 
@@ -49,7 +51,16 @@ float CZMHiddenSpawnSystem::GetMinimumDistance() const
 
 int CZMHiddenSpawnSystem::GetResourcesMax( ZombieClass_t zclass ) const
 {
-    return zm_sv_hidden_cost_shambler.GetInt();
+    int baseCost = zm_sv_hidden_cost_shambler.GetInt();
+
+    if ( zclass != ZMCLASS_SHAMBLER && zm_sv_hidden_allclasses.GetBool() )
+    {
+        int zombieCost = CZMBaseZombie::GetCost( zclass );
+        float mult = zm_sv_hidden_cost_mult.GetFloat();
+        baseCost += (int)( zombieCost * mult );
+    }
+
+    return baseCost;
 }
 
 int CZMHiddenSpawnSystem::ComputeResourceCost( ZombieClass_t zclass, float closestZombieDist ) const
@@ -111,7 +122,13 @@ bool CZMHiddenSpawnSystem::CanSee( CZMPlayer* pSurvivor, const Vector& zombiepos
 
 bool CZMHiddenSpawnSystem::CanSpawnClass( ZombieClass_t zclass ) const
 {
-    return zclass == ZMCLASS_SHAMBLER;
+    if ( zclass == ZMCLASS_SHAMBLER )
+        return true;
+
+    if ( zm_sv_hidden_allclasses.GetBool() && CZMBaseZombie::IsValidClass( zclass ) )
+        return true;
+
+    return false;
 }
 
 HiddenSpawnError_t CZMHiddenSpawnSystem::Spawn( ZombieClass_t zclass, CZMPlayer* pZM, const Vector& pos, int* pResourceCost )

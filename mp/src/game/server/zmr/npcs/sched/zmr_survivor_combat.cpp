@@ -17,6 +17,8 @@ CSurvivorCombatSchedule::CSurvivorCombatSchedule()
 
     m_vecLookAt = vec3_origin;
     m_pLastLookArea = nullptr;
+    m_flIdleSince = 0.0f;
+    m_bWasMoving = false;
 }
 
 CSurvivorCombatSchedule::~CSurvivorCombatSchedule()
@@ -130,42 +132,75 @@ void CSurvivorCombatSchedule::OnUpdate()
         m_Path.Invalidate();
 
         m_bMovingOutOfRange = false;
+    }
 
-        if ( !m_NextLookAround.HasStarted() || m_NextLookAround.IsElapsed() )
+
+    // Look-around idle behavior: only trigger after the bot has been stationary for a random delay.
+    // Track moving->stopped transitions per bot so they don't all sync up.
+    bool bMovingNow = pOuter->GetMotor()->IsMoving();
+    if ( bMovingNow )
+    {
+        // Bot is moving - reset idle timer and suppress look-around
+        m_bWasMoving = true;
+        m_flIdleSince = 0.0f;
+        m_NextLookAround.Invalidate();
+    }
+    else
+    {
+        // Bot just stopped - record the time
+        if ( m_bWasMoving )
         {
-            m_NextLookAround.Start( random->RandomFloat( 4.0f, 10.0f ) );
+            m_bWasMoving = false;
+            // Random per-bot delay before starting to look around (2-6s), offset by entindex
+            float flDelay = random->RandomFloat( 2.0f, 6.0f ) + ( (pOuter->entindex() * 3) % 7 ) * 0.3f;
+            m_flIdleSince = gpGlobals->curtime + flDelay;
+            m_NextLookAround.Invalidate();
+        }
 
-            CNavArea* pMyArea = pOuter->GetLastKnownArea();
+        // Only look around once we've been idle long enough
+        bool bIdleReady = ( m_flIdleSince > 0.0f && gpGlobals->curtime >= m_flIdleSince );
 
-            if ( pMyArea )
+        if ( bIdleReady )
+        {
+            if ( !m_NextLookAround.HasStarted() || m_NextLookAround.IsElapsed() )
             {
-                CNavArea* pArea = nullptr;
-                for ( int i = 0; i < NUM_DIRECTIONS; i++ )
+                // Pick a new independent random look direction for this bot
+                // Use entindex as part of the seed offset so bots don't sync
+                float flInterval = random->RandomFloat( 5.0f, 12.0f ) + ( pOuter->entindex() % 5 ) * 0.7f;
+                m_NextLookAround.Start( flInterval );
+
+                CNavArea* pMyArea = pOuter->GetLastKnownArea();
+                if ( pMyArea )
                 {
-                    pArea = pMyArea->GetRandomAdjacentArea( (NavDirType)i );
-                    if ( pArea && pArea != m_pLastLookArea )
+                    // Pick a random direction offset by entindex so bots look different ways
+                    int startDir = pOuter->entindex() % NUM_DIRECTIONS;
+                    for ( int i = 0; i < NUM_DIRECTIONS; i++ )
                     {
-                        m_pLastLookArea = pArea;
-                        m_vecLookAt = pArea->GetRandomPoint() + Vector( 0.0f, 0.0f, 64.0f );
-                        break;
+                        NavDirType dir = (NavDirType)( (startDir + i) % NUM_DIRECTIONS );
+                        CNavArea* pArea = pMyArea->GetRandomAdjacentArea( dir );
+                        if ( pArea && pArea != m_pLastLookArea )
+                        {
+                            m_pLastLookArea = pArea;
+                            m_vecLookAt = pArea->GetRandomPoint() + Vector( 0.0f, 0.0f, 64.0f );
+                            break;
+                        }
                     }
                 }
             }
+
+            bool bIsFacing = pOuter->GetMotor()->IsFacing( m_vecLookAt );
+
+            if ( zm_sv_debug_bot_lookat.GetBool() )
+            {
+                Vector box( 4.0f, 4.0f, 4.0f );
+                NDebugOverlay::Box( m_vecLookAt, -box, box, (!bIsFacing) ? 255 : 0, bIsFacing ? 255 : 0, 0, 0, 0.1f );
+            }
+
+            if ( !bIsFacing )
+            {
+                pOuter->GetMotor()->FaceTowards( m_vecLookAt );
+            }
         }
-    }
-
-
-    bool bIsFacing = pOuter->GetMotor()->IsFacing( m_vecLookAt );
-
-    if ( zm_sv_debug_bot_lookat.GetBool() )
-    {
-        Vector box( 4.0f, 4.0f, 4.0f );
-        NDebugOverlay::Box( m_vecLookAt, -box, box, (!bIsFacing) ? 255 : 0, bIsFacing ? 255 : 0, 0, 0, 0.1f );
-    }
-
-    if ( !bIsFacing )
-    {
-        pOuter->GetMotor()->FaceTowards( m_vecLookAt );
     }
 }
 

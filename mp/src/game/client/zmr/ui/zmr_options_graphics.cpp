@@ -21,6 +21,8 @@ extern ConVar zm_cl_muzzleflash_light;
 extern ConVar zm_cl_round_cinematic_effects;
 extern ConVar zm_cl_fireglow_max;
 
+ConVar zm_cl_ui_scale( "zm_cl_ui_scale", "1.0", FCVAR_ARCHIVE, "UI scale multiplier. 0.5 = smaller, 1.0 = default, 2.0 = double size.", true, 0.5f, true, 3.0f );
+
 
 CZMOptionsSubGraphics::CZMOptionsSubGraphics( Panel* parent ) : BaseClass( parent )
 {
@@ -38,6 +40,8 @@ CZMOptionsSubGraphics::CZMOptionsSubGraphics( Panel* parent ) : BaseClass( paren
     LoadItem( &m_pMuzzleflashBox, "ComboMuzzleflash" );
     LoadItem( &m_pCheck_CinematicBars, "CheckCinematicFX" );
     LoadItem( &m_pFireLightsBox, "ComboFireLights" );
+    LoadItem( &m_pSlider_UIScale, "UIScaleSlider" );
+    LoadItem( &m_pTextEntry_UIScale, "UIScaleEntry" );
     
 
     if ( FailedLoad() ) return;
@@ -68,6 +72,9 @@ CZMOptionsSubGraphics::CZMOptionsSubGraphics( Panel* parent ) : BaseClass( paren
 
     m_pSlider_MaxRagdolls->SetRange( 0, 100 );
     m_pSlider_MaxRagdolls->AddActionSignalTarget( this );
+
+    m_pSlider_UIScale->SetRange( 50, 300 );
+    m_pSlider_UIScale->AddActionSignalTarget( this );
 }
 
 CZMOptionsSubGraphics::~CZMOptionsSubGraphics()
@@ -124,6 +131,9 @@ void CZMOptionsSubGraphics::OnApplyChanges()
     }
 
     zm_cl_fireglow_max.SetValue( fireglowmax );
+
+    float uiScale = (float)m_pSlider_UIScale->GetValue() / 100.0f;
+    zm_cl_ui_scale.SetValue( uiScale );
 }
 
 void CZMOptionsSubGraphics::OnResetData()
@@ -180,6 +190,11 @@ void CZMOptionsSubGraphics::OnResetData()
     Q_snprintf( buffer, sizeof( buffer ), "%i", g_ragdoll_maxcount.GetInt() );
 
     m_pTextEntry_MaxRagdolls->SetText( buffer );
+
+    int uiScalePercent = (int)( zm_cl_ui_scale.GetFloat() * 100.0f );
+    m_pSlider_UIScale->SetValue( uiScalePercent );
+    Q_snprintf( buffer, sizeof( buffer ), "%i%%", uiScalePercent );
+    m_pTextEntry_UIScale->SetText( buffer );
 }
 
 void CZMOptionsSubGraphics::OnSliderMoved( Panel* panel )
@@ -194,6 +209,13 @@ void CZMOptionsSubGraphics::OnSliderMoved( Panel* panel )
 
         m_pTextEntry_MaxRagdolls->SetText( buffer );
     }
+    else if ( panel == m_pSlider_UIScale )
+    {
+        char buffer[32];
+        Q_snprintf( buffer, sizeof( buffer ), "%i%%", m_pSlider_UIScale->GetValue() );
+
+        m_pTextEntry_UIScale->SetText( buffer );
+    }
 }
 
 void CZMOptionsSubGraphics::OnTextChanged( Panel* panel )
@@ -207,6 +229,13 @@ void CZMOptionsSubGraphics::OnTextChanged( Panel* panel )
         m_pTextEntry_MaxRagdolls->GetText( buffer, sizeof( buffer ) );
 
         m_pSlider_MaxRagdolls->SetValue( atoi( buffer ) );
+    }
+    else if ( panel == m_pTextEntry_UIScale )
+    {
+        char buffer[32];
+        m_pTextEntry_UIScale->GetText( buffer, sizeof( buffer ) );
+
+        m_pSlider_UIScale->SetValue( atoi( buffer ) );
     }
 }
 

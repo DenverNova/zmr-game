@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -39,13 +39,8 @@ COptionsDialog::COptionsDialog(vgui::Panel *parent, OptionsDialogTabStyle iTabSt
 {
 	SetProportional( false );
 	SetDeleteSelfOnClose( true );
-	SetBounds( 
-		0, 
-		0,
-        512,
-        415 );
-		//vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), 512 ),
-		//vgui::scheme()->GetProportionalScaledValueEx( GetScheme(), 415 ) );
+
+	SetBounds( 0, 0, 512, 415 );
 	SetSizeable( false );
 
 	// debug timing code, this function takes too long
@@ -96,7 +91,7 @@ COptionsDialog::COptionsDialog(vgui::Panel *parent, OptionsDialogTabStyle iTabSt
 //	Msg("COptionsDialog::COptionsDialog(): %.3fms\n", (float)(s5 - s4) * 1000.0f);
 
 	SetApplyButtonVisible(true);
-	GetPropertySheet()->SetTabWidth(84);
+	GetPropertySheet()->SetTabWidth( 84 );
 }
 
 //-----------------------------------------------------------------------------

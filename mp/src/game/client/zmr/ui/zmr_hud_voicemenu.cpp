@@ -529,7 +529,11 @@ void CZMHudVoiceMenu::Paint()
 
         if ( pData->m_wszCachedTxt[0] == NULL )
         {
-            Q_wcsncpy( pData->m_wszCachedTxt, g_pVGuiLocalize->Find( pData->m_szLocalization ), sizeof( pData->m_wszCachedTxt ) );
+            const wchar_t* pFound = g_pVGuiLocalize->Find( pData->m_szLocalization );
+            if ( pFound )
+                Q_wcsncpy( pData->m_wszCachedTxt, pFound, sizeof( pData->m_wszCachedTxt ) );
+            else
+                Q_wcsncpy( pData->m_wszCachedTxt, L"???", sizeof( pData->m_wszCachedTxt ) );
         }
 
         const wchar_t* txt = pData->m_wszCachedTxt;

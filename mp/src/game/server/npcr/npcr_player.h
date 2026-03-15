@@ -53,6 +53,7 @@ namespace NPCR
         DECLARE_BTN( PressDuck )
         DECLARE_BTN( PressReload )
         DECLARE_BTN( PressUse )
+        DECLARE_BTN( PressJump )
         //
 
 

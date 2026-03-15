@@ -59,6 +59,8 @@ private:
     CountdownTimer m_NextLookAround;
     CNavArea* m_pLastLookArea;
     Vector m_vecLookAt;
+    float m_flIdleSince;       // Time when bot last stopped moving (for deferred look-around)
+    bool m_bWasMoving;         // Track moving->stopped transition
 
     bool m_bMovingOutOfRange;
     CHandle<CBaseEntity> m_hLastCombatTarget;

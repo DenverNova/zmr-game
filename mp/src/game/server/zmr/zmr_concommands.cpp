@@ -9,6 +9,7 @@
 #include "zmr_player.h"
 #include "zmr_gamerules.h"
 #include "zmr_voicelines.h"
+#include "npcs/zmr_playerbot.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -219,6 +220,76 @@ static ConCommand zm_observezombie( "zm_observezombie", ZM_ObserveZombie, "Allow
 /*
 
 */
+extern ConVar zm_sv_bot_help_range;
+
+static void BotVoiceCommand_Help( CZMPlayer* pCaller )
+{
+    float flRange = zm_sv_bot_help_range.GetFloat();
+    float flRangeSqr = flRange * flRange;
+    Vector callerPos = pCaller->GetAbsOrigin();
+
+    for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+    {
+        CBasePlayer* pPlayer = UTIL_PlayerByIndex( i );
+        if ( !pPlayer || !pPlayer->IsBot() || !pPlayer->IsAlive() )
+            continue;
+        if ( pPlayer->GetTeamNumber() != ZMTEAM_HUMAN )
+            continue;
+        if ( pPlayer == pCaller )
+            continue;
+
+        float distSqr = pPlayer->GetAbsOrigin().DistToSqr( callerPos );
+        if ( distSqr > flRangeSqr )
+            continue;
+
+        CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
+        if ( pBot )
+        {
+            pBot->SetFollowTarget( pCaller );
+        }
+    }
+}
+
+static void BotVoiceCommand_Follow( CZMPlayer* pCaller )
+{
+    // Follow the bot the caller is looking at
+    Vector eyePos = pCaller->EyePosition();
+    Vector fwd;
+    AngleVectors( pCaller->EyeAngles(), &fwd );
+
+    float flBestDot = 0.95f;
+    CZMPlayerBot* pBestBot = nullptr;
+
+    for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+    {
+        CBasePlayer* pPlayer = UTIL_PlayerByIndex( i );
+        if ( !pPlayer || !pPlayer->IsBot() || !pPlayer->IsAlive() )
+            continue;
+        if ( pPlayer->GetTeamNumber() != ZMTEAM_HUMAN )
+            continue;
+
+        Vector toBot = pPlayer->GetAbsOrigin() - eyePos;
+        float dist = toBot.NormalizeInPlace();
+        if ( dist > 1024.0f )
+            continue;
+
+        float dot = fwd.Dot( toBot );
+        if ( dot > flBestDot )
+        {
+            flBestDot = dot;
+            pBestBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
+        }
+    }
+
+    if ( pBestBot )
+    {
+        pBestBot->SetFollowTarget( pCaller );
+    }
+}
+
+#define VOICE_INDEX_HELP    2
+#define VOICE_INDEX_FOLLOW  3
+
 void ZM_VoiceMenu( const CCommand &args )
 {
     if ( args.ArgC() <= 1 ) return;
@@ -230,8 +301,20 @@ void ZM_VoiceMenu( const CCommand &args )
     if ( !pPlayer->IsHuman() || !pPlayer->IsAlive() ) return;
 
 
+    int voiceIndex = atoi( args.Arg( 1 ) );
 
-    ZMGetVoiceLines()->OnVoiceLine( pPlayer, atoi( args.Arg( 1 ) ) );
+    ZMGetVoiceLines()->OnVoiceLine( pPlayer, voiceIndex );
+
+    // Bot commands triggered by voice lines
+    switch ( voiceIndex )
+    {
+    case VOICE_INDEX_HELP:
+        BotVoiceCommand_Help( pPlayer );
+        break;
+    case VOICE_INDEX_FOLLOW:
+        BotVoiceCommand_Follow( pPlayer );
+        break;
+    }
 }
 
 static ConCommand zm_cmd_voicemenu( "zm_cmd_voicemenu", ZM_VoiceMenu );
@@ -264,3 +347,123 @@ LEGACY_CVAR( zm_spotcreate_cost, zm_sv_hidden_cost_shambler )
 
 // kink
 LEGACY_CVAR( zm_flashlight_drainrate, zm_sv_flashlightdrainrate )
+
+
+/*
+    Bot Possession - spectator takes over a bot
+*/
+ConVar zm_sv_bot_possess( "zm_sv_bot_possess", "1", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Allow dead players to possess AI bots by pressing USE while spectating them." );
+
+void ZM_PossessBot( const CCommand &args )
+{
+    if ( !zm_sv_bot_possess.GetBool() )
+        return;
+
+    CZMPlayer* pPlayer = ToZMPlayer( UTIL_GetCommandClient() );
+    if ( !pPlayer )
+        return;
+
+    // Must be dead and spectating
+    if ( pPlayer->IsAlive() || !pPlayer->IsObserver() )
+        return;
+
+    // Must be on the human team
+    if ( pPlayer->GetTeamNumber() != ZMTEAM_HUMAN )
+        return;
+
+    // Must be spectating a bot
+    CBaseEntity* pTarget = pPlayer->GetObserverTarget();
+    if ( !pTarget || !pTarget->IsPlayer() || !pTarget->IsAlive() )
+        return;
+
+    if ( pTarget->GetTeamNumber() != ZMTEAM_HUMAN )
+        return;
+
+    CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pTarget );
+    if ( !pBot )
+        return;
+
+    // Store the bot's state before kicking it
+    Vector vecPos = pBot->GetAbsOrigin();
+    QAngle angEyes = pBot->EyeAngles();
+    int iHealth = pBot->GetHealth();
+    int iArmor = pBot->ArmorValue();
+
+    // Collect the bot's weapons and ammo
+    struct WepInfo_t
+    {
+        char szClassname[64];
+        int iClip1;
+        int iClip2;
+    };
+    CUtlVector<WepInfo_t> weapons;
+    const char* pszActiveWep = nullptr;
+
+    for ( int i = 0; i < MAX_WEAPONS; i++ )
+    {
+        CBaseCombatWeapon* pWep = pBot->GetWeapon( i );
+        if ( !pWep )
+            continue;
+
+        WepInfo_t info;
+        Q_strncpy( info.szClassname, pWep->GetClassname(), sizeof( info.szClassname ) );
+        info.iClip1 = pWep->m_iClip1;
+        info.iClip2 = pWep->m_iClip2;
+        weapons.AddToTail( info );
+
+        if ( pWep == pBot->GetActiveWeapon() )
+            pszActiveWep = info.szClassname;
+    }
+
+    // Copy ammo counts
+    int ammo[MAX_AMMO_SLOTS];
+    for ( int i = 0; i < MAX_AMMO_SLOTS; i++ )
+        ammo[i] = pBot->GetAmmoCount( i );
+
+    // Kick the bot
+    engine->ServerCommand( UTIL_VarArgs( "kickid %d\n", pBot->GetUserID() ) );
+    engine->ServerExecute();
+
+    // Respawn the player at the bot's position
+    pPlayer->pl.deadflag = false;
+    pPlayer->m_lifeState = LIFE_RESPAWNABLE;
+    pPlayer->Spawn();
+
+    pPlayer->SetAbsOrigin( vecPos );
+    pPlayer->SnapEyeAngles( angEyes );
+    pPlayer->SetHealth( iHealth );
+    pPlayer->SetArmorValue( iArmor );
+
+    // Remove default items first
+    pPlayer->RemoveAllItems( false );
+
+    // Give the bot's weapons
+    CBaseCombatWeapon* pActiveWep = nullptr;
+    for ( int i = 0; i < weapons.Count(); i++ )
+    {
+        CBaseCombatWeapon* pWep = dynamic_cast<CBaseCombatWeapon*>( pPlayer->GiveNamedItem( weapons[i].szClassname ) );
+        if ( pWep )
+        {
+            pWep->m_iClip1 = weapons[i].iClip1;
+            pWep->m_iClip2 = weapons[i].iClip2;
+
+            if ( pszActiveWep && Q_stricmp( weapons[i].szClassname, pszActiveWep ) == 0 )
+                pActiveWep = pWep;
+        }
+    }
+
+    // Restore ammo
+    for ( int i = 0; i < MAX_AMMO_SLOTS; i++ )
+    {
+        if ( ammo[i] > 0 )
+            pPlayer->SetAmmoCount( ammo[i], i );
+    }
+
+    // Switch to the weapon the bot was using
+    if ( pActiveWep )
+        pPlayer->Weapon_Switch( pActiveWep );
+
+    ClientPrint( pPlayer, HUD_PRINTCENTER, "Bot possessed!" );
+}
+
+static ConCommand zm_cmd_possess_bot( "zm_cmd_possess_bot", ZM_PossessBot, "Take over the bot you are spectating." );

@@ -18,6 +18,7 @@ namespace NPCR
 
 
         virtual void Update() OVERRIDE;
+        virtual void Approach( const Vector& vecDesiredGoal ) OVERRIDE;
 
 
         virtual float GetHullWidth() const OVERRIDE { return 16.0f; }

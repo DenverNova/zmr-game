@@ -17,6 +17,7 @@ $Configuration
 	{
 		$AdditionalIncludeDirectories	"$BASE;"
 		$PreprocessorDefinitions		"$BASE;NO_STEAM;ZMR"
+		$DisableSpecificWarnings		"$BASE;4172"
 	}
 }
 
@@ -24,6 +25,8 @@ $Project "GameUI (ZMR)"
 {
 	$Folder	"Source Files"
 	{
+		$File	"createmultiplayergamezmrpage.cpp"
+		$File	"createmultiplayergamezmrpage.h"
 	}
 }
 

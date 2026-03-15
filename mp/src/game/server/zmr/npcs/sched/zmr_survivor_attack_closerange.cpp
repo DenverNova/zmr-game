@@ -28,12 +28,17 @@ void CSurvivorAttackCloseRangeSchedule::OnStart()
 
     if ( !IsMeleeing() )
     {
-        if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_CLOSERANGE ) && pOuter->WeaponHasAmmo( pOuter->GetActiveWeapon() ) )
+        if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_MAINGUN ) && pOuter->WeaponHasAmmo( pOuter->GetActiveWeapon() ) )
         {
             return;
         }
 
-        if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_LONGRANGE ) && pOuter->WeaponHasAmmo( pOuter->GetActiveWeapon() ) )
+        if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_SECONDARYWEAPON ) && pOuter->WeaponHasAmmo( pOuter->GetActiveWeapon() ) )
+        {
+            return;
+        }
+
+        if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_MELEE ) )
         {
             return;
         }

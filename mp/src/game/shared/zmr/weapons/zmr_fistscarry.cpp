@@ -844,6 +844,17 @@ void CZMWeaponHands::DetachObject( bool bLaunch )
     m_hAttachedObject.Set( nullptr );
 
     m_flTimeWeaponIdle = gpGlobals->curtime + 0.1f;
+
+#ifdef GAME_DLL
+    // Auto re-equip the weapon the player had before picking up an object
+    auto* pOwnerPlayer = GetPlayerOwner();
+    auto* pLastWep = GetLastWeaponBeforePickup();
+    if ( pOwnerPlayer && pLastWep && pOwnerPlayer->Weapon_OwnsThisType( pLastWep->GetClassname() ) )
+    {
+        pOwnerPlayer->Weapon_Switch( pLastWep );
+        SetLastWeaponBeforePickup( nullptr );
+    }
+#endif
 }
 
 
@@ -1235,6 +1246,9 @@ void PlayerAttemptPickup( CBasePlayer* pPlayer, CBaseEntity* pEntity )
 
     if ( pPlayer->GetActiveWeapon() != pWeapon )
     {
+        // Remember the weapon before switching to fists for carrying
+        pWeapon->SetLastWeaponBeforePickup( pPlayer->GetActiveWeapon() );
+
         if ( !pPlayer->Weapon_Switch( pWeapon ) )
             return;
     }

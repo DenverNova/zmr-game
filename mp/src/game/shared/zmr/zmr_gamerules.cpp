@@ -20,6 +20,8 @@
 #include "zmr_mapentities.h"
 #include "zmr_resource_system.h"
 #include "zmr_util.h"
+#include "npcs/zmr_playerbot.h"
+#include "zmr_ai_zm.h"
 #else
 #include "c_zmr_player.h"
 #endif
@@ -49,6 +51,12 @@ ConVar zm_sv_reward_kill( "zm_sv_reward_kill", "100", FCVAR_NOTIFY | FCVAR_ARCHI
 #endif
 
 ConVar zm_sv_zombiemax( "zm_sv_zombiemax", "70", FCVAR_REPLICATED | FCVAR_NOTIFY | FCVAR_ARCHIVE, "The maximum amount of zombie population allowed." );
+
+#ifndef CLIENT_DLL
+ConVar zm_sv_bot_survivors( "zm_sv_bot_survivors", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Number of AI survivor bots to auto-spawn each round. 0 = disabled." );
+ConVar zm_sv_ai_zm( "zm_sv_ai_zm", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Enable AI Zombie Master. 0 = off, 1 = always on, 2 = only when no human volunteers for ZM." );
+ConVar zm_sv_bot_replace_player( "zm_sv_bot_replace_player", "1", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Spawn a bot to replace a survivor who disconnects or gets AFK-kicked." );
+#endif
 
 
 
@@ -548,6 +556,11 @@ void CZMRules::Think()
         }
     }
 
+#ifndef CLIENT_DLL
+    // Update AI Zombie Master
+    g_ZMAIZombieMaster.Update();
+#endif
+
     if ( GetMapRemainingTime() < 0 )
     {
         GoToIntermission();
@@ -668,6 +681,29 @@ void CZMRules::ClientDisconnected( edict_t* pClient )
         // Tell the rejoin system we're leaving.
         GetZMRejoinSystem()->OnPlayerLeave( pPlayer );
 
+        // Replace a living human survivor with a bot so the team isn't weakened
+        if ( zm_sv_bot_replace_player.GetBool()
+            && pPlayer->IsHuman()
+            && pPlayer->IsAlive()
+            && !IsInRoundEnd()
+            && dynamic_cast<CZMPlayerBot*>( pPlayer ) == nullptr )
+        {
+            Vector vecPos = pPlayer->GetAbsOrigin();
+            QAngle angEyes = pPlayer->EyeAngles();
+            int iHealth = pPlayer->GetHealth();
+
+            CZMPlayer* pBot = CZMPlayerBot::CreateZMBot();
+            if ( pBot )
+            {
+                pBot->ChangeTeam( ZMTEAM_HUMAN );
+                pBot->Spawn();
+                pBot->SetAbsOrigin( vecPos );
+                pBot->SnapEyeAngles( angEyes );
+                pBot->SetHealth( iHealth );
+
+                Msg( "Bot \"%s\" replaced disconnected player \"%s\"\n", pBot->GetPlayerName(), pPlayer->GetPlayerName() );
+            }
+        }
 
 
         CTeam* teamplayer = pPlayer->GetTeam();
@@ -813,6 +849,29 @@ void CZMRules::PunishInactivity( CZMPlayer* pPlayer )
         ReplaceZM( pPlayer );
     }
 
+    // Replace an AFK human survivor with a bot before punishing
+    if ( zm_sv_bot_replace_player.GetBool()
+        && pPlayer->IsHuman()
+        && pPlayer->IsAlive()
+        && !IsInRoundEnd()
+        && dynamic_cast<CZMPlayerBot*>( pPlayer ) == nullptr )
+    {
+        Vector vecPos = pPlayer->GetAbsOrigin();
+        QAngle angEyes = pPlayer->EyeAngles();
+        int iHealth = pPlayer->GetHealth();
+
+        CZMPlayer* pBot = CZMPlayerBot::CreateZMBot();
+        if ( pBot )
+        {
+            pBot->ChangeTeam( ZMTEAM_HUMAN );
+            pBot->Spawn();
+            pBot->SetAbsOrigin( vecPos );
+            pBot->SnapEyeAngles( angEyes );
+            pBot->SetHealth( iHealth );
+
+            Msg( "Bot \"%s\" replaced AFK player \"%s\"\n", pBot->GetPlayerName(), pPlayer->GetPlayerName() );
+        }
+    }
 
     switch ( zm_sv_antiafk_punish.GetInt() )
     {
@@ -1120,6 +1179,8 @@ CZMPlayer* CZMRules::ChooseZM()
 
         if ( pPlayer->IsHLTV() ) continue;
 
+        // Never pick bots as ZM - they are either survivor bots or the AI ZM bot
+        if ( pPlayer->IsBot() ) continue;
 
         switch ( pPlayer->GetParticipation() )
         {
@@ -1159,9 +1220,23 @@ CZMPlayer* CZMRules::ChooseZM()
     }
 
 
+    // AI ZM mode 1 = always AI, never pick a human
+    if ( zm_sv_ai_zm.GetInt() == 1 )
+    {
+        Msg( "AI Zombie Master forced on (zm_sv_ai_zm 1).\n" );
+        return nullptr;
+    }
+
     if ( vZMFirstChoices.Count() > 0 )
     {
         return vZMFirstChoices[random->RandomInt( 0, vZMFirstChoices.Count() - 1 )];
+    }
+
+    // AI ZM mode 2 = fallback when no volunteers
+    if ( zm_sv_ai_zm.GetInt() >= 2 )
+    {
+        Msg( "No ZM volunteers found. AI Zombie Master will take over.\n" );
+        return nullptr;
     }
 
     // Nothing to pick from...
@@ -1276,9 +1351,40 @@ void CZMRules::ResetWorld()
     }
 
     g_ZMResourceSystem.OnRoundStart();
+    g_ZMAIZombieMaster.Reset();
 
     // Choose ZM and begin the round!
     CZMPlayer* pZM = ChooseZM();
+
+    // If no human ZM was chosen and AI ZM is enabled, reuse or create a bot ZM
+    if ( !pZM && zm_sv_ai_zm.GetInt() > 0 )
+    {
+        // Look for an existing AI ZM bot from the previous round
+        CZMPlayerBot* pExistingZMBot = nullptr;
+        for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+        {
+            CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( UTIL_PlayerByIndex( i ) );
+            if ( pBot && pBot->IsZM() )
+            {
+                pExistingZMBot = pBot;
+                break;
+            }
+        }
+
+        if ( pExistingZMBot )
+        {
+            pZM = pExistingZMBot;
+            Msg( "AI Zombie Master '%s' continuing from previous round.\n", pZM->GetPlayerName() );
+        }
+        else
+        {
+            pZM = CZMPlayerBot::CreateZMBot( "Zombie Master" );
+            if ( pZM )
+            {
+                Msg( "AI Zombie Master bot created.\n" );
+            }
+        }
+    }
 
     BeginRound( pZM );
 
@@ -1295,6 +1401,36 @@ void CZMRules::ResetWorld()
     m_flRoundRestartTime = 0.0f;
     m_bInRoundEnd = false;
 
+    // Auto-spawn survivor bots
+    {
+        int nDesiredBots = zm_sv_bot_survivors.GetInt();
+        if ( nDesiredBots > 0 )
+        {
+            // Count existing bots
+            int nExistingBots = 0;
+            for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+            {
+                CBasePlayer* pPlayer = UTIL_PlayerByIndex( i );
+                if ( pPlayer && pPlayer->IsBot() && pPlayer->GetTeamNumber() == ZMTEAM_HUMAN )
+                    nExistingBots++;
+            }
+
+            // Spawn additional bots to reach desired count
+            int nToSpawn = nDesiredBots - nExistingBots;
+            for ( int i = 0; i < nToSpawn; i++ )
+            {
+                CZMPlayer* pBot = CZMPlayerBot::CreateZMBot();
+                if ( pBot )
+                {
+                    pBot->ChangeTeam( ZMTEAM_HUMAN );
+                    pBot->Spawn();
+                }
+            }
+
+            if ( nToSpawn > 0 )
+                Msg( "Spawned %i AI survivor bot(s).\n", nToSpawn );
+        }
+    }
 
     // This will be used for clients in the future.
     pEvent = gameeventmanager->CreateEvent( "round_restart_post", true );

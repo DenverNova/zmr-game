@@ -21,9 +21,9 @@ void CSurvivorAttackLongRangeSchedule::OnStart()
 {
     CZMPlayerBot* pOuter = GetOuter();
 
-    if ( !pOuter->EquipWeaponOfType( BOTWEPRANGE_LONGRANGE ) )
+    if ( !pOuter->EquipWeaponOfType( BOTWEPRANGE_MAINGUN ) && !pOuter->EquipWeaponOfType( BOTWEPRANGE_SECONDARYWEAPON ) )
     {
-        End( "Couldn't equip any long range weapons!" );
+        End( "Couldn't equip any ranged weapons!" );
         return;
     }
 }

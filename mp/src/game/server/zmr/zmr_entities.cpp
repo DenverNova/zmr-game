@@ -1991,6 +1991,7 @@ PRECACHE_REGISTER( env_delayed_physexplosion );
 ConVar zm_sv_physexp_debug( "zm_sv_physexp_debug", "0" );
 ConVar zm_sv_physexp_disorientateplayer( "zm_sv_physexp_disorientateplayer", "10", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Maximum angular disorientation applied to players." );
 ConVar zm_sv_physexp_player_mult( "zm_sv_physexp_player_mult", "0.05", FCVAR_NOTIFY | FCVAR_ARCHIVE, "How much players are pushed." );
+ConVar zm_sv_physexp_player_damage( "zm_sv_physexp_player_damage", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Damage dealt to survivors by ZM blast. 0 = no damage." );
 
 
 CZMPhysExplosion::CZMPhysExplosion()
@@ -2150,6 +2151,19 @@ void CZMPhysExplosion::Push()
                 pEnt->AddFlag( FL_BASEVELOCITY );
             }
 
+
+            // Apply damage if configured
+            if ( zm_sv_physexp_player_damage.GetFloat() > 0.0f )
+            {
+                float dmg = ratio * zm_sv_physexp_player_damage.GetFloat();
+                if ( dmg > 0.0f )
+                {
+                    CTakeDamageInfo dmgInfo( this, this, dmg, DMG_BLAST );
+                    dmgInfo.SetDamagePosition( src );
+                    dmgInfo.SetDamageForce( dir * dmg );
+                    pPlayer->TakeDamage( dmgInfo );
+                }
+            }
 
             pPlayer->ForceDropOfCarriedPhysObjects( nullptr );
         }

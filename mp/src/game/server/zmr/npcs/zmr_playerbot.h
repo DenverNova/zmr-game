@@ -10,10 +10,11 @@ enum ZMBotWeaponTypeRange_t
 {
     BOTWEPRANGE_INVALID = 0,
 
-    BOTWEPRANGE_CLOSERANGE,
-    BOTWEPRANGE_LONGRANGE,
-    BOTWEPRANGE_THROWABLE,
-    BOTWEPRANGE_MELEE,
+    BOTWEPRANGE_MAINGUN,        // Shotgun, rifle, SMG, sniper
+    BOTWEPRANGE_SECONDARYWEAPON, // Pistol, revolver
+    BOTWEPRANGE_MELEE,          // Axe, sledge, improvised
+    BOTWEPRANGE_THROWABLE,      // Molotov, pipebomb
+    BOTWEPRANGE_FISTS,          // Fists/carry
 
     BOTWEPRANGE_MAX
 };
@@ -57,6 +58,8 @@ public:
     bool            HasWeaponOfType( ZMBotWeaponTypeRange_t wepType ) const;
     bool            HasEquippedWeaponOfType( ZMBotWeaponTypeRange_t wepType ) const;
     bool            EquipWeaponOfType( ZMBotWeaponTypeRange_t wepType );
+    bool            EquipBestWeapon();
+    void            ThinkEquipBestWeapon();
     ZMBotWeaponTypeRange_t GetCurrentWeaponType() const;
     bool            WeaponHasAmmo( CZMBaseWeapon* pWeapon ) const;
     bool            ShouldReload() const;
@@ -73,8 +76,14 @@ public:
 
 
     CBasePlayer*    GetFollowTarget() const { return m_hFollowTarget.Get(); }
-    void            SetFollowTarget( CBasePlayer* pPlayer ) { m_hFollowTarget.Set( pPlayer ); }
+    void            SetFollowTarget( CBasePlayer* pPlayer ) { m_hFollowTarget.Set( pPlayer ); m_bStayPut = false; }
+    void            SetStayPut( bool bStay ) { m_bStayPut = bStay; }
+    bool            IsStayingPut() const { return m_bStayPut; }
+
+    void            CheckObstacleJump();
 
 private:
     CHandle<CBasePlayer> m_hFollowTarget;
+    float           m_flNextObstacleCheck;
+    bool            m_bStayPut;
 };

@@ -15,6 +15,7 @@
 #include "zmr_zombiebase.h"
 #include "zmr_softcollisions.h"
 #include "npcs/zmr_zombiebase_shared.h"
+#include "npcs/zmr_playerbot.h"
 #include "sched/zmr_zombie_main.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -22,6 +23,9 @@
 
 
 ConVar zm_sv_debug_zombie_flinch( "zm_sv_debug_zombie_flinch", "0", 0, "Play flinching animations every time a zombie g ets shot." );
+
+ConVar zm_sv_zombie_health_mult( "zm_sv_zombie_health_mult", "1.0", FCVAR_NOTIFY | FCVAR_REPLICATED, "Multiplier for all zombie health. 1.0 = default." );
+ConVar zm_sv_zombie_damage_mult( "zm_sv_zombie_damage_mult", "1.0", FCVAR_NOTIFY | FCVAR_REPLICATED, "Multiplier for all zombie damage output. 1.0 = default." );
 
 
 class CZMLOSFilter : public CTraceFilter
@@ -382,6 +386,14 @@ void CZMBaseZombie::Spawn()
 
     BaseClass::Spawn();
 
+    // Apply zombie health multiplier
+    float flHealthMult = zm_sv_zombie_health_mult.GetFloat();
+    if ( flHealthMult != 1.0f && flHealthMult > 0.0f )
+    {
+        int newHealth = MAX( 1, (int)( GetMaxHealth() * flHealthMult ) );
+        SetMaxHealth( newHealth );
+        SetHealth( newHealth );
+    }
 
     SetThink( &CZMBaseZombie::ZombieThink );
     SetNextThink( gpGlobals->curtime );
@@ -699,7 +711,7 @@ bool CZMBaseZombie::MeleeAttackTrace(
     const Vector vecEnd = vecStart + fwd * flDist;
 
 
-    CTakeDamageInfo	info( this, this, flDamage, iDmgType );
+    CTakeDamageInfo	info( this, this, flDamage * zm_sv_zombie_damage_mult.GetFloat(), iDmgType );
 
     CZMMeleeFilter filter( this, MASK_SHOT_HULL, info );
 
@@ -893,10 +905,27 @@ void CZMBaseZombie::MultiplyBuckshotDamage( CTakeDamageInfo& info ) const
     }
 }
 
+extern ConVar zm_sv_bot_taunt_chance;
+
 void CZMBaseZombie::Event_Killed( const CTakeDamageInfo& info )
 {
     StopLoopingSounds();
     DeathSound();
+
+    // Check if a bot killed us and maybe taunt
+    CBaseEntity* pAttacker = info.GetAttacker();
+    if ( pAttacker && pAttacker->IsPlayer() )
+    {
+        CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pAttacker );
+        if ( pBot )
+        {
+            int chance = zm_sv_bot_taunt_chance.GetInt();
+            if ( chance > 0 && RandomInt( 1, 100 ) <= chance && pBot->IsAlive() )
+            {
+                engine->ClientCommand( pBot->edict(), "zm_cmd_voicemenu 4" );
+            }
+        }
+    }
 
     BaseClass::Event_Killed( info );
 }

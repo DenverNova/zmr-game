@@ -101,6 +101,10 @@ protected:
 #endif	// CLIENT_DLL
 
 
+public:
+    CBaseCombatWeapon* GetLastWeaponBeforePickup() const { return m_hLastWeaponBeforePickup.Get(); }
+    void SetLastWeaponBeforePickup( CBaseCombatWeapon* pWep ) { m_hLastWeaponBeforePickup.Set( pWep ); }
+
 private:
     bool	m_bResetOwnerEntity;
 #ifdef CLIENT_DLL
@@ -108,6 +112,7 @@ private:
 #endif
 
     CGrabController m_grabController;
+    CHandle<CBaseCombatWeapon> m_hLastWeaponBeforePickup;
 
 
 #ifdef GAME_DLL

@@ -7,6 +7,7 @@
 #include "clienteffectprecachesystem.h"
 #include "fx_quad.h"
 #include "IGameUIFuncs.h"
+#include "vgui/ILocalize.h"
 
 #include "npcs/zmr_zombiebase_shared.h"
 #include "c_zmr_util.h"
@@ -172,6 +173,7 @@ CZMViewBase::CZMViewBase( const char* pElementName ) : CHudElement( pElementName
 
     m_pTempHiddenZombie = nullptr;
     m_flLastHiddenSpawnUpdate = 0.0f;
+    m_iHiddenSpawnClass = ZMCLASS_SHAMBLER;
 
 
     m_hCursorFont = vgui::scheme()->GetIScheme( GetScheme() )->GetFont( "ZMCursorFont" );
@@ -204,6 +206,12 @@ void CZMViewBase::SetClickMode( ZMClickMode_t mode, bool print )
 {
     if ( mode == GetClickMode() ) return;
 
+    // Reset hidden spawn class when entering hidden mode
+    if ( mode == ZMCLICKMODE_HIDDEN )
+    {
+        m_iHiddenSpawnClass = ZMCLASS_SHAMBLER;
+        FreeTempHiddenZombie();
+    }
 
     if ( print )
     {
@@ -402,6 +410,15 @@ void CZMViewBase::OnMouseDoublePressed( MouseCode code )
 
 void CZMViewBase::OnMouseWheeled( int delta )
 {
+    // When in hidden spawn mode, scroll wheel cycles zombie types
+    if ( GetClickMode() == ZMCLICKMODE_HIDDEN && delta != 0 )
+    {
+        CycleHiddenSpawnClass( delta > 0 ? 1 : -1 );
+        // Recreate the ghost model for the new class
+        FreeTempHiddenZombie();
+        return;
+    }
+
     BaseClass::OnMouseWheeled( delta );
 
 
@@ -413,6 +430,66 @@ void CZMViewBase::OnMouseWheeled( int delta )
 
         UTIL_PassKeyToEngine( code );
     }
+}
+
+void CZMViewBase::CycleHiddenSpawnClass( int direction )
+{
+    extern ConVar zm_sv_hidden_allclasses;
+
+    // If all classes not allowed, stay on shambler
+    if ( !zm_sv_hidden_allclasses.GetBool() )
+    {
+        m_iHiddenSpawnClass = ZMCLASS_SHAMBLER;
+        return;
+    }
+
+    // Build sorted list of valid classes by cost (cheapest first)
+    struct ClassCostPair { ZombieClass_t zc; int cost; };
+    CUtlVector<ClassCostPair> sorted;
+
+    for ( int i = 0; i < ZMCLASS_MAX; i++ )
+    {
+        ZombieClass_t zc = (ZombieClass_t)i;
+        if ( !CZMBaseZombie::IsValidClass( zc ) ) continue;
+        ClassCostPair pair;
+        pair.zc = zc;
+        pair.cost = CZMBaseZombie::GetCost( zc );
+        sorted.AddToTail( pair );
+    }
+
+    // Sort by cost ascending
+    for ( int i = 0; i < sorted.Count() - 1; i++ )
+    {
+        for ( int j = i + 1; j < sorted.Count(); j++ )
+        {
+            if ( sorted[j].cost < sorted[i].cost )
+            {
+                ClassCostPair tmp = sorted[i];
+                sorted[i] = sorted[j];
+                sorted[j] = tmp;
+            }
+        }
+    }
+
+    if ( sorted.Count() == 0 ) return;
+
+    // Find current class in sorted list
+    int curIdx = 0;
+    for ( int i = 0; i < sorted.Count(); i++ )
+    {
+        if ( sorted[i].zc == m_iHiddenSpawnClass )
+        {
+            curIdx = i;
+            break;
+        }
+    }
+
+    // Cycle
+    curIdx += direction;
+    if ( curIdx >= sorted.Count() ) curIdx = 0;
+    if ( curIdx < 0 ) curIdx = sorted.Count() - 1;
+
+    m_iHiddenSpawnClass = sorted[curIdx].zc;
 }
 
 void CZMViewBase::Paint()
@@ -573,6 +650,32 @@ int CZMViewBase::ZMKeyInput( ButtonCode_t keynum, int down )
         return 0;
     }
 
+    // Control groups: Ctrl+number = assign, number = recall
+    if ( down )
+    {
+        int group = -1;
+        if ( bNumber )
+            group = keynum - KEY_0;
+        else if ( bNumpad )
+            group = keynum - KEY_PAD_0;
+
+        if ( group >= 1 && group <= MAX_GROUP_INDEX )
+        {
+            if ( GetZMClientMode()->IsZMHoldingCtrl() )
+            {
+                // Ctrl+number: assign selected zombies to this group
+                ZMClientUtil::SetSelectedGroup( group );
+                return 0;
+            }
+            else
+            {
+                // Number: recall (select) this group
+                ZMClientUtil::SelectGroup( group );
+                return 0;
+            }
+        }
+    }
+
     return -1;
 }
 
@@ -624,10 +727,11 @@ void CZMViewBase::OnLeftClick()
 
 
         case ZMCLICKMODE_HIDDEN :
-            engine->ClientCmd( VarArgs( "zm_cmd_createhidden %.1f %.1f %.1f",
+            engine->ClientCmd( VarArgs( "zm_cmd_createhidden %.1f %.1f %.1f %i",
                 pos[0],
                 pos[1],
-                pos[2] ) );
+                pos[2],
+                (int)m_iHiddenSpawnClass ) );
             break;
 
         case ZMCLICKMODE_PHYSEXP :
@@ -1046,7 +1150,7 @@ C_ZMTempModel* CZMViewBase::CreateTempHiddenZombie() const
 {
     auto* pTemp = new C_ZMTempModel;
 
-    pTemp->Initialize( GetTempHiddenSpawnModel( ZMCLASS_SHAMBLER ) );
+    pTemp->Initialize( GetTempHiddenSpawnModel( m_iHiddenSpawnClass ) );
     pTemp->SetRenderColorA( 100 );
     pTemp->SetRenderMode( kRenderTransColor );
 
@@ -1106,22 +1210,28 @@ void CZMViewBase::UpdateHiddenSpawnSpot( int mx, int my )
     // Get the hidden spawn data.
     int rescost = -1;
 
-    auto res = g_ZMHiddenSpawn.Spawn( ZMCLASS_SHAMBLER, pLocal, tr.endpos, &rescost );
+    auto res = g_ZMHiddenSpawn.Spawn( m_iHiddenSpawnClass, pLocal, tr.endpos, &rescost );
 
+    // Build class name for display
+    const char* pClassName = CZMBaseZombie::ClassToName( m_iHiddenSpawnClass );
+    // Strip "npc_" prefix for display
+    if ( Q_strnicmp( pClassName, "npc_", 4 ) == 0 )
+        pClassName += 4;
+
+    wchar_t wszClassName[32];
+    g_pVGuiLocalize->ConvertANSIToUnicode( pClassName, wszClassName, sizeof( wszClassName ) );
 
     m_HiddenSpawnTxtColor = Color( 255, 0, 0, 255 );
 
     switch ( res )
     {
     case HSERROR_OK :
-        //V_wcsncpy( buf, L"OK", sizeof( buf ) );
-        V_snwprintf( m_wszHiddenSpawnTxt, sizeof( m_wszHiddenSpawnTxt ), L"Cost: %i", rescost );
+        V_snwprintf( m_wszHiddenSpawnTxt, ARRAYSIZE( m_wszHiddenSpawnTxt ), L"%ls - Cost: %i", wszClassName, rescost );
         break;
-    //case HSERROR_TOOCLOSE :
-    //case HSERROR_CANSEE :
-    //case HSERROR_NOTENOUGHRES :
-    //case HSERROR_NOTENOUGHPOP :
-    //case HSERROR_BADCLASS :
+    case HSERROR_BADCLASS :
+        m_HiddenSpawnTxtColor[0] = 150;
+        V_snwprintf( m_wszHiddenSpawnTxt, ARRAYSIZE( m_wszHiddenSpawnTxt ), L"%ls - Not Allowed", wszClassName );
+        break;
     default :
         m_HiddenSpawnTxtColor[0] = 150;
         V_wcsncpy( m_wszHiddenSpawnTxt, L"X", sizeof( m_wszHiddenSpawnTxt ) );

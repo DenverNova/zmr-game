@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ? 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -16,6 +16,7 @@
 class CCreateMultiplayerGameServerPage;
 class CCreateMultiplayerGameGameplayPage;
 class CCreateMultiplayerGameBotPage;
+class CCreateMultiplayerGameZMRPage;
 
 //-----------------------------------------------------------------------------
 // Purpose: dialog for launching a listenserver
@@ -35,6 +36,7 @@ private:
 	CCreateMultiplayerGameServerPage *m_pServerPage;
 	CCreateMultiplayerGameGameplayPage *m_pGameplayPage;
 	CCreateMultiplayerGameBotPage *m_pBotPage;
+	CCreateMultiplayerGameZMRPage *m_pZMRPage;
 
 	bool m_bBotsEnabled;
 

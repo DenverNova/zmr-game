@@ -8,6 +8,7 @@
 #include "npcr/npcr_senses.h"
 
 #include "zmr_playerbot.h"
+#include "zmr_playermodels.h"
 
 #include "npcs/sched/zmr_bot_main.h"
 
@@ -27,11 +28,19 @@ public:
 
     virtual void FindNewEntities( CUtlVector<CBaseEntity*>& vListEntities ) OVERRIDE
     {
-        CBaseEntity* pEnt = nullptr;
-        while ( (pEnt = gEntList.FindEntityByClassname( pEnt, "npc_*" )) != nullptr )
+        static const char* s_szZombieClasses[] = {
+            "npc_zombie", "npc_fastzombie", "npc_poisonzombie",
+            "npc_burnzombie", "npc_dragzombie",
+        };
+
+        for ( int c = 0; c < ARRAYSIZE( s_szZombieClasses ); c++ )
         {
-            if ( pEnt->IsBaseZombie() && pEnt->IsAlive() )
-                vListEntities.AddToTail( pEnt );
+            CBaseEntity* pEnt = nullptr;
+            while ( (pEnt = gEntList.FindEntityByClassname( pEnt, s_szZombieClasses[c] )) != nullptr )
+            {
+                if ( pEnt->IsAlive() )
+                    vListEntities.AddToTail( pEnt );
+            }
         }
     }
 
@@ -53,6 +62,8 @@ PRECACHE_REGISTER( npcr_player_zm );
 CZMPlayerBot::CZMPlayerBot()
 {
     m_hFollowTarget.Set( nullptr );
+    m_flNextObstacleCheck = 0.0f;
+    m_bStayPut = false;
 }
 
 CZMPlayerBot::~CZMPlayerBot()
@@ -77,18 +88,91 @@ bool CZMPlayerBot::ShouldUpdate() const
     return CBaseNPC::ShouldUpdate();
 }
 
+static const char* PickBotName( bool bFemale );
+
 void CZMPlayerBot::Spawn()
 {
     BaseClass::Spawn();
 
     NPCR::CEventDispatcher::OnSpawn();
+
+    // ZM bots keep their assigned name ("Zombie Master")
+    // Check both team and name since team may not be set on first spawn
+    if ( IsZM() || FStrEq( GetPlayerName(), "Zombie Master" ) )
+        return;
+
+    // Equip the best weapon we have (e.g. pistol from GiveDefaultItems over fists)
+    // Use PostThink-deferred call since weapons may not be fully initialized yet
+    SetContextThink( &CZMPlayerBot::ThinkEquipBestWeapon, gpGlobals->curtime + 0.1f, "EquipBestWeaponThink" );
+
+    // Assign a gender-matched name based on the actual model
+    const char* pszModel = STRING( GetModelName() );
+    bool bFemale = ( pszModel && Q_strstr( pszModel, "female" ) != nullptr );
+
+    CZMPlayerModelData* pModelData = ZMGetPlayerModels()->GetPlayerModelData( pszModel );
+    if ( pModelData )
+        bFemale = ( pModelData->GetGender() == 1 );
+
+    const char* pName = PickBotName( bFemale );
+    engine->SetFakeClientConVarValue( edict(), "name", pName );
+    SetPlayerName( pName );
+}
+
+static const char* g_szBotNamesMale[] =
+{
+    "Marcus", "Jake", "Derek", "Travis", "Cole",
+    "Nathan", "Victor", "Leon", "Hank", "Ellis",
+    "Rick", "Glenn", "Shane", "Daryl", "Morgan",
+    "Frank", "Chuck", "Nick", "Coach", "Bill",
+    "Louis", "Francis", "Jim", "Ray", "Duane"
+};
+
+static const char* g_szBotNamesFemale[] =
+{
+    "Zoey", "Rochelle", "Sarah", "Elena", "Maria",
+    "Claire", "Jill", "Ada", "Rebecca", "Sheva",
+    "Maggie", "Carol", "Beth", "Rosita", "Sasha",
+    "Tess", "Ellie", "Abby", "Dina", "Riley",
+    "Kate", "Lena", "Mia", "Eva", "Nina"
+};
+
+ConVar zm_sv_bot_default_behavior( "zm_sv_bot_default_behavior", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI Survivor default behavior. 0=Follow Random, 1=Explore, 2=Defend Spawn, 3=Complete Objectives" );
+ConVar zm_sv_bot_help_range( "zm_sv_bot_help_range", "1024", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Range for Help voice command to call AI survivors." );
+ConVar zm_sv_bot_taunt_chance( "zm_sv_bot_taunt_chance", "8", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Percent chance for AI survivor to taunt after a kill (0=never)." );
+
+static int g_nBotNameIndexMale = 0;
+static int g_nBotNameIndexFemale = 0;
+
+static const char* PickBotName( bool bFemale )
+{
+    if ( bFemale )
+    {
+        int count = ARRAYSIZE( g_szBotNamesFemale );
+        // Shuffle starting point
+        if ( g_nBotNameIndexFemale == 0 )
+            g_nBotNameIndexFemale = RandomInt( 0, count - 1 );
+        const char* name = g_szBotNamesFemale[ g_nBotNameIndexFemale % count ];
+        g_nBotNameIndexFemale++;
+        return name;
+    }
+    else
+    {
+        int count = ARRAYSIZE( g_szBotNamesMale );
+        if ( g_nBotNameIndexMale == 0 )
+            g_nBotNameIndexMale = RandomInt( 0, count - 1 );
+        const char* name = g_szBotNamesMale[ g_nBotNameIndexMale % count ];
+        g_nBotNameIndexMale++;
+        return name;
+    }
 }
 
 CZMPlayer* CZMPlayerBot::CreateZMBot( const char* playername )
 {
     char name[128];
-    Q_strncpy( name, ( playername && (*playername) ) ? playername : "L Ron Hubbard", sizeof( name ) );
-
+    if ( playername && (*playername) )
+        Q_strncpy( name, playername, sizeof( name ) );
+    else
+        Q_strncpy( name, "Survivor", sizeof( name ) );
 
     CZMPlayer* pPlayer = NPCR::CPlayer<CZMPlayer>::CreateBot<CZMPlayerBot>( name );
 
@@ -158,10 +242,16 @@ bool CZMPlayerBot::MustStopToShoot() const
 {
     auto type = GetWeaponType( GetActiveWeapon() );
 
-    if ( type == BOTWEPRANGE_LONGRANGE )
+    if ( type == BOTWEPRANGE_MAINGUN )
     {
         const char* wep = GetActiveWeapon()->GetClassname() + 10;
-        if ( FStrEq( wep, "rifle" ) || FStrEq( wep, "revolver" ) )
+        if ( FStrEq( wep, "rifle" ) || FStrEq( wep, "r700" ) )
+            return true;
+    }
+    if ( type == BOTWEPRANGE_SECONDARYWEAPON )
+    {
+        const char* wep = GetActiveWeapon()->GetClassname() + 10;
+        if ( FStrEq( wep, "revolver" ) )
             return true;
     }
 
@@ -173,31 +263,41 @@ ZMBotWeaponTypeRange_t CZMPlayerBot::GetWeaponType( const char* classname )
     if ( !classname || !(*classname) )
         return BOTWEPRANGE_INVALID;
 
-    // ZMRTODO: Get rid of this hardcoded stuff.
-
     // Skip 'weapon_zm_'
     const char* wep = classname + sizeof( "weapon_zm_" ) - 1;
 
+    // Main guns (shotguns, rifles, SMGs, snipers)
     if ( FStrEq( wep, "mac10" ) )
-        return BOTWEPRANGE_CLOSERANGE;
+        return BOTWEPRANGE_MAINGUN;
     if ( Q_strncmp( wep, "shotgun", sizeof( "shotgun" ) - 1 ) == 0 )
-        return BOTWEPRANGE_CLOSERANGE;
-
+        return BOTWEPRANGE_MAINGUN;
     if ( FStrEq( wep, "rifle" ) )
-        return BOTWEPRANGE_LONGRANGE;
-    if ( FStrEq( wep, "pistol" ) )
-        return BOTWEPRANGE_LONGRANGE;
-    if ( FStrEq( wep, "revolver" ) )
-        return BOTWEPRANGE_LONGRANGE;
+        return BOTWEPRANGE_MAINGUN;
+    if ( FStrEq( wep, "r700" ) )
+        return BOTWEPRANGE_MAINGUN;
 
+    // Sidearms (pistol, revolver)
+    if ( FStrEq( wep, "pistol" ) )
+        return BOTWEPRANGE_SECONDARYWEAPON;
+    if ( FStrEq( wep, "revolver" ) )
+        return BOTWEPRANGE_SECONDARYWEAPON;
+
+    // Melee weapons
     if ( FStrEq( wep, "improvised" ) )
         return BOTWEPRANGE_MELEE;
     if ( FStrEq( wep, "sledge" ) )
         return BOTWEPRANGE_MELEE;
-    if ( FStrEq( wep, "fistscarry" ) )
+    if ( FStrEq( wep, "fireaxe" ) )
         return BOTWEPRANGE_MELEE;
 
+    // Fists (lowest priority)
+    if ( FStrEq( wep, "fistscarry" ) )
+        return BOTWEPRANGE_FISTS;
+
+    // Throwables (grenades)
     if ( FStrEq( wep, "molotov" ) )
+        return BOTWEPRANGE_THROWABLE;
+    if ( FStrEq( wep, "pipebomb" ) )
         return BOTWEPRANGE_THROWABLE;
 
     return BOTWEPRANGE_INVALID;
@@ -236,6 +336,45 @@ bool CZMPlayerBot::EquipWeaponOfType( ZMBotWeaponTypeRange_t wepType )
 
     Weapon_Switch( pWep );
     return pWep == m_hActiveWeapon.Get();
+}
+
+bool CZMPlayerBot::EquipBestWeapon()
+{
+    // Priority: main gun (with ammo) > sidearm (with ammo) > melee > fists
+    static const ZMBotWeaponTypeRange_t s_Priority[] = {
+        BOTWEPRANGE_MAINGUN,
+        BOTWEPRANGE_SECONDARYWEAPON,
+        BOTWEPRANGE_MELEE,
+        BOTWEPRANGE_FISTS,
+    };
+
+    for ( int i = 0; i < ARRAYSIZE( s_Priority ); i++ )
+    {
+        CZMBaseWeapon* pWep = FindWeaponOfType( s_Priority[i] );
+        if ( !pWep )
+            continue;
+
+        // For ranged weapons, check ammo
+        if ( s_Priority[i] == BOTWEPRANGE_MAINGUN || s_Priority[i] == BOTWEPRANGE_SECONDARYWEAPON )
+        {
+            if ( !WeaponHasAmmo( pWep ) )
+                continue;
+        }
+
+        if ( pWep == m_hActiveWeapon.Get() )
+            return true;
+
+        Weapon_Switch( pWep );
+        return ( pWep == m_hActiveWeapon.Get() );
+    }
+
+    return false;
+}
+
+void CZMPlayerBot::ThinkEquipBestWeapon()
+{
+    if ( IsAlive() )
+        EquipBestWeapon();
 }
 
 ZMBotWeaponTypeRange_t CZMPlayerBot::GetCurrentWeaponType() const
@@ -277,7 +416,7 @@ bool CZMPlayerBot::HasAnyEffectiveRangeWeapons() const
 
 
         ZMBotWeaponTypeRange_t wepType = GetWeaponType( pWep );
-        if ( wepType != BOTWEPRANGE_CLOSERANGE && wepType != BOTWEPRANGE_LONGRANGE )
+        if ( wepType != BOTWEPRANGE_MAINGUN && wepType != BOTWEPRANGE_SECONDARYWEAPON )
             continue;
 
         if ( WeaponHasAmmo( pWep ) )
@@ -375,6 +514,47 @@ CZMBaseWeapon* CZMPlayerBot::FindWeaponOfType( ZMBotWeaponTypeRange_t wepType ) 
     }
 
     return nullptr;
+}
+
+void CZMPlayerBot::CheckObstacleJump()
+{
+    if ( !IsAlive() || !(GetFlags() & FL_ONGROUND) )
+        return;
+
+    if ( gpGlobals->curtime < m_flNextObstacleCheck )
+        return;
+
+    m_flNextObstacleCheck = gpGlobals->curtime + 0.25f;
+
+    // Trace forward at knee height to detect obstacles
+    Vector fwd;
+    AngleVectors( EyeAngles(), &fwd );
+    fwd.z = 0.0f;
+    fwd.NormalizeInPlace();
+
+    Vector origin = GetAbsOrigin();
+    Vector kneePos = origin + Vector( 0, 0, 18.0f );
+    Vector kneeEnd = kneePos + fwd * 32.0f;
+
+    trace_t trKnee;
+    CTraceFilterNoNPCsOrPlayer filter( this, COLLISION_GROUP_NONE );
+    UTIL_TraceLine( kneePos, kneeEnd, MASK_PLAYERSOLID, &filter, &trKnee );
+
+    if ( trKnee.fraction >= 1.0f )
+        return;
+
+    // Something at knee height - check if we can clear it by jumping
+    Vector headPos = origin + Vector( 0, 0, 64.0f );
+    Vector headEnd = headPos + fwd * 32.0f;
+
+    trace_t trHead;
+    UTIL_TraceLine( headPos, headEnd, MASK_PLAYERSOLID, &filter, &trHead );
+
+    if ( trHead.fraction < 1.0f )
+        return;
+
+    // Obstacle at knee but clear at head = jumpable
+    PressJump( 0.15f );
 }
 
 CON_COMMAND( bot, "" )

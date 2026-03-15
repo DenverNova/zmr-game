@@ -26,15 +26,7 @@ void CPlayerBotMainSchedule::OnStart()
 
 void CPlayerBotMainSchedule::OnUpdate()
 {
-    /*if ( m_Path.IsValid() && !m_ExpireTimer.IsElapsed() )
-    {
-        m_Path.Update( GetOuter() );
-    }
-    else
-    {
-        ComputePath();
-        m_ExpireTimer.Start( 10.0f );
-    }*/
+    GetOuter()->CheckObstacleJump();
 }
     
 void CPlayerBotMainSchedule::ComputePath()

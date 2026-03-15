@@ -6,6 +6,9 @@
 
 #include "npcr_schedule.h"
 #include "npcr_path_chase.h"
+#include "npcr_path_follow.h"
+#include "npcr_path_cost.h"
+#include "npcr_motor.h"
 
 
 //
@@ -47,11 +50,28 @@ private:
 
     CBasePlayer* FindSurvivorToFollow( CBasePlayer* pIgnore = nullptr, bool bAllowBot = false ) const;
 
+    void UpdateExploreMode();
+    void UpdateDefendMode();
+    void UpdateObjectiveMode();
+    CBaseEntity* FindNearestUsableEntity() const;
+    void TryPickupNearbyWeapons();
 
     NPCR::CChaseNavPath m_Path;
     NPCR::CPathCostGroundOnly m_PathCost;
+    NPCR::CFollowNavPath m_ObjPath;
+    NPCR::CFollowNavPath m_ExplorePath;
 
     CountdownTimer m_NextFollowTarget;
+    CountdownTimer m_NextObjectiveScan;
+    CountdownTimer m_NextExplorePath;
+    CountdownTimer m_NextWeaponScan;
+    CountdownTimer m_NextHeardLook;         // Cooldown after reacting to a heard sound
+    CountdownTimer m_NextPeripheralScan;    // Periodic peripheral threat check
+    Vector m_vecHeardLookAt;               // Direction to look toward after hearing something
 
     CHandle<CBasePlayer> m_hFollowTarget;
+    CHandle<CBaseEntity> m_hObjectiveTarget;
+    Vector m_vecFormationOffset;
+    Vector m_vecDefendPos;
+    bool m_bHasDefendPos;
 };

@@ -168,6 +168,7 @@ DEFINE_BTN( NPCR::CPlayerCmdHandler, PressFire2 )
 DEFINE_BTN( NPCR::CPlayerCmdHandler, PressDuck )
 DEFINE_BTN( NPCR::CPlayerCmdHandler, PressReload )
 DEFINE_BTN( NPCR::CPlayerCmdHandler, PressUse )
+DEFINE_BTN( NPCR::CPlayerCmdHandler, PressJump )
 
 void NPCR::CPlayerCmdHandler::BuildPlayerCmd( CUserCmd& cmd )
 {
@@ -176,6 +177,7 @@ void NPCR::CPlayerCmdHandler::BuildPlayerCmd( CUserCmd& cmd )
     HANDLE_BTN( PressDuck, IN_DUCK, cmd )
     HANDLE_BTN( PressReload, IN_RELOAD, cmd )
     HANDLE_BTN( PressUse, IN_USE, cmd )
+    HANDLE_BTN( PressJump, IN_JUMP, cmd )
 
 
     // Movement

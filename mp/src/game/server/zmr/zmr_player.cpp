@@ -26,6 +26,7 @@
 #include "weapons/zmr_fistscarry.h"
 #include "zmr_ammodef.h"
 #include "zmr_resource_system.h"
+#include "npcs/zmr_playerbot.h"
 #include "zmr_player.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -54,6 +55,7 @@ extern ConVar zm_sv_antiafk_punish;
 
 ConVar zm_sv_flashlightdrainrate( "zm_sv_flashlightdrainrate", "0.6", FCVAR_NOTIFY, "How fast the flashlight battery drains per second. (out of 100)" ); // Originally 0.4
 ConVar zm_sv_flashlightrechargerate( "zm_sv_flashlightrechargerate", "2.5", FCVAR_NOTIFY, "How fast the flashlight battery recharges per second. (out of 100)" ); // Originally 0.1
+ConVar zm_sv_flashlight_infinite( "zm_sv_flashlight_infinite", "0", FCVAR_NOTIFY | FCVAR_REPLICATED, "Flashlight battery never drains when enabled." );
 
 
 
@@ -501,6 +503,9 @@ void CZMPlayer::PostThink()
 
 void CZMPlayer::UpdateFlashlight()
 {
+    if ( zm_sv_flashlight_infinite.GetBool() )
+        return;
+
     if ( FlashlightIsOn() )
     {
         SetFlashlightBattery( GetFlashlightBattery() - gpGlobals->frametime * zm_sv_flashlightdrainrate.GetFloat() );
@@ -1988,6 +1993,53 @@ void CZMPlayer::PlayerUse()
     // Reacquire the continuous use entity
     m_hContinuousUseEntity.Set( nullptr );
 
+    // Spectator pressing USE on their observer target - possess bot or take over ZM
+    if ( IsObserver() && (m_afButtonPressed & IN_USE) != 0 )
+    {
+        CBaseEntity* pTarget = GetObserverTarget();
+        if ( pTarget )
+        {
+            CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pTarget );
+            if ( pBot )
+            {
+                if ( pBot->IsZM() )
+                {
+                    // Transfer resources from the AI ZM before removing it
+                    int iResources = pBot->GetResources();
+
+                    engine->ServerCommand( UTIL_VarArgs( "kickid %i\n", pBot->GetUserID() ) );
+
+                    // Put the player on the ZM team - ChangeTeam calls Spawn which
+                    // sets up MOVETYPE_NOCLIP, collision, etc. via SetTeamSpecificProps
+                    ChangeTeam( ZMTEAM_ZM );
+                    SetResources( iResources );
+
+                    ClientPrint( this, HUD_PRINTCENTER, "You are now the Zombie Master!" );
+                    return;
+                }
+                else if ( pBot->IsHuman() && pBot->IsAlive() )
+                {
+                    // Possess a survivor bot - swap the spectator into the bot's body
+                    Vector vecPos = pBot->GetAbsOrigin();
+                    QAngle angEye = pBot->EyeAngles();
+                    int iHealth = pBot->GetHealth();
+
+                    // Remove the bot
+                    engine->ServerCommand( UTIL_VarArgs( "kickid %i\n", pBot->GetUserID() ) );
+
+                    // Respawn the player as a human at the bot's location
+                    ChangeTeam( ZMTEAM_HUMAN );
+                    Spawn();
+                    SetAbsOrigin( vecPos );
+                    SnapEyeAngles( angEye );
+                    SetHealth( iHealth );
+
+                    ClientPrint( this, HUD_PRINTCENTER, "You took control of a survivor!" );
+                    return;
+                }
+            }
+        }
+    }
 
     auto* pOldUseEntity = GetUseEntity();
 
@@ -2012,6 +2064,57 @@ void CZMPlayer::PlayerUse()
 	// Was use pressed or released?
 	if ( !bPressedUse && !bReleasedUse && !bHoldingUse )
 		return;
+
+	// Check if pressing E while looking at an AI bot - toggle follow/stay
+	if ( bPressedUse )
+	{
+		Vector eyePos = EyePosition();
+		Vector fwd;
+		AngleVectors( EyeAngles(), &fwd );
+
+		float flBestDot = 0.95f;
+		CZMPlayerBot* pBestBot = nullptr;
+
+		for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+		{
+			CBasePlayer* pOther = UTIL_PlayerByIndex( i );
+			if ( !pOther || !pOther->IsBot() || !pOther->IsAlive() )
+				continue;
+			if ( pOther->GetTeamNumber() != ZMTEAM_HUMAN )
+				continue;
+
+			Vector toBot = pOther->GetAbsOrigin() + Vector( 0, 0, 36 ) - eyePos;
+			float dist = toBot.NormalizeInPlace();
+			if ( dist > 512.0f )
+				continue;
+
+			float dot = fwd.Dot( toBot );
+			if ( dot > flBestDot )
+			{
+				flBestDot = dot;
+				pBestBot = dynamic_cast<CZMPlayerBot*>( pOther );
+			}
+		}
+
+		if ( pBestBot )
+		{
+			// Bot is considered "following" if not explicitly told to stay put.
+			// This covers both explicit SetFollowTarget and default-behavior auto-follow.
+			bool bIsFollowing = !pBestBot->IsStayingPut();
+			if ( bIsFollowing )
+			{
+				pBestBot->SetFollowTarget( nullptr );
+				pBestBot->SetStayPut( true );
+				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Staying", pBestBot->GetPlayerName() ) );
+			}
+			else
+			{
+				pBestBot->SetFollowTarget( this );
+				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Following", pBestBot->GetPlayerName() ) );
+			}
+			return;
+		}
+	}
 
 	if ( bPressedUse )
 	{
