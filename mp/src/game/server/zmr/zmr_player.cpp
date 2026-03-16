@@ -2338,7 +2338,7 @@ void CZMPlayer::PlayerUse()
 				CBaseEntity* pHeld = pHands->GetHeldObject();
 				if ( pHeld )
 				{
-					pHands->DetachObject();
+					pHands->ForceDrop( pHeld );
 					pBestBot->SetCommandedGrabTarget( pHeld );
 					ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Taking object", pBestBot->GetPlayerName() ) );
 					ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
