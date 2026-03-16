@@ -263,6 +263,29 @@ void CSurvivorFollowSchedule::OnUpdate()
         Msg( "[Bot %s] Behavior: convar=%i override=%i effective=%i\n",
             pOuter->GetPlayerName(), behavior, pOuter->GetBehaviorOverride(), effectiveBehavior );
 
+    // Mixed Mode: assign a permanent random sub-behavior (0/1/2) on first update
+    if ( effectiveBehavior == 3 )
+    {
+        if ( m_iMixedBehavior < 0 )
+        {
+            m_iMixedBehavior = random->RandomInt( 0, 2 );
+
+            if ( zm_sv_bot_debug.GetBool() )
+            {
+                const char* names[] = { "Follow", "Explore", "Defend" };
+                Msg( "[Bot %s] Mixed mode assigned: %s (%i)\n",
+                    GetOuter()->GetPlayerName(), names[m_iMixedBehavior], m_iMixedBehavior );
+            }
+
+            if ( m_iMixedBehavior == 2 && !m_bHasDefendPos )
+            {
+                m_vecDefendPos = GetOuter()->GetAbsOrigin();
+                m_bHasDefendPos = true;
+            }
+        }
+        effectiveBehavior = m_iMixedBehavior;
+    }
+
     // No explicit follow target - use the effective behavior mode
     switch ( effectiveBehavior )
     {
@@ -271,9 +294,6 @@ void CSurvivorFollowSchedule::OnUpdate()
         return;
     case 2: // Defend Spawn
         UpdateDefendMode();
-        return;
-    case 3: // Mixed Mode - each bot gets a random behavior
-        UpdateMixedMode();
         return;
     default: // 0 = Follow nearest player
         break;
@@ -548,7 +568,16 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
         // Pick a random nav area and walk to it
         CNavArea* pStart = pOuter->GetLastKnownArea();
         if ( !pStart )
-            return;
+        {
+            // Bot hasn't walked onto nav mesh yet - try to find nearest area
+            pStart = TheNavMesh->GetNearestNavArea( pOuter->GetAbsOrigin(), true, 512.0f, false );
+            if ( !pStart )
+            {
+                if ( zm_sv_bot_debug.GetBool() )
+                    Msg( "[Bot %s] Explore: no nav area found near bot position!\n", pOuter->GetPlayerName() );
+                return;
+            }
+        }
 
         int navCount = TheNavMesh->GetNavAreaCount();
         if ( navCount <= 0 )
@@ -706,6 +735,8 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
         {
             Vector vecMyPos = pOuter->GetAbsOrigin();
             CNavArea* pStart = pOuter->GetLastKnownArea();
+            if ( !pStart )
+                pStart = TheNavMesh->GetNearestNavArea( vecMyPos, true, 512.0f, false );
             CNavArea* pGoal = TheNavMesh->GetNearestNavArea( m_vecDefendPos, true, 512.0f, false );
 
             if ( pStart && pGoal )
@@ -722,83 +753,6 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
         {
             m_ExplorePath.Update( pOuter );
         }
-    }
-}
-
-void CSurvivorFollowSchedule::UpdateMixedMode()
-{
-    // Assign a random behavior on first call (per bot, persists for the round)
-    if ( m_iMixedBehavior < 0 )
-    {
-        m_iMixedBehavior = random->RandomInt( 0, 2 );
-
-        if ( zm_sv_bot_debug.GetBool() )
-        {
-            const char* names[] = { "Follow", "Explore", "Defend" };
-            Msg( "[Bot %s] Mixed mode assigned: %s (%i)\n",
-                GetOuter()->GetPlayerName(), names[m_iMixedBehavior], m_iMixedBehavior );
-        }
-
-        // Initialize defend position for mixed mode defend bots
-        if ( m_iMixedBehavior == 2 && !m_bHasDefendPos )
-        {
-            m_vecDefendPos = GetOuter()->GetAbsOrigin();
-            m_bHasDefendPos = true;
-        }
-    }
-
-    switch ( m_iMixedBehavior )
-    {
-    case 1:
-        UpdateExploreMode();
-        return;
-    case 2:
-        UpdateDefendMode();
-        return;
-    default:
-    {
-        // Follow mode - scan for weapons/ammo and hunt zombies while following
-        TryPickupNearbyWeapons();
-
-        CBaseEntity* pZombie = FindNearestZombie( 600.0f );
-        if ( pZombie )
-        {
-            m_vecHeardLookAt = pZombie->WorldSpaceCenter();
-            m_NextHeardLook.Start( 1.5f );
-        }
-
-        // Ensure the follow target timer is running
-        if ( !m_NextFollowTarget.HasStarted() || m_NextFollowTarget.IsElapsed() )
-        {
-            m_NextFollowTarget.Start( 0.1f );
-            NextFollow();
-        }
-
-        auto* pFollow = m_hFollowTarget.Get();
-        if ( pFollow && !IsValidFollowTarget( pFollow ) )
-        {
-            NextFollow();
-            pFollow = m_hFollowTarget.Get();
-        }
-
-        if ( !pFollow )
-        {
-            // No human to follow - explore instead of just standing
-            UpdateExploreMode();
-            return;
-        }
-
-        // Make sure we have a path to follow target
-        if ( !m_Path.IsValid() && pFollow )
-            StartFollow( pFollow );
-
-        bool bBusy = GetOuter()->IsBusy() == NPCR::RES_YES;
-        if ( m_Path.IsValid() && pFollow && !bBusy && ShouldMoveCloser( pFollow ) )
-        {
-            m_Path.Update( GetOuter(), pFollow, m_PathCost );
-        }
-        return;
-    }
     }
 }
 
@@ -823,6 +777,8 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
             if ( m_vecPreScavengePos.DistTo( vecMyPos ) > 64.0f )
             {
                 CNavArea* pStart = pOuter->GetLastKnownArea();
+                if ( !pStart )
+                    pStart = TheNavMesh->GetNearestNavArea( vecMyPos, true, 512.0f, false );
                 CNavArea* pGoal = TheNavMesh->GetNearestNavArea( m_vecPreScavengePos, true, 256.0f, false );
                 if ( pStart && pGoal )
                 {
@@ -1065,6 +1021,8 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
 
         Vector vecTarget = pBestWeapon->GetAbsOrigin();
         CNavArea* pStart = pOuter->GetLastKnownArea();
+        if ( !pStart )
+            pStart = TheNavMesh->GetNearestNavArea( myPos, true, 512.0f, false );
         CNavArea* pGoal = TheNavMesh->GetNearestNavArea( vecTarget, true, 256.0f, false );
 
         if ( pStart && pGoal )

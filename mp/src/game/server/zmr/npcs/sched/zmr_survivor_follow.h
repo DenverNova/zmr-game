@@ -52,7 +52,6 @@ private:
 
     void UpdateExploreMode();
     void UpdateDefendMode();
-    void UpdateMixedMode();
     void TryPickupNearbyWeapons();
     void UpdateExploreLookAngles();
     CBaseEntity* FindNearestZombie( float flMaxRange ) const;
