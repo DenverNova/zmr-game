@@ -118,8 +118,10 @@ void CZMPlayerBot::Spawn()
         return;
 
     // Equip the best weapon we have (e.g. pistol from GiveDefaultItems over fists)
-    // Use PostThink-deferred call since weapons may not be fully initialized yet
-    SetContextThink( &CZMPlayerBot::ThinkEquipBestWeapon, gpGlobals->curtime + 0.1f, "EquipBestWeaponThink" );
+    // Use deferred calls since weapons may not be fully initialized yet
+    SetContextThink( &CZMPlayerBot::ThinkEquipBestWeapon, gpGlobals->curtime + 0.5f, "EquipBestWeaponThink" );
+    // Second attempt as safety net in case first one was too early
+    SetContextThink( &CZMPlayerBot::ThinkEquipBestWeapon, gpGlobals->curtime + 1.5f, "EquipBestWeaponRetry" );
 
     // Assign a gender-matched name based on the actual model
     const char* pszModel = STRING( GetModelName() );
@@ -393,8 +395,31 @@ bool CZMPlayerBot::EquipBestWeapon()
 
 void CZMPlayerBot::ThinkEquipBestWeapon()
 {
-    if ( IsAlive() )
-        EquipBestWeapon();
+    if ( !IsAlive() )
+        return;
+
+    extern ConVar zm_sv_bot_debug;
+    if ( zm_sv_bot_debug.GetBool() )
+    {
+        CZMBaseWeapon* pBefore = GetActiveWeapon();
+        Msg( "[Bot %s] ThinkEquipBestWeapon: before='%s'\n",
+            GetPlayerName(), pBefore ? pBefore->GetClassname() : "(none)" );
+        for ( int i = 0; i < MAX_WEAPONS; i++ )
+        {
+            CZMBaseWeapon* pWep = ToZMBaseWeapon( GetWeapon( i ) );
+            if ( !pWep ) continue;
+            Msg( "  [%i] %s type=%i\n", i, pWep->GetClassname(), GetWeaponType( pWep ) );
+        }
+    }
+
+    EquipBestWeapon();
+
+    if ( zm_sv_bot_debug.GetBool() )
+    {
+        CZMBaseWeapon* pAfter = GetActiveWeapon();
+        Msg( "[Bot %s] ThinkEquipBestWeapon: after='%s'\n",
+            GetPlayerName(), pAfter ? pAfter->GetClassname() : "(none)" );
+    }
 }
 
 ZMBotWeaponTypeRange_t CZMPlayerBot::GetCurrentWeaponType() const

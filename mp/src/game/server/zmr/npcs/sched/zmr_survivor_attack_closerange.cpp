@@ -42,10 +42,23 @@ void CSurvivorAttackCloseRangeSchedule::OnStart()
         {
             return;
         }
+
+        // Fall back to fists if nothing else is available
+        if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS ) )
+        {
+            m_bAllowMelee = true;
+            return;
+        }
     }
     else
     {
         if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_MELEE ) )
+        {
+            return;
+        }
+
+        // Fall back to fists
+        if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS ) )
         {
             return;
         }

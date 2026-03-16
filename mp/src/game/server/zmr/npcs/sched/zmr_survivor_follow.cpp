@@ -124,6 +124,13 @@ void CSurvivorFollowSchedule::OnUpdate()
     }
 
     // Periodically look for weapons to pick up
+    // If scavenging or returning from scavenging, skip all behavior code below
+    // to prevent competing path computations that cause jittering
+    if ( m_bScavenging || m_ObjPath.IsValid() )
+    {
+        TryPickupNearbyWeapons();
+        return;
+    }
     TryPickupNearbyWeapons();
 
     // Keep the best weapon equipped when not in combat
@@ -227,12 +234,33 @@ void CSurvivorFollowSchedule::OnUpdate()
 
     int behavior = zm_sv_bot_default_behavior.GetInt();
 
-    // Throttle debug output to once every 3 seconds per bot
+    // Throttle debug output to once every 5 seconds per bot
     bool bDebugThisTick = false;
     if ( zm_sv_bot_debug.GetBool() && ( !m_NextDebugLog.HasStarted() || m_NextDebugLog.IsElapsed() ) )
     {
         bDebugThisTick = true;
-        m_NextDebugLog.Start( 3.0f );
+        m_NextDebugLog.Start( 5.0f );
+
+        // Full inventory and state dump
+        CZMBaseWeapon* pActive = pOuter->GetActiveWeapon();
+        Msg( "[Bot %s] --- State ---\n", pOuter->GetPlayerName() );
+        Msg( "  Active weapon: %s\n", pActive ? pActive->GetClassname() : "(none)" );
+        Msg( "  Inventory:\n" );
+        for ( int i = 0; i < MAX_WEAPONS; i++ )
+        {
+            CZMBaseWeapon* pWep = ToZMBaseWeapon( pOuter->GetWeapon( i ) );
+            if ( !pWep ) continue;
+            int clip = pWep->Clip1();
+            int ammoType = pWep->GetPrimaryAmmoType();
+            int reserve = ( ammoType >= 0 ) ? pOuter->GetAmmoCount( ammoType ) : -1;
+            Msg( "    [%i] %s  clip=%i reserve=%i type=%i\n",
+                i, pWep->GetClassname(), clip, reserve, CZMPlayerBot::GetWeaponType( pWep ) );
+        }
+        Msg( "  Scavenging=%i  ObjPath=%i  FollowPath=%i  ExplorePath=%i\n",
+            m_bScavenging ? 1 : 0, m_ObjPath.IsValid() ? 1 : 0,
+            m_Path.IsValid() ? 1 : 0, m_ExplorePath.IsValid() ? 1 : 0 );
+        Msg( "  StayingPut=%i  HasDefendPos=%i  MixedBehavior=%i\n",
+            pOuter->IsStayingPut() ? 1 : 0, m_bHasDefendPos ? 1 : 0, m_iMixedBehavior );
     }
 
     // If the bot was told to stay put, don't follow anyone
@@ -325,6 +353,8 @@ void CSurvivorFollowSchedule::OnUpdate()
     // No human survivors to follow - fall back to defending the spawn area
     if ( !pFollow )
     {
+        if ( bDebugThisTick )
+            Msg( "[Bot %s] No follow target found - falling back to defend mode\n", pOuter->GetPlayerName() );
         UpdateDefendMode();
         return;
     }
