@@ -674,11 +674,10 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
 {
     CZMPlayerBot* pOuter = GetOuter();
 
-    // While exploring, only grab items we walk right past (within 96 units)
-    // Don't use TryPickupNearbyWeapons which would walk to distant items and return
+    // Pick up weapons and ammo we walk near (within 128 units) while exploring
     if ( m_NextWeaponScan.IsElapsed() )
     {
-        m_NextWeaponScan.Start( 1.0f );
+        m_NextWeaponScan.Start( 0.5f );
         Vector myPos = pOuter->GetAbsOrigin();
 
         static const char* s_szPickupClasses[] = {
@@ -699,7 +698,7 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
                 CBaseCombatWeapon* pWep = pEnt->MyCombatWeaponPointer();
                 if ( pWep && pWep->GetOwner() ) continue;
 
-                if ( myPos.DistTo( pEnt->GetAbsOrigin() ) < 96.0f )
+                if ( myPos.DistTo( pEnt->GetAbsOrigin() ) < 128.0f )
                 {
                     pOuter->GetMotor()->FaceTowards( pEnt->GetAbsOrigin() );
                     pOuter->PressUse( 0.15f );
@@ -718,39 +717,9 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
         m_NextHeardLook.Start( 1.5f );
     }
 
-    // Idle pause: periodically stop and look around before continuing
-    if ( m_bExploreIdling )
+    // Continuously explore: when path is done or invalid, immediately pick a new destination
+    if ( !m_ExplorePath.IsValid() || m_NextExplorePath.IsElapsed() )
     {
-        if ( !m_ExploreIdlePause.IsElapsed() )
-        {
-            // Still idling - look around
-            UpdateExploreLookAngles();
-            return;
-        }
-        // Done idling, resume moving
-        m_bExploreIdling = false;
-    }
-
-    // Randomly trigger an idle pause when reaching a waypoint or after some travel time
-    if ( m_ExplorePath.IsValid() && !m_ExploreIdlePause.HasStarted() )
-    {
-        m_ExploreIdlePause.Start( random->RandomFloat( 6.0f, 14.0f ) );
-    }
-    else if ( m_ExploreIdlePause.HasStarted() && m_ExploreIdlePause.IsElapsed() && !m_bExploreIdling )
-    {
-        // Time for a pause - stop and look around for 2-4 seconds
-        m_bExploreIdling = true;
-        m_ExploreIdlePause.Start( random->RandomFloat( 2.0f, 4.0f ) );
-        m_ExplorePath.Invalidate();
-        return;
-    }
-
-    // Natural look angles while moving
-    UpdateExploreLookAngles();
-
-    if ( !m_NextExplorePath.HasStarted() || m_NextExplorePath.IsElapsed() || !m_ExplorePath.IsValid() )
-    {
-        // Pick a random nav area and walk to it
         CNavArea* pStart = pOuter->GetLastKnownArea();
         if ( !pStart )
         {
@@ -758,8 +727,7 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
             if ( !pStart )
             {
                 if ( zm_sv_bot_debug.GetBool() )
-                    Msg( "[Bot %s] Explore: no nav area found near bot position!\n", pOuter->GetPlayerName() );
-                m_NextExplorePath.Start( 2.0f );
+                    Msg( "[Bot %s] Explore: no nav area near bot!\n", pOuter->GetPlayerName() );
                 return;
             }
         }
@@ -771,8 +739,8 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
         Vector vecMyPos = pOuter->GetAbsOrigin();
         bool bPathFound = false;
 
-        // Try up to 5 random areas to find a reachable one
-        for ( int attempt = 0; attempt < 5 && !bPathFound; attempt++ )
+        // Try up to 8 random areas to find a reachable one far away
+        for ( int attempt = 0; attempt < 8 && !bPathFound; attempt++ )
         {
             int n = random->RandomInt( 0, navCount - 1 );
 
@@ -798,9 +766,9 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
             if ( !pGoal || pGoal == pStart )
                 continue;
 
-            // Skip areas that are very close - we want to actually explore
+            // Skip areas that are very close - we want real exploration
             Vector vecGoal = pGoal->GetCenter();
-            if ( vecMyPos.DistToSqr( vecGoal ) < (256.0f * 256.0f) )
+            if ( vecMyPos.DistToSqr( vecGoal ) < (512.0f * 512.0f) )
                 continue;
 
             m_PathCost.SetStepHeight( pOuter->GetMotor()->GetStepHeight() );
@@ -810,21 +778,19 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
             if ( m_ExplorePath.Compute( vecMyPos, vecGoal, pStart, pGoal, m_PathCost ) )
             {
                 bPathFound = true;
-                m_NextExplorePath.Start( 20.0f );
+                m_NextExplorePath.Start( 30.0f );
 
                 if ( zm_sv_bot_debug.GetBool() )
-                    Msg( "[Bot %s] Explore: pathing to area %i (dist=%.0f)\n",
+                    Msg( "[Bot %s] Explore: heading to area %i (dist=%.0f)\n",
                         pOuter->GetPlayerName(), pGoal->GetID(), vecMyPos.DistTo( vecGoal ) );
             }
         }
 
         if ( !bPathFound )
         {
-            // Retry quickly instead of waiting 20 seconds
-            m_NextExplorePath.Start( 1.0f );
-
             if ( zm_sv_bot_debug.GetBool() )
-                Msg( "[Bot %s] Explore: failed to find reachable area after 5 attempts\n", pOuter->GetPlayerName() );
+                Msg( "[Bot %s] Explore: no reachable area found, retrying...\n", pOuter->GetPlayerName() );
+            m_NextExplorePath.Start( 0.5f );
         }
     }
 
