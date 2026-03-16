@@ -1094,24 +1094,36 @@ void CZMPlayer::GiveDefaultItems()
         }
     }
 
-    // Random starting weapon - give to all survivors based on ConVar category
+    // Random starting weapon - only give if the map loadout didn't provide anything beyond fists
     int startWepType = zm_sv_random_start_weapon.GetInt();
     if ( startWepType > 0 )
     {
-        const char* wepClass = PickRandomStartWeapon( startWepType );
-        Msg( "[StartWep] Player '%s' type=%i picked='%s'\n", GetPlayerName(), startWepType, wepClass ? wepClass : "NULL" );
-        if ( wepClass )
+        bool bHasRealWeapon = false;
+        for ( int i = 0; i < MAX_WEAPONS; i++ )
         {
-            GiveNamedItem( wepClass );
+            CBaseCombatWeapon* pCheck = GetWeapon( i );
+            if ( !pCheck ) continue;
+            if ( FClassnameIs( pCheck, "weapon_zm_fistscarry" ) ) continue;
+            bHasRealWeapon = true;
+            break;
+        }
 
-            const char* ammoName = GetAmmoNameForWeapon( wepClass );
-            if ( ammoName )
+        if ( !bHasRealWeapon )
+        {
+            const char* wepClass = PickRandomStartWeapon( startWepType );
+            if ( wepClass )
             {
-                int ammoIndex = GetAmmoDef()->Index( ammoName );
-                if ( ammoIndex >= 0 )
+                GiveNamedItem( wepClass );
+
+                const char* ammoName = GetAmmoNameForWeapon( wepClass );
+                if ( ammoName )
                 {
-                    int maxAmmo = GetAmmoDef()->MaxCarry( ammoIndex );
-                    CBasePlayer::GiveAmmo( maxAmmo, ammoIndex );
+                    int ammoIndex = GetAmmoDef()->Index( ammoName );
+                    if ( ammoIndex >= 0 )
+                    {
+                        int maxAmmo = GetAmmoDef()->MaxCarry( ammoIndex );
+                        CBasePlayer::GiveAmmo( maxAmmo, ammoIndex );
+                    }
                 }
             }
         }

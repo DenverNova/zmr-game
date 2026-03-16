@@ -1,4 +1,4 @@
-//========= Copyright © 1996-2005, Valve Corporation, All rights reserved. ============//
+//========= Copyright ï¿½ 1996-2005, Valve Corporation, All rights reserved. ============//
 //
 // Purpose: 
 //
@@ -52,7 +52,8 @@ CCreateMultiplayerGameGameplayPage::CCreateMultiplayerGameGameplayPage(vgui::Pan
 
 	m_pDescription = new CServerDescription(m_pOptionsList);
 	m_pDescription->InitFromFile( DEFAULT_OPTIONS_FILE );
-	m_pDescription->InitFromFile( OPTIONS_FILE );
+	// Skip loading cached settings.scr - it accumulates Source engine defaults (mp_fraglimit, mp_flashlight, etc.)
+	// m_pDescription->InitFromFile( OPTIONS_FILE );
 	m_pList = NULL;
 
 	LoadControlSettings("Resource/CreateMultiplayerGameGameplayPage.res");
@@ -138,19 +139,11 @@ void CCreateMultiplayerGameGameplayPage::OnApplyChanges()
 	// Create the game.cfg file
 	if ( m_pDescription )
 	{
-		FileHandle_t fp;
 
 		// Add settings to config.cfg
 		m_pDescription->WriteToConfig();
 
-		// save out in the settings file
-		g_pFullFileSystem->CreateDirHierarchy( OPTIONS_DIR, "GAME" );
-		fp = g_pFullFileSystem->Open( OPTIONS_FILE, "wb", "GAME" );
-		if ( fp )
-		{
-			m_pDescription->WriteToScriptFile( fp );
-			g_pFullFileSystem->Close( fp );
-		}
+		// Skip writing settings.scr - only settings_default.scr is authoritative
 	}
 }
 

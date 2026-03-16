@@ -87,6 +87,9 @@ private:
     float m_flExploreScanYawOffset;        // Yaw offset for scanning while moving
     bool m_bExploreIdling;                 // Currently in an idle pause
 
+    // Debug log throttle
+    CountdownTimer m_NextDebugLog;         // Throttle debug output to every few seconds
+
     // Explosion dodge
     CountdownTimer m_NextExplosionCheck;   // Periodic scan for nearby ZM explosions
     NPCR::CFollowNavPath m_FleePath;      // Path to flee from explosion

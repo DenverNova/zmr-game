@@ -227,10 +227,18 @@ void CSurvivorFollowSchedule::OnUpdate()
 
     int behavior = zm_sv_bot_default_behavior.GetInt();
 
+    // Throttle debug output to once every 3 seconds per bot
+    bool bDebugThisTick = false;
+    if ( zm_sv_bot_debug.GetBool() && ( !m_NextDebugLog.HasStarted() || m_NextDebugLog.IsElapsed() ) )
+    {
+        bDebugThisTick = true;
+        m_NextDebugLog.Start( 3.0f );
+    }
+
     // If the bot was told to stay put, don't follow anyone
     if ( pOuter->IsStayingPut() )
     {
-        if ( zm_sv_bot_debug.GetBool() )
+        if ( bDebugThisTick )
             Msg( "[Bot %s] Staying put - skipping behavior update\n", pOuter->GetPlayerName() );
         m_hFollowTarget.Set( nullptr );
         m_Path.Invalidate();
@@ -241,7 +249,7 @@ void CSurvivorFollowSchedule::OnUpdate()
     auto* pExplicitFollow = pOuter->GetFollowTarget();
     if ( pExplicitFollow && IsValidFollowTarget( pExplicitFollow, true ) )
     {
-        if ( zm_sv_bot_debug.GetBool() )
+        if ( bDebugThisTick )
             Msg( "[Bot %s] Explicit follow target: %s\n", pOuter->GetPlayerName(), pExplicitFollow->GetPlayerName() );
 
         if ( !ShouldMoveCloser( pExplicitFollow ) )
@@ -265,7 +273,7 @@ void CSurvivorFollowSchedule::OnUpdate()
     // Voice command override takes priority over default behavior
     int effectiveBehavior = ( pOuter->GetBehaviorOverride() >= 0 ) ? pOuter->GetBehaviorOverride() : behavior;
 
-    if ( zm_sv_bot_debug.GetBool() )
+    if ( bDebugThisTick )
         Msg( "[Bot %s] Behavior: convar=%i override=%i effective=%i\n",
             pOuter->GetPlayerName(), behavior, pOuter->GetBehaviorOverride(), effectiveBehavior );
 
@@ -594,7 +602,7 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
             pStart = TheNavMesh->GetNearestNavArea( pOuter->GetAbsOrigin(), true, 512.0f, false );
             if ( !pStart )
             {
-                if ( zm_sv_bot_debug.GetBool() )
+                if ( zm_sv_bot_debug.GetBool() && m_NextDebugLog.HasStarted() && m_NextDebugLog.GetRemainingTime() > 2.5f )
                     Msg( "[Bot %s] Explore: no nav area found near bot position!\n", pOuter->GetPlayerName() );
                 return;
             }
@@ -888,15 +896,14 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
         }
     }
 
+    // Throttle debug output (shares timer with OnUpdate)
+    bool bDebug = zm_sv_bot_debug.GetBool() && m_NextDebugLog.HasStarted() && m_NextDebugLog.GetRemainingTime() > 2.5f;
+
     // Fully loaded - nothing to pick up at all
     if ( !bNeedMainGun && !bNeedSidearm && !bNeedMelee && !bNeedGrenade && !bNeedAmmo )
-    {
-        if ( zm_sv_bot_debug.GetBool() )
-            Msg( "[Bot %s] TryPickup: fully loaded, nothing needed\n", pOuter->GetPlayerName() );
         return;
-    }
 
-    if ( zm_sv_bot_debug.GetBool() )
+    if ( bDebug )
         Msg( "[Bot %s] TryPickup: need main=%i side=%i melee=%i nade=%i ammo=%i (ammoType=%i)\n",
             pOuter->GetPlayerName(), bNeedMainGun, bNeedSidearm, bNeedMelee, bNeedGrenade, bNeedAmmo, iNeededAmmoType );
 
@@ -1014,26 +1021,26 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
 
     if ( !pBestWeapon )
     {
-        if ( zm_sv_bot_debug.GetBool() )
+        if ( bDebug )
             Msg( "[Bot %s] TryPickup: nothing found in range %.0f\n", pOuter->GetPlayerName(), flSearchRange );
         return;
     }
 
-    if ( zm_sv_bot_debug.GetBool() )
+    if ( bDebug )
         Msg( "[Bot %s] TryPickup: found '%s' at dist=%.0f priority=%i\n",
             pOuter->GetPlayerName(), pBestWeapon->GetClassname(), myPos.DistTo( pBestWeapon->GetAbsOrigin() ), nBestPriority );
 
     float flPickupDist = myPos.DistTo( pBestWeapon->GetAbsOrigin() );
     if ( flPickupDist < 64.0f )
     {
-        if ( zm_sv_bot_debug.GetBool() )
+        if ( bDebug )
             Msg( "[Bot %s] TryPickup: close enough, pressing USE on '%s'\n", pOuter->GetPlayerName(), pBestWeapon->GetClassname() );
         pOuter->GetMotor()->FaceTowards( pBestWeapon->GetAbsOrigin() );
         pOuter->PressUse( 0.15f );
     }
     else
     {
-        if ( zm_sv_bot_debug.GetBool() )
+        if ( bDebug )
             Msg( "[Bot %s] TryPickup: walking to '%s' (%.0f units away)\n", pOuter->GetPlayerName(), pBestWeapon->GetClassname(), flPickupDist );
         // Save current position so we can return after picking up the item
         m_vecPreScavengePos = myPos;

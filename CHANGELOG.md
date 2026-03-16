@@ -50,6 +50,7 @@ The AI globally tracks all zombie spawners and traps on the map, activates them 
 | `zm_sv_ai_zm_stall_timeout` | `12.0` | Seconds before abandoning a plan that can't execute |
 | `zm_sv_ai_zm_rally_interval` | `6.0` | Seconds between idle zombie rally commands |
 | `zm_sv_ai_zm_rally_buffer` | `256.0` | Distance buffer for splitting zombie targets between survivors |
+| `zm_sv_ai_zm_rush_prevention` | `15.0` | Seconds at round start before the AI ZM can spawn, trigger traps, or use abilities. Does not affect human ZMs |
 
 ---
 
@@ -147,7 +148,7 @@ When the **Enable Per-Zombie-Type Limits** option is checked, each special zombi
 
 ## Random Starting Weapons
 
-Give all survivors a random weapon at the start of each round. This weapon is given **in addition to** any weapon the map loadout provides. The **Secondary** option gives only pistol-type weapons. The **Any** option picks randomly from Melee, Secondary, or Primary categories.
+Give all survivors a random weapon at the start of each round if the map loadout doesn't already provide one. The **Secondary** option gives only pistol-type weapons. The **Any** option picks randomly from Melee, Secondary, or Primary categories.
 
 | ConVar | Default | Description |
 |--------|---------|-------------|

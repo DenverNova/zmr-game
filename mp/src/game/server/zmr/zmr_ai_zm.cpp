@@ -34,6 +34,7 @@ ConVar zm_sv_ai_zm_rally_buffer( "zm_sv_ai_zm_rally_buffer", "256.0", FCVAR_NOTI
 ConVar zm_sv_ai_zm_trap_cooldown( "zm_sv_ai_zm_trap_cooldown", "30.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Per-trap cooldown in seconds before the AI ZM can re-use the same trap." );
 ConVar zm_sv_ai_zm_hidden_max( "zm_sv_ai_zm_hidden_max", "5", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Max hidden spawns per 2-minute window." );
 ConVar zm_sv_ai_zm_plan_pause( "zm_sv_ai_zm_plan_pause", "8.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Seconds to pause between completing one plan and starting the next." );
+ConVar zm_sv_ai_zm_rush_prevention( "zm_sv_ai_zm_rush_prevention", "15.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Seconds at round start before the AI ZM can spawn, trigger traps, or use abilities. Does not affect human ZMs." );
 
 CZMAIZombieMaster g_ZMAIZombieMaster;
 
@@ -818,6 +819,11 @@ void CZMAIZombieMaster::Update()
         Msg( "[AI ZM] Update: ZM='%s' res=%i planStep=%i/%i trapReady=%.1f curtime=%.1f\n",
             pZM->GetPlayerName(), pZM->GetResources(),
             m_iPlanStep, m_Plan.Count(), m_flNextTrapTime, gpGlobals->curtime );
+
+    // Rush prevention: don't do anything for the first N seconds of a round
+    float flRushTime = zm_sv_ai_zm_rush_prevention.GetFloat();
+    if ( flRushTime > 0.0f && gpGlobals->curtime < flRushTime )
+        return;
 
     // Build first plan if we don't have one
     if ( m_Plan.Count() == 0 )
