@@ -1094,38 +1094,24 @@ void CZMPlayer::GiveDefaultItems()
         }
     }
 
-    // Random starting weapon - only give if loadout didn't provide anything beyond fists
+    // Random starting weapon - give to all survivors based on ConVar category
     int startWepType = zm_sv_random_start_weapon.GetInt();
     if ( startWepType > 0 )
     {
-        bool bHasRealWeapon = false;
-        for ( int i = 0; i < MAX_WEAPONS; i++ )
+        const char* wepClass = PickRandomStartWeapon( startWepType );
+        Msg( "[StartWep] Player '%s' type=%i picked='%s'\n", GetPlayerName(), startWepType, wepClass ? wepClass : "NULL" );
+        if ( wepClass )
         {
-            CBaseCombatWeapon* pCheck = GetWeapon( i );
-            if ( !pCheck ) continue;
-            if ( FClassnameIs( pCheck, "weapon_zm_fistscarry" ) ) continue;
-            bHasRealWeapon = true;
-            DevMsg( "[StartWep] Player '%s' already has '%s' from loadout, skipping random weapon\n", GetPlayerName(), pCheck->GetClassname() );
-            break;
-        }
+            GiveNamedItem( wepClass );
 
-        if ( !bHasRealWeapon )
-        {
-            const char* wepClass = PickRandomStartWeapon( startWepType );
-            DevMsg( "[StartWep] Player '%s' type=%i picked='%s'\n", GetPlayerName(), startWepType, wepClass ? wepClass : "NULL" );
-            if ( wepClass )
+            const char* ammoName = GetAmmoNameForWeapon( wepClass );
+            if ( ammoName )
             {
-                GiveNamedItem( wepClass );
-
-                const char* ammoName = GetAmmoNameForWeapon( wepClass );
-                if ( ammoName )
+                int ammoIndex = GetAmmoDef()->Index( ammoName );
+                if ( ammoIndex >= 0 )
                 {
-                    int ammoIndex = GetAmmoDef()->Index( ammoName );
-                    if ( ammoIndex >= 0 )
-                    {
-                        int maxAmmo = GetAmmoDef()->MaxCarry( ammoIndex );
-                        CBasePlayer::GiveAmmo( maxAmmo, ammoIndex );
-                    }
+                    int maxAmmo = GetAmmoDef()->MaxCarry( ammoIndex );
+                    CBasePlayer::GiveAmmo( maxAmmo, ammoIndex );
                 }
             }
         }

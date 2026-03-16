@@ -88,6 +88,7 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 | `zm_sv_bot_taunt_chance` | `8` | Percent chance for bots to play taunt sounds |
 | `zm_sv_bot_possess` | `1` | Allow spectators to possess bots with USE key |
 | `zm_sv_bot_weapon_search_range` | `1024` | How far bots search for weapons and ammo (units) |
+| `zm_sv_bot_debug` | `0` | Enable AI survivor bot debug logging (cheat-protected). Logs behavior mode, weapon scanning, scavenging, and mixed mode assignment |
 
 ---
 
@@ -146,7 +147,7 @@ When the **Enable Per-Zombie-Type Limits** option is checked, each special zombi
 
 ## Random Starting Weapons
 
-Give all survivors a random weapon at the start of each round. The **Secondary** option gives only pistol-type weapons. The **Any** option always gives something (nobody spawns empty-handed unless the map loadout already provides a weapon).
+Give all survivors a random weapon at the start of each round. This weapon is given **in addition to** any weapon the map loadout provides. The **Secondary** option gives only pistol-type weapons. The **Any** option picks randomly from Melee, Secondary, or Primary categories.
 
 | ConVar | Default | Description |
 |--------|---------|-------------|
@@ -185,7 +186,7 @@ When a human player is the Zombie Master, zombie kills now display the ZM player
 
 ## Mixed Mode (Bot Behavior)
 
-The "Mixed Mode" bot behavior option (value 3) randomly assigns each bot one of three behaviors at spawn: Follow a player, Explore the map, or Defend the spawn area. This creates more varied and realistic bot movement patterns.
+The "Mixed Mode" bot behavior option (value 3) randomly assigns each bot one of three real behaviors at spawn: Follow a player, Explore the map, or Defend the spawn area. Each bot goes through the same code paths as the dedicated behavior modes, so Follow bots properly follow, Explore bots properly roam, and Defend bots properly hold position. Bots use movement hysteresis to avoid jittering in place when near their follow target.
 
 ---
 

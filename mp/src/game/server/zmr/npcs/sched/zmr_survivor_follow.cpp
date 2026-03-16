@@ -13,7 +13,7 @@
 extern ConVar zm_sv_bot_default_behavior;
 extern ConVar zm_sv_bot_weapon_search_range;
 
-static ConVar zm_sv_bot_debug( "zm_sv_bot_debug", "0", FCVAR_CHEAT, "Enable AI survivor bot debug logging. 0=off, 1=on." );
+ConVar zm_sv_bot_debug( "zm_sv_bot_debug", "0", FCVAR_CHEAT, "Enable AI survivor bot debug logging. 0=off, 1=on." );
 
 
 CSurvivorFollowSchedule::CSurvivorFollowSchedule()
@@ -244,12 +244,18 @@ void CSurvivorFollowSchedule::OnUpdate()
         if ( zm_sv_bot_debug.GetBool() )
             Msg( "[Bot %s] Explicit follow target: %s\n", pOuter->GetPlayerName(), pExplicitFollow->GetPlayerName() );
 
+        if ( !ShouldMoveCloser( pExplicitFollow ) )
+        {
+            m_Path.Invalidate();
+            return;
+        }
+
         // Follow the explicit target
         if ( m_hFollowTarget.Get() != pExplicitFollow || !m_Path.IsValid() )
             StartFollow( pExplicitFollow );
 
         bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
-        if ( m_Path.IsValid() && !bBusy && ShouldMoveCloser( pExplicitFollow ) )
+        if ( m_Path.IsValid() && !bBusy )
         {
             m_Path.Update( pOuter, pExplicitFollow, m_PathCost );
         }
@@ -315,9 +321,18 @@ void CSurvivorFollowSchedule::OnUpdate()
         return;
     }
 
+    if ( !ShouldMoveCloser( pFollow ) )
+    {
+        m_Path.Invalidate();
+        return;
+    }
+
+    if ( !m_Path.IsValid() )
+        StartFollow( pFollow );
+
     bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
 
-    if ( m_Path.IsValid() && pFollow && !bBusy && ShouldMoveCloser( pFollow ) )
+    if ( m_Path.IsValid() && !bBusy )
     {
         m_Path.Update( pOuter, pFollow, m_PathCost );
     }
@@ -471,7 +486,7 @@ void CSurvivorFollowSchedule::StartFollow( CBasePlayer* pFollow )
     m_vecFormationOffset.x = -flBackSpread;
     m_vecFormationOffset.y = flSide * flSideSpread;
 
-    m_Path.SetGoalTolerance( 32.0f );
+    m_Path.SetGoalTolerance( 128.0f );
     m_Path.Compute( pOuter, pFollow, m_PathCost );
 }
 
@@ -481,7 +496,13 @@ bool CSurvivorFollowSchedule::ShouldMoveCloser( CBasePlayer* pFollow ) const
 
     float flDistSqr = pOuter->GetAbsOrigin().DistToSqr( pFollow->GetAbsOrigin() );
 
-    return ( flDistSqr > (160.0f * 160.0f) );
+    // Hysteresis: start moving when far, stop when close
+    // If we're already moving (path valid), keep going until 128 units
+    // If we're stopped (no path), don't start until 256 units
+    if ( m_Path.IsValid() )
+        return ( flDistSqr > (128.0f * 128.0f) );
+    else
+        return ( flDistSqr > (256.0f * 256.0f) );
 }
 
 CBasePlayer* CSurvivorFollowSchedule::FindSurvivorToFollow( CBasePlayer* pIgnore, bool bAllowBot ) const
