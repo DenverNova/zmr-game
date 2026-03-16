@@ -102,6 +102,14 @@ CON_COMMAND( zm_hiddenspawn, "" )
     }
 }
 
+CON_COMMAND( zm_physexp, "Shortcut to switch to explosion placement mode." )
+{
+    if ( g_pZMView && CZMViewBase::UsesZMView() )
+    {
+        g_pZMView->SetClickMode( ZMCLICKMODE_PHYSEXP );
+    }
+}
+
 CON_COMMAND( zm_cmd_select_radius, "Selects zombies in a radius." )
 {
     if ( !g_pZMView || !CZMViewBase::UsesZMView() )

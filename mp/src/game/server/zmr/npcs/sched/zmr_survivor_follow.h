@@ -79,6 +79,10 @@ private:
     bool m_bScavenging;                // Currently walking to pick up a weapon/ammo
     Vector m_vecPreScavengePos;        // Position to return to after scavenging
     EHANDLE m_hScavengeTarget;         // Entity we're walking toward
+    int m_nScavengeStuckCount;         // Consecutive frames not making progress toward scavenge target
+    float m_flLastScavengeDist;        // Distance to scavenge target on previous check
+    CUtlVector<EHANDLE> m_BlacklistedItems; // Items we failed to reach - skip them for a while
+    CountdownTimer m_BlacklistClearTimer;   // Periodically clear the blacklist
 
     // Explore mode idle pauses and look scanning
     CountdownTimer m_ExploreIdlePause;     // Timer for standing still and looking around
@@ -86,6 +90,13 @@ private:
     float m_flExploreScanPitch;            // Target pitch for natural scanning while moving
     float m_flExploreScanYawOffset;        // Yaw offset for scanning while moving
     bool m_bExploreIdling;                 // Currently in an idle pause
+
+    // Defend mode look-around
+    CountdownTimer m_DefendLookTimer;      // Timer for periodic look direction changes in defend mode
+    float m_flDefendLookYaw;               // Target yaw for defend mode scanning
+
+    // Position deconfliction
+    CountdownTimer m_NextDeconflict;       // Periodic check to avoid stacking on other bots
 
     // Debug log throttle
     CountdownTimer m_NextDebugLog;         // Throttle debug output to every few seconds
