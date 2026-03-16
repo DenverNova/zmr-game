@@ -89,7 +89,7 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 | `zm_sv_bot_taunt_chance` | `8` | Percent chance for bots to play taunt sounds |
 | `zm_sv_bot_possess` | `1` | Allow spectators to possess bots with USE key |
 | `zm_sv_bot_weapon_search_range` | `1024` | How far bots search for weapons and ammo (units) |
-| `zm_sv_bot_debug` | `0` | Enable AI survivor bot debug logging (cheat-protected). Logs behavior mode, weapon scanning, scavenging, and mixed mode assignment |
+| `zm_sv_bot_debug` | `0` | Enable detailed bot debug logging (cheat-protected). Dumps full inventory with ammo counts, active weapon, scavenge/path state, and behavior decisions every 5 seconds per bot. Also logs weapon equip choices at spawn |
 
 ---
 
