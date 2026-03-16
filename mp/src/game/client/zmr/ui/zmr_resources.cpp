@@ -17,6 +17,8 @@
 
 using namespace vgui;
 
+extern ConVar zm_cl_ui_scale;
+
 
 enum// Icon
 { 
@@ -131,7 +133,11 @@ void CZMResourceHud::VidInit()
 
 void CZMResourceHud::Reposition()
 {
-    SetPos( 0, ScreenHeight() - GetTall() );
+    float scale = zm_cl_ui_scale.GetFloat();
+    int w = (int)( 140 * scale );
+    int h = (int)( 140 * scale );
+    SetSize( w, h );
+    SetPos( 0, ScreenHeight() - h );
 }
 
 void CZMResourceHud::OnThink()
@@ -143,6 +149,8 @@ void CZMResourceHud::OnThink()
     SetVisible( pPlayer->IsZM() );
 
     if ( !IsVisible() ) return;
+
+    Reposition();
 
 
 
@@ -172,18 +180,29 @@ void CZMResourceHud::PaintBg()
 
 void CZMResourceHud::Paint()
 {
-    PaintBg();
+    float scale = zm_cl_ui_scale.GetFloat();
 
+    VMatrix matScale;
+    MatrixBuildScale( matScale, scale, scale, 1.0f );
+    vgui::surface()->PushMakeCurrent( GetVPanel(), true );
+
+    // Draw at base 140x140 coordinates, the panel size handles clipping
+    int baseW = 140, baseH = 140;
+
+    // Background
+    vgui::surface()->DrawSetColor( m_BgColor );
+    surface()->DrawSetTexture( m_nTexBgId );
+    surface()->DrawTexturedRect( 0, 0, baseW, baseH );
 
     static wchar_t text[32];
     int w, h;
 
-    const int offsety = 45;
+    const int offsety = (int)( 45 * scale );
     
     _snwprintf( text, ARRAYSIZE(text) - 1, L"%i", m_nResCount );
 
 	surface()->DrawSetTextFont( m_hLargeFont );
-	surface()->DrawSetTextPos( 60, offsety + 0 );
+	surface()->DrawSetTextPos( (int)( 60 * scale ), offsety + 0 );
 	surface()->DrawSetTextColor( m_FgColor );
 	surface()->DrawPrintText( text, wcslen( text ) );
 
@@ -196,7 +215,7 @@ void CZMResourceHud::Paint()
     surface()->GetTextSize( m_hMediumFont, text, w2, h );
 
 	surface()->DrawSetTextFont( m_hMediumFont );
-	surface()->DrawSetTextPos( 112 - w2, offsety + 27 );
+	surface()->DrawSetTextPos( (int)( 112 * scale ) - w2, offsety + (int)( 27 * scale ) );
 	surface()->DrawSetTextColor( m_FgColor );
 	surface()->DrawPrintText( text, wcslen( text ) );
 
@@ -209,28 +228,26 @@ void CZMResourceHud::Paint()
 
 
 	surface()->DrawSetTextFont( m_hMediumFont );
-	surface()->DrawSetTextPos( 50, offsety + 53 );
+	surface()->DrawSetTextPos( (int)( 50 * scale ), offsety + (int)( 53 * scale ) );
 	surface()->DrawSetTextColor( m_FgColor );
 	surface()->DrawPrintText( text, wcslen( text ) );
     
 
 
-    int x = 17;
+    int x = (int)( 17 * scale );
     int y = offsety + 0;
     for ( int i = 0; i < NUM_ICONS; i++ )
     {
         if ( m_pIcons[i] )
         {
-            //when we get better/larger icons than the current 32x32 ones, replace Width/Height calls with hardcoded 32 size
-            w = (int)m_pIcons[i]->Width();
-            h = (int)m_pIcons[i]->Height();
+            w = (int)( m_pIcons[i]->Width() * scale );
+            h = (int)( m_pIcons[i]->Height() * scale );
 
-            //can't avoid some icon-specific positioning
-            int indent = 2;
+            int indent = (int)( 2 * scale );
             switch ( i )
             {
                 case ICON_ZEDS:
-                    indent = 10;
+                    indent = (int)( 10 * scale );
                     break;
                 default:
                     break;
@@ -238,8 +255,9 @@ void CZMResourceHud::Paint()
 
             m_pIcons[i]->DrawSelf( x + indent, y, w, h, m_FgColor );
 
-            //for now just assume we move down
-            y += h + 25;
+            y += h + (int)( 25 * scale );
         }
     }
+
+    vgui::surface()->PopMakeCurrent( GetVPanel() );
 }
