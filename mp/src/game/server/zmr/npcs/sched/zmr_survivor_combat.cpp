@@ -77,9 +77,11 @@ void CSurvivorCombatSchedule::OnUpdate()
         {
             m_hLastCombatTarget.Set( pClosestEnemy );
 
+            float flDist = pClosestEnemy->GetAbsOrigin().DistTo( pOuter->GetPosition() );
+
             if ( pOuter->HasAnyEffectiveRangeWeapons() )
             {
-                if ( pClosestEnemy->GetAbsOrigin().DistTo( pOuter->GetPosition() ) > 400.0f )
+                if ( flDist > 400.0f )
                 {
                     m_pAttackLongRangeSched->SetAttackTarget( pClosestEnemy );
                     Intercept( m_pAttackLongRangeSched, "Trying to attack long range!" );
@@ -92,11 +94,13 @@ void CSurvivorCombatSchedule::OnUpdate()
                     Intercept( m_pAttackCloseRangeSched, "Trying to attack close range!" );
                 }
             }
-            else if ( pClosestEnemy->GetAbsOrigin().DistTo( pOuter->GetPosition() ) < 160.0f )
+
+            // Melee fallback: engage with fists/melee if no ranged weapons or enemy is close
+            if ( !IsIntercepted() && flDist < 512.0f )
             {
                 m_pAttackCloseRangeSched->SetAttackTarget( pClosestEnemy );
                 m_pAttackCloseRangeSched->SetMeleeing( true );
-                Intercept( m_pAttackCloseRangeSched, "Trying to attack close range with melee!" );
+                Intercept( m_pAttackCloseRangeSched, "Trying to attack with melee!" );
             }
 
             if ( IsIntercepted() )

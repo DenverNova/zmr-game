@@ -3,6 +3,7 @@
 #include "zmr_player.h"
 #include "zmr_entities.h"
 #include "utlvector.h"
+#include "utlmap.h"
 
 //
 // AI Zombie Master - Server-side tactical controller that manages zombie spawning,
@@ -44,6 +45,9 @@ private:
 
     // Hidden spawn - occasionally place a zombie behind survivors
     void TryHiddenSpawn( CZMPlayer* pZM );
+
+    // Explosive barrel opportunism - detonate barrels near survivors
+    void TryDetonateBarrel( CZMPlayer* pZM );
 
     // Spawning helpers
     bool TrySpawnZombies( ZombieClass_t zclass, int count, CZMEntZombieSpawn* pSpawner );
@@ -87,6 +91,19 @@ private:
     float m_flNextHiddenSpawnTime;
     float m_flLastUpdateTime;
     bool  m_bLoggedSpawners;
+
+    // Post-plan cooldown: pause between finishing one plan and starting the next
+    float m_flPlanCooldownUntil;
+
+    // Per-trap cooldown: tracks last trigger time by entity index
+    CUtlMap<int, float> m_TrapCooldowns;
+
+    // Hidden spawn rate limiting: max N per time window
+    int   m_nHiddenSpawnsThisWindow;
+    float m_flHiddenSpawnWindowStart;
+
+    // Explosive barrel detonation cooldown
+    float m_flNextBarrelDetonateTime;
 };
 
 extern CZMAIZombieMaster g_ZMAIZombieMaster;

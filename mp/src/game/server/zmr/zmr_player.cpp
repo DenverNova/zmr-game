@@ -27,6 +27,7 @@
 #include "zmr_ammodef.h"
 #include "zmr_resource_system.h"
 #include "npcs/zmr_playerbot.h"
+#include "zmr_voicelines.h"
 #include "zmr_player.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -152,6 +153,8 @@ CZMPlayer::CZMPlayer()
     m_flInterpNPCTime = 0.0f;
     m_ServerWepData.Reset();
     m_hContinuousUseEntity.Set( nullptr );
+    m_flHoldUseStartTime = 0.0f;
+    m_bHoldUseConsumed = false;
 
 
     BaseClass::ChangeTeam( 0 );
@@ -1032,6 +1035,41 @@ int CZMPlayer::GiveAmmo( int nCount, int nAmmoIndex, bool bSuppressSound )
     return nAdd;
 }
 
+static ConVar zm_sv_random_start_weapon( "zm_sv_random_start_weapon", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE,
+    "Give all survivors a random starting weapon. 0=None, 1=Melee, 2=Secondary, 3=Primary, 4=Any" );
+
+static const char* PickRandomStartWeapon( int type )
+{
+    static const char* s_Melee[] = { "weapon_zm_improvised", "weapon_zm_sledge", "weapon_zm_fireaxe" };
+    static const char* s_Secondary[] = { "weapon_zm_pistol", "weapon_zm_revolver" };
+    static const char* s_Primary[] = { "weapon_zm_shotgun", "weapon_zm_shotgun_sporting", "weapon_zm_rifle", "weapon_zm_mac10", "weapon_zm_r700" };
+
+    switch ( type )
+    {
+    case 1: return s_Melee[ random->RandomInt( 0, ARRAYSIZE( s_Melee ) - 1 ) ];
+    case 2: return s_Secondary[ random->RandomInt( 0, ARRAYSIZE( s_Secondary ) - 1 ) ];
+    case 3: return s_Primary[ random->RandomInt( 0, ARRAYSIZE( s_Primary ) - 1 ) ];
+    case 4:
+    {
+        int cat = random->RandomInt( 1, 3 );
+        return PickRandomStartWeapon( cat );
+    }
+    default: return nullptr;
+    }
+}
+
+static const char* GetAmmoNameForWeapon( const char* wep )
+{
+    if ( !wep ) return nullptr;
+    const char* name = wep + sizeof( "weapon_zm_" ) - 1;
+    if ( FStrEq( name, "pistol" ) ) return "Pistol";
+    if ( FStrEq( name, "revolver" ) ) return "Revolver";
+    if ( FStrEq( name, "shotgun" ) || FStrEq( name, "shotgun_sporting" ) ) return "Buckshot";
+    if ( FStrEq( name, "rifle" ) || FStrEq( name, "r700" ) ) return "357";
+    if ( FStrEq( name, "mac10" ) ) return "SMG1";
+    return nullptr;
+}
+
 void CZMPlayer::GiveDefaultItems()
 {
     RemoveAllItems( false );
@@ -1053,6 +1091,41 @@ void CZMPlayer::GiveDefaultItems()
         if ( pLoadout )
         {
             pLoadout->DistributeToPlayer( this );
+        }
+    }
+
+    // Random starting weapon - only give if loadout didn't provide anything beyond fists
+    int startWepType = zm_sv_random_start_weapon.GetInt();
+    if ( startWepType > 0 )
+    {
+        bool bHasRealWeapon = false;
+        for ( int i = 0; i < MAX_WEAPONS; i++ )
+        {
+            CBaseCombatWeapon* pCheck = GetWeapon( i );
+            if ( !pCheck ) continue;
+            if ( FClassnameIs( pCheck, "weapon_zm_fistscarry" ) ) continue;
+            bHasRealWeapon = true;
+            break;
+        }
+
+        if ( !bHasRealWeapon )
+        {
+            const char* wepClass = PickRandomStartWeapon( startWepType );
+            if ( wepClass )
+            {
+                GiveNamedItem( wepClass );
+
+                const char* ammoName = GetAmmoNameForWeapon( wepClass );
+                if ( ammoName )
+                {
+                    int ammoIndex = GetAmmoDef()->Index( ammoName );
+                    if ( ammoIndex >= 0 )
+                    {
+                        int maxAmmo = GetAmmoDef()->MaxCarry( ammoIndex );
+                        CBasePlayer::GiveAmmo( maxAmmo, ammoIndex );
+                    }
+                }
+            }
         }
     }
 
@@ -2065,9 +2138,112 @@ void CZMPlayer::PlayerUse()
 	if ( !bPressedUse && !bReleasedUse && !bHoldingUse )
 		return;
 
-	// Check if pressing E while looking at an AI bot - toggle follow/stay
+	// Track hold E timing for bot commands
 	if ( bPressedUse )
 	{
+		m_flHoldUseStartTime = gpGlobals->curtime;
+		m_bHoldUseConsumed = false;
+	}
+
+	// Hold E for 1 second: command bots to defend location or grab object
+	if ( bHoldingUse && m_flHoldUseStartTime > 0.0f && !m_bHoldUseConsumed &&
+		 (gpGlobals->curtime - m_flHoldUseStartTime) >= 1.0f )
+	{
+		m_bHoldUseConsumed = true;
+
+		Vector eyePos = EyePosition();
+		Vector fwd;
+		AngleVectors( EyeAngles(), &fwd );
+
+		trace_t tr;
+		UTIL_TraceLine( eyePos, eyePos + fwd * 2048.0f, MASK_SOLID, this, COLLISION_GROUP_NONE, &tr );
+
+		if ( tr.fraction < 1.0f )
+		{
+			CBaseEntity* pHitEnt = tr.m_pEnt;
+			bool bHandled = false;
+
+			// Check if we hit a grabbable physics object
+			if ( pHitEnt && !pHitEnt->IsWorld() )
+			{
+				IPhysicsObject* pPhys = pHitEnt->VPhysicsGetObject();
+				if ( pPhys && pPhys->IsMoveable() && !pPhys->IsAttachedToConstraint(false) )
+				{
+					// Find the closest following bot to send to grab it
+					CZMPlayerBot* pClosestBot = nullptr;
+					float flClosestDist = FLT_MAX;
+
+					for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+					{
+						CBasePlayer* pOther = UTIL_PlayerByIndex( i );
+						if ( !pOther || !pOther->IsBot() || !pOther->IsAlive() )
+							continue;
+						if ( pOther->GetTeamNumber() != ZMTEAM_HUMAN )
+							continue;
+
+						CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pOther );
+						if ( !pBot || pBot->GetFollowTarget() != this )
+							continue;
+
+						float dist = pBot->GetAbsOrigin().DistToSqr( pHitEnt->GetAbsOrigin() );
+						if ( dist < flClosestDist )
+						{
+							flClosestDist = dist;
+							pClosestBot = pBot;
+						}
+					}
+
+					if ( pClosestBot )
+					{
+						pClosestBot->SetCommandedGrabTarget( pHitEnt );
+						ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Grabbing object", pClosestBot->GetPlayerName() ) );
+						ZMGetVoiceLines()->OnVoiceLine( pClosestBot, 0 );
+						bHandled = true;
+					}
+				}
+			}
+
+			// If we didn't hit a grabbable object, check for navigable ground
+			if ( !bHandled )
+			{
+				Vector vecHitPos = tr.endpos;
+				CNavArea* pNavArea = TheNavMesh->GetNearestNavArea( vecHitPos, true, 256.0f, false );
+
+				if ( pNavArea )
+				{
+					int nCommanded = 0;
+					for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+					{
+						CBasePlayer* pOther = UTIL_PlayerByIndex( i );
+						if ( !pOther || !pOther->IsBot() || !pOther->IsAlive() )
+							continue;
+						if ( pOther->GetTeamNumber() != ZMTEAM_HUMAN )
+							continue;
+
+						CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pOther );
+						if ( !pBot || pBot->GetFollowTarget() != this )
+							continue;
+
+						pBot->SetFollowTarget( nullptr );
+						pBot->SetCommandedDefendPos( vecHitPos );
+						pBot->SetBehaviorOverride( 2 ); // Defend
+						ZMGetVoiceLines()->OnVoiceLine( pBot, 0 );
+						nCommanded++;
+					}
+
+					if ( nCommanded > 0 )
+						ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%d bot(s): Defending position", nCommanded ) );
+				}
+			}
+		}
+		return;
+	}
+
+	// Release E: if it was a quick tap (< 1s) and not consumed by hold, check for bot toggle
+	if ( bReleasedUse && m_flHoldUseStartTime > 0.0f && !m_bHoldUseConsumed )
+	{
+		m_flHoldUseStartTime = 0.0f;
+
 		Vector eyePos = EyePosition();
 		Vector fwd;
 		AngleVectors( EyeAngles(), &fwd );
@@ -2098,23 +2274,44 @@ void CZMPlayer::PlayerUse()
 
 		if ( pBestBot )
 		{
-			// Bot is considered "following" if not explicitly told to stay put.
-			// This covers both explicit SetFollowTarget and default-behavior auto-follow.
+			// If we're holding an object, hand it to the bot instead of toggling follow
+			CZMWeaponHands* pHands = dynamic_cast<CZMWeaponHands*>( GetActiveWeapon() );
+			if ( pHands && pHands->IsCarryingObject() )
+			{
+				CBaseEntity* pHeld = pHands->GetHeldObject();
+				if ( pHeld )
+				{
+					pHands->DetachObject();
+					pBestBot->SetCommandedGrabTarget( pHeld );
+					ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Taking object", pBestBot->GetPlayerName() ) );
+					ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
+					return;
+				}
+			}
+
 			bool bIsFollowing = !pBestBot->IsStayingPut();
 			if ( bIsFollowing )
 			{
 				pBestBot->SetFollowTarget( nullptr );
 				pBestBot->SetStayPut( true );
+				pBestBot->ClearCommandedDefendPos();
 				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Staying", pBestBot->GetPlayerName() ) );
+				ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
 			}
 			else
 			{
 				pBestBot->SetFollowTarget( this );
+				pBestBot->ClearCommandedDefendPos();
+				pBestBot->SetBehaviorOverride( -1 );
 				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Following", pBestBot->GetPlayerName() ) );
+				ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
 			}
 			return;
 		}
 	}
+
+	if ( bReleasedUse )
+		m_flHoldUseStartTime = 0.0f;
 
 	if ( bPressedUse )
 	{

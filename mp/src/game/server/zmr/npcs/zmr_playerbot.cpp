@@ -64,6 +64,10 @@ CZMPlayerBot::CZMPlayerBot()
     m_hFollowTarget.Set( nullptr );
     m_flNextObstacleCheck = 0.0f;
     m_bStayPut = false;
+    m_iBehaviorOverride = -1;
+    m_vecCommandedDefendPos = vec3_origin;
+    m_bHasCommandedDefendPos = false;
+    m_hCommandedGrabTarget.Set( nullptr );
 }
 
 CZMPlayerBot::~CZMPlayerBot()
@@ -86,6 +90,18 @@ bool CZMPlayerBot::ShouldUpdate() const
         return false;
 
     return CBaseNPC::ShouldUpdate();
+}
+
+bool CZMPlayerBot::IsEnemy( CBaseEntity* pEnt ) const
+{
+    if ( !pEnt || !pEnt->IsAlive() )
+        return false;
+
+    // All zombies (NPCs) are enemies to survivor bots
+    if ( pEnt->IsNPC() )
+        return true;
+
+    return false;
 }
 
 static const char* PickBotName( bool bFemale );
@@ -138,33 +154,36 @@ static const char* g_szBotNamesFemale[] =
 
 ConVar zm_sv_bot_default_behavior( "zm_sv_bot_default_behavior", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI Survivor default behavior. 0=Follow Random, 1=Explore, 2=Defend Spawn, 3=Mixed Mode" );
 ConVar zm_sv_bot_weapon_search_range( "zm_sv_bot_weapon_search_range", "1024", FCVAR_NOTIFY | FCVAR_ARCHIVE, "How far AI survivors search for weapons and ammo (units)." );
-ConVar zm_sv_bot_help_range( "zm_sv_bot_help_range", "1024", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Range for Help voice command to call AI survivors." );
+ConVar zm_sv_bot_command_range( "zm_sv_bot_command_range", "1024", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Range for voice commands to affect AI survivors." );
 ConVar zm_sv_bot_taunt_chance( "zm_sv_bot_taunt_chance", "8", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Percent chance for AI survivor to taunt after a kill (0=never)." );
 
 static int g_nBotNameIndexMale = 0;
 static int g_nBotNameIndexFemale = 0;
 
+static char g_szBotNameBuf[128];
+
 static const char* PickBotName( bool bFemale )
 {
+    const char* baseName;
     if ( bFemale )
     {
         int count = ARRAYSIZE( g_szBotNamesFemale );
-        // Shuffle starting point
         if ( g_nBotNameIndexFemale == 0 )
             g_nBotNameIndexFemale = RandomInt( 0, count - 1 );
-        const char* name = g_szBotNamesFemale[ g_nBotNameIndexFemale % count ];
+        baseName = g_szBotNamesFemale[ g_nBotNameIndexFemale % count ];
         g_nBotNameIndexFemale++;
-        return name;
     }
     else
     {
         int count = ARRAYSIZE( g_szBotNamesMale );
         if ( g_nBotNameIndexMale == 0 )
             g_nBotNameIndexMale = RandomInt( 0, count - 1 );
-        const char* name = g_szBotNamesMale[ g_nBotNameIndexMale % count ];
+        baseName = g_szBotNamesMale[ g_nBotNameIndexMale % count ];
         g_nBotNameIndexMale++;
-        return name;
     }
+
+    Q_snprintf( g_szBotNameBuf, sizeof( g_szBotNameBuf ), "%s (Bot)", baseName );
+    return g_szBotNameBuf;
 }
 
 CZMPlayer* CZMPlayerBot::CreateZMBot( const char* playername )

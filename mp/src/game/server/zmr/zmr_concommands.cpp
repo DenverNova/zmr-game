@@ -220,11 +220,11 @@ static ConCommand zm_observezombie( "zm_observezombie", ZM_ObserveZombie, "Allow
 /*
 
 */
-extern ConVar zm_sv_bot_help_range;
+extern ConVar zm_sv_bot_command_range;
 
 static void BotVoiceCommand_Help( CZMPlayer* pCaller )
 {
-    float flRange = zm_sv_bot_help_range.GetFloat();
+    float flRange = zm_sv_bot_command_range.GetFloat();
     float flRangeSqr = flRange * flRange;
     Vector callerPos = pCaller->GetAbsOrigin();
 
@@ -238,8 +238,47 @@ static void BotVoiceCommand_Help( CZMPlayer* pCaller )
         if ( pPlayer == pCaller )
             continue;
 
+        CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
+        if ( !pBot )
+            continue;
+
+        // Only affect bots not already following a human player
+        CBasePlayer* pCurrentFollow = pBot->GetFollowTarget();
+        if ( pCurrentFollow && !pCurrentFollow->IsBot() )
+            continue;
+
         float distSqr = pPlayer->GetAbsOrigin().DistToSqr( callerPos );
         if ( distSqr > flRangeSqr )
+            continue;
+
+        pBot->SetFollowTarget( pCaller );
+    }
+}
+
+static void BotVoiceCommand_Follow( CZMPlayer* pCaller )
+{
+    float flRange = zm_sv_bot_command_range.GetFloat();
+    float flRangeSqr = flRange * flRange;
+    Vector eyePos = pCaller->EyePosition();
+    Vector fwd;
+    AngleVectors( pCaller->EyeAngles(), &fwd );
+
+    for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+    {
+        CBasePlayer* pPlayer = UTIL_PlayerByIndex( i );
+        if ( !pPlayer || !pPlayer->IsBot() || !pPlayer->IsAlive() )
+            continue;
+        if ( pPlayer->GetTeamNumber() != ZMTEAM_HUMAN )
+            continue;
+
+        float distSqr = pPlayer->GetAbsOrigin().DistToSqr( pCaller->GetAbsOrigin() );
+        if ( distSqr > flRangeSqr )
+            continue;
+
+        // Must be visible to the caller (line of sight)
+        trace_t tr;
+        UTIL_TraceLine( eyePos, pPlayer->WorldSpaceCenter(), MASK_VISIBLE, pCaller, COLLISION_GROUP_NONE, &tr );
+        if ( tr.fraction < 0.9f && tr.m_pEnt != pPlayer )
             continue;
 
         CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
@@ -250,15 +289,11 @@ static void BotVoiceCommand_Help( CZMPlayer* pCaller )
     }
 }
 
-static void BotVoiceCommand_Follow( CZMPlayer* pCaller )
+static void BotVoiceCommand_Go( CZMPlayer* pCaller )
 {
-    // Follow the bot the caller is looking at
-    Vector eyePos = pCaller->EyePosition();
-    Vector fwd;
-    AngleVectors( pCaller->EyeAngles(), &fwd );
-
-    float flBestDot = 0.95f;
-    CZMPlayerBot* pBestBot = nullptr;
+    float flRange = zm_sv_bot_command_range.GetFloat();
+    float flRangeSqr = flRange * flRange;
+    Vector callerPos = pCaller->GetAbsOrigin();
 
     for ( int i = 1; i <= gpGlobals->maxClients; i++ )
     {
@@ -268,27 +303,29 @@ static void BotVoiceCommand_Follow( CZMPlayer* pCaller )
         if ( pPlayer->GetTeamNumber() != ZMTEAM_HUMAN )
             continue;
 
-        Vector toBot = pPlayer->GetAbsOrigin() - eyePos;
-        float dist = toBot.NormalizeInPlace();
-        if ( dist > 1024.0f )
+        CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
+        if ( !pBot )
             continue;
 
-        float dot = fwd.Dot( toBot );
-        if ( dot > flBestDot )
-        {
-            flBestDot = dot;
-            pBestBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
-        }
-    }
+        // Only affect bots not already following a human player
+        CBasePlayer* pCurrentFollow = pBot->GetFollowTarget();
+        if ( pCurrentFollow && !pCurrentFollow->IsBot() )
+            continue;
 
-    if ( pBestBot )
-    {
-        pBestBot->SetFollowTarget( pCaller );
+        float distSqr = pPlayer->GetAbsOrigin().DistToSqr( callerPos );
+        if ( distSqr > flRangeSqr )
+            continue;
+
+        // Clear follow target and set behavior override to explore
+        pBot->SetFollowTarget( nullptr );
+        pBot->SetStayPut( false );
+        pBot->SetBehaviorOverride( 1 ); // 1 = Explore
     }
 }
 
 #define VOICE_INDEX_HELP    2
 #define VOICE_INDEX_FOLLOW  3
+#define VOICE_INDEX_GO      6
 
 void ZM_VoiceMenu( const CCommand &args )
 {
@@ -313,6 +350,9 @@ void ZM_VoiceMenu( const CCommand &args )
         break;
     case VOICE_INDEX_FOLLOW:
         BotVoiceCommand_Follow( pPlayer );
+        break;
+    case VOICE_INDEX_GO:
+        BotVoiceCommand_Go( pPlayer );
         break;
     }
 }
@@ -383,11 +423,15 @@ void ZM_PossessBot( const CCommand &args )
     if ( !pBot )
         return;
 
-    // Store the bot's state before kicking it
+    // Store the bot's state before removing it
     Vector vecPos = pBot->GetAbsOrigin();
     QAngle angEyes = pBot->EyeAngles();
     int iHealth = pBot->GetHealth();
     int iArmor = pBot->ArmorValue();
+
+    // Save the bot's model so the player looks identical
+    char szBotModel[256];
+    Q_strncpy( szBotModel, STRING( pBot->GetModelName() ), sizeof( szBotModel ) );
 
     // Collect the bot's weapons and ammo
     struct WepInfo_t
@@ -420,14 +464,20 @@ void ZM_PossessBot( const CCommand &args )
     for ( int i = 0; i < MAX_AMMO_SLOTS; i++ )
         ammo[i] = pBot->GetAmmoCount( i );
 
-    // Kick the bot
-    engine->ServerCommand( UTIL_VarArgs( "kickid %d\n", pBot->GetUserID() ) );
-    engine->ServerExecute();
+    // Move the bot to spectator instead of kicking - it stays until next round
+    pBot->RemoveAllItems( true );
+    pBot->ChangeTeam( ZMTEAM_SPECTATOR );
+    pBot->m_lifeState = LIFE_DEAD;
+    pBot->AddEffects( EF_NODRAW );
 
     // Respawn the player at the bot's position
     pPlayer->pl.deadflag = false;
     pPlayer->m_lifeState = LIFE_RESPAWNABLE;
     pPlayer->Spawn();
+
+    // Apply the bot's model to the player
+    if ( szBotModel[0] )
+        pPlayer->SetModel( szBotModel );
 
     pPlayer->SetAbsOrigin( vecPos );
     pPlayer->SnapEyeAngles( angEyes );

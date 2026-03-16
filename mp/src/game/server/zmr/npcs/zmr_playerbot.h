@@ -35,7 +35,8 @@ public:
     // HACK
     virtual void SetEyeAngles( const QAngle& ang ) OVERRIDE { SetAngles( ang ); pl.v_angle = ang; }
     
-    virtual bool ShouldUpdate() const OVERRIDE;    
+    virtual bool ShouldUpdate() const OVERRIDE;
+    virtual bool IsEnemy( CBaseEntity* pEnt ) const OVERRIDE;
     //
 
     virtual void Spawn() OVERRIDE;
@@ -80,10 +81,29 @@ public:
     void            SetStayPut( bool bStay ) { m_bStayPut = bStay; }
     bool            IsStayingPut() const { return m_bStayPut; }
 
+    void            SetBehaviorOverride( int iBehavior ) { m_iBehaviorOverride = iBehavior; }
+    int             GetBehaviorOverride() const { return m_iBehaviorOverride; }
+
+    // Player-commanded defend position (Hold E on ground)
+    void            SetCommandedDefendPos( const Vector& pos ) { m_vecCommandedDefendPos = pos; m_bHasCommandedDefendPos = true; }
+    void            ClearCommandedDefendPos() { m_bHasCommandedDefendPos = false; }
+    bool            HasCommandedDefendPos() const { return m_bHasCommandedDefendPos; }
+    const Vector&   GetCommandedDefendPos() const { return m_vecCommandedDefendPos; }
+
+    // Player-commanded grab object (Hold E on physics object)
+    void            SetCommandedGrabTarget( CBaseEntity* pEnt ) { m_hCommandedGrabTarget.Set( pEnt ); }
+    CBaseEntity*    GetCommandedGrabTarget() const { return m_hCommandedGrabTarget.Get(); }
+    void            ClearCommandedGrabTarget() { m_hCommandedGrabTarget.Set( nullptr ); }
+
     void            CheckObstacleJump();
 
 private:
     CHandle<CBasePlayer> m_hFollowTarget;
     float           m_flNextObstacleCheck;
     bool            m_bStayPut;
+    int             m_iBehaviorOverride; // -1 = no override, set by voice commands
+
+    Vector          m_vecCommandedDefendPos;
+    bool            m_bHasCommandedDefendPos;
+    EHANDLE         m_hCommandedGrabTarget;
 };

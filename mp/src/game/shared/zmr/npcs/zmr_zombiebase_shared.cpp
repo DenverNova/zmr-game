@@ -32,6 +32,13 @@ ConVar zm_sv_spawndelay_immolator( "zm_sv_spawndelay_immolator", "0.75", FCVAR_R
 
 ConVar zm_sv_happyzombies( "zm_sv_happyzombies", "0", FCVAR_REPLICATED, "Happy, happy zombies :)" );
 
+// Per-type zombie limits (0 = unlimited, only checked when zm_sv_zombie_type_limits is enabled)
+ConVar zm_sv_zombie_type_limits( "zm_sv_zombie_type_limits", "0", FCVAR_REPLICATED | FCVAR_NOTIFY | FCVAR_ARCHIVE, "Enable per-zombie-type population limits. 0 = off, 1 = on." );
+ConVar zm_sv_zombie_max_banshee( "zm_sv_zombie_max_banshee", "0", FCVAR_REPLICATED | FCVAR_NOTIFY | FCVAR_ARCHIVE, "Max Banshees allowed at once. 0 = unlimited." );
+ConVar zm_sv_zombie_max_hulk( "zm_sv_zombie_max_hulk", "0", FCVAR_REPLICATED | FCVAR_NOTIFY | FCVAR_ARCHIVE, "Max Hulks allowed at once. 0 = unlimited." );
+ConVar zm_sv_zombie_max_drifter( "zm_sv_zombie_max_drifter", "0", FCVAR_REPLICATED | FCVAR_NOTIFY | FCVAR_ARCHIVE, "Max Drifters allowed at once. 0 = unlimited." );
+ConVar zm_sv_zombie_max_immolator( "zm_sv_zombie_max_immolator", "0", FCVAR_REPLICATED | FCVAR_NOTIFY | FCVAR_ARCHIVE, "Max Immolators allowed at once. 0 = unlimited." );
+
 
 
 CZMZombieManager g_ZombieManager;
@@ -127,20 +134,65 @@ float CZMBaseZombie::GetSpawnDelay( ZombieClass_t zclass )
     }
 }
 
+#ifdef GAME_DLL
+static int CountAliveZombiesOfClass( ZombieClass_t zclass )
+{
+    int count = 0;
+    const char* szClassName = CZMBaseZombie::ClassToName( zclass );
+    if ( !szClassName )
+        return 0;
+
+    CBaseEntity* pEnt = nullptr;
+    while ( (pEnt = gEntList.FindEntityByClassname( pEnt, szClassName )) != nullptr )
+    {
+        if ( pEnt->IsAlive() )
+            count++;
+    }
+    return count;
+}
+
+static int GetPerTypeLimit( ZombieClass_t zclass )
+{
+    switch ( zclass )
+    {
+    case ZMCLASS_BANSHEE :   return zm_sv_zombie_max_banshee.GetInt();
+    case ZMCLASS_HULK :      return zm_sv_zombie_max_hulk.GetInt();
+    case ZMCLASS_DRIFTER :   return zm_sv_zombie_max_drifter.GetInt();
+    case ZMCLASS_IMMOLATOR : return zm_sv_zombie_max_immolator.GetInt();
+    default : return -1; // Shamblers have no per-type limit
+    }
+}
+#endif
+
 bool CZMBaseZombie::HasEnoughPopToSpawn( ZombieClass_t zclass )
 {
     CZMRules* pRules = ZMRules();
 
-
     int curpop = 0;
-
     if ( pRules )
     {
         curpop = pRules->GetZombiePop();
     }
 
+    // Total pop cap always enforced
+    if ( (curpop + GetPopCost( zclass )) > zm_sv_zombiemax.GetInt() )
+        return false;
 
-    return (curpop + GetPopCost( zclass )) <= zm_sv_zombiemax.GetInt();
+#ifdef GAME_DLL
+    // Per-type limits (when enabled, server-side only)
+    if ( zm_sv_zombie_type_limits.GetBool() )
+    {
+        int typeLimit = GetPerTypeLimit( zclass );
+        if ( typeLimit >= 0 )
+        {
+            int typeCount = CountAliveZombiesOfClass( zclass );
+            if ( typeCount >= typeLimit )
+                return false;
+        }
+    }
+#endif
+
+    return true;
 }
 
 CZMPlayer* CZMBaseZombie::GetSelector() const

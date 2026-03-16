@@ -53,7 +53,7 @@ ConVar zm_sv_reward_kill( "zm_sv_reward_kill", "100", FCVAR_NOTIFY | FCVAR_ARCHI
 ConVar zm_sv_zombiemax( "zm_sv_zombiemax", "70", FCVAR_REPLICATED | FCVAR_NOTIFY | FCVAR_ARCHIVE, "The maximum amount of zombie population allowed." );
 
 #ifndef CLIENT_DLL
-ConVar zm_sv_bot_survivors( "zm_sv_bot_survivors", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Number of AI survivor bots to auto-spawn each round. 0 = disabled." );
+ConVar zm_sv_bot_survivors( "zm_sv_bot_survivors", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Enable AI survivor bots to fill empty player slots. 0 = off, 1 = on." );
 ConVar zm_sv_ai_zm( "zm_sv_ai_zm", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Enable AI Zombie Master. 0 = off, 1 = always on, 2 = only when no human volunteers for ZM." );
 ConVar zm_sv_bot_replace_player( "zm_sv_bot_replace_player", "1", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Spawn a bot to replace a survivor who disconnects or gets AFK-kicked." );
 #endif
@@ -1234,11 +1234,22 @@ CZMPlayer* CZMRules::ChooseZM()
     }
 
 
-    // AI ZM mode 1 = always AI, never pick a human
+    // AI ZM mode 1 = AI has equal chance as human volunteers
     if ( zm_sv_ai_zm.GetInt() == 1 )
     {
-        Msg( "AI Zombie Master forced on (zm_sv_ai_zm 1).\n" );
-        return nullptr;
+        // Add AI as one more "candidate" alongside human volunteers
+        int nCandidates = vZMFirstChoices.Count() + 1; // +1 for AI
+        int pick = random->RandomInt( 0, nCandidates - 1 );
+
+        if ( pick < vZMFirstChoices.Count() )
+        {
+            return vZMFirstChoices[pick]; // Human won the draw
+        }
+        else
+        {
+            Msg( "AI Zombie Master selected by random draw (zm_sv_ai_zm 1).\n" );
+            return nullptr; // AI won the draw
+        }
     }
 
     if ( vZMFirstChoices.Count() > 0 )
@@ -1432,21 +1443,56 @@ void CZMRules::ResetWorld()
     m_flRoundRestartTime = 0.0f;
     m_bInRoundEnd = false;
 
-    // Auto-spawn survivor bots
+    // Reset all bot follow targets and behavior overrides for the new round
+    // Also kick any spectator bots (from previous possess) and count players
     {
-        int nDesiredBots = zm_sv_bot_survivors.GetInt();
-        if ( nDesiredBots > 0 )
-        {
-            // Count existing bots
-            int nExistingBots = 0;
-            for ( int i = 1; i <= gpGlobals->maxClients; i++ )
-            {
-                CBasePlayer* pPlayer = UTIL_PlayerByIndex( i );
-                if ( pPlayer && pPlayer->IsBot() && pPlayer->GetTeamNumber() == ZMTEAM_HUMAN )
-                    nExistingBots++;
-            }
+        int nHumanPlayers = 0; // non-bot players on any team (except spectator bots)
+        int nExistingBots = 0; // survivor bots already on the human team
+        int nZMSlots = 0;      // ZM player slots
 
-            // Spawn additional bots to reach desired count
+        for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+        {
+            CBasePlayer* pPlayer = UTIL_PlayerByIndex( i );
+            if ( !pPlayer )
+                continue;
+
+            CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
+            if ( pBot )
+            {
+                // Kick spectator bots left over from possession
+                if ( pBot->GetTeamNumber() == ZMTEAM_SPECTATOR )
+                {
+                    engine->ServerCommand( UTIL_VarArgs( "kickid %i\n", pBot->GetUserID() ) );
+                    engine->ServerExecute();
+                    continue;
+                }
+
+                // Reset follow targets and behavior overrides
+                pBot->SetFollowTarget( nullptr );
+                pBot->SetStayPut( false );
+                pBot->SetBehaviorOverride( -1 );
+
+                if ( pBot->GetTeamNumber() == ZMTEAM_HUMAN )
+                    nExistingBots++;
+                if ( pBot->GetTeamNumber() == ZMTEAM_ZM )
+                    nZMSlots++;
+            }
+            else
+            {
+                nHumanPlayers++;
+                if ( pPlayer->GetTeamNumber() == ZMTEAM_ZM )
+                    nZMSlots++;
+            }
+        }
+
+        // Auto-spawn survivor bots to fill empty slots up to maxplayers
+        if ( zm_sv_bot_survivors.GetBool() )
+        {
+            int nMaxPlayers = gpGlobals->maxClients;
+            int nDesiredBots = nMaxPlayers - nHumanPlayers - nZMSlots;
+            if ( nDesiredBots < 0 )
+                nDesiredBots = 0;
+
             int nToSpawn = nDesiredBots - nExistingBots;
             for ( int i = 0; i < nToSpawn; i++ )
             {
@@ -1458,8 +1504,27 @@ void CZMRules::ResetWorld()
                 }
             }
 
+            // Kick excess bots if human players joined
+            if ( nToSpawn < 0 )
+            {
+                int nToKick = -nToSpawn;
+                for ( int i = gpGlobals->maxClients; i >= 1 && nToKick > 0; i-- )
+                {
+                    CBasePlayer* pPlayer = UTIL_PlayerByIndex( i );
+                    if ( !pPlayer )
+                        continue;
+                    CZMPlayerBot* pKickBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
+                    if ( pKickBot && pKickBot->GetTeamNumber() == ZMTEAM_HUMAN )
+                    {
+                        engine->ServerCommand( UTIL_VarArgs( "kickid %i\n", pKickBot->GetUserID() ) );
+                        engine->ServerExecute();
+                        nToKick--;
+                    }
+                }
+            }
+
             if ( nToSpawn > 0 )
-                Msg( "Spawned %i AI survivor bot(s).\n", nToSpawn );
+                Msg( "Spawned %i AI survivor bot(s) to fill slots.\n", nToSpawn );
         }
     }
 

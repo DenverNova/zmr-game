@@ -54,6 +54,8 @@ private:
     void UpdateDefendMode();
     void UpdateMixedMode();
     void TryPickupNearbyWeapons();
+    void UpdateExploreLookAngles();
+    CBaseEntity* FindNearestZombie( float flMaxRange ) const;
 
     NPCR::CChaseNavPath m_Path;
     NPCR::CPathCostGroundOnly m_PathCost;
@@ -73,4 +75,21 @@ private:
     Vector m_vecDefendPos;
     bool m_bHasDefendPos;
     int m_iMixedBehavior;    // Randomly assigned behavior for Mixed Mode (0=follow, 1=explore, 2=defend)
+
+    // Weapon/ammo scavenging state
+    bool m_bScavenging;                // Currently walking to pick up a weapon/ammo
+    Vector m_vecPreScavengePos;        // Position to return to after scavenging
+    EHANDLE m_hScavengeTarget;         // Entity we're walking toward
+
+    // Explore mode idle pauses and look scanning
+    CountdownTimer m_ExploreIdlePause;     // Timer for standing still and looking around
+    CountdownTimer m_ExploreLookScan;      // Timer for periodic look direction changes while moving
+    float m_flExploreScanPitch;            // Target pitch for natural scanning while moving
+    float m_flExploreScanYawOffset;        // Yaw offset for scanning while moving
+    bool m_bExploreIdling;                 // Currently in an idle pause
+
+    // Explosion dodge
+    CountdownTimer m_NextExplosionCheck;   // Periodic scan for nearby ZM explosions
+    NPCR::CFollowNavPath m_FleePath;      // Path to flee from explosion
+    bool m_bFleeingExplosion;              // Currently running from an explosion
 };

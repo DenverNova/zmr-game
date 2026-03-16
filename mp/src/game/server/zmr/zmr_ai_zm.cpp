@@ -10,6 +10,7 @@
 
 #include "zmr_hiddenspawn.h"
 #include "zmr_ai_zm.h"
+#include "props.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -30,12 +31,16 @@ ConVar zm_sv_ai_zm_tactic_max_time( "zm_sv_ai_zm_tactic_max_time", "40.0", FCVAR
 ConVar zm_sv_ai_zm_stall_timeout( "zm_sv_ai_zm_stall_timeout", "12.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Seconds before AI ZM abandons a plan it can't execute." );
 ConVar zm_sv_ai_zm_rally_interval( "zm_sv_ai_zm_rally_interval", "6.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Seconds between AI ZM zombie rally commands." );
 ConVar zm_sv_ai_zm_rally_buffer( "zm_sv_ai_zm_rally_buffer", "256.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Distance buffer for target splitting when rallying zombies." );
+ConVar zm_sv_ai_zm_trap_cooldown( "zm_sv_ai_zm_trap_cooldown", "30.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Per-trap cooldown in seconds before the AI ZM can re-use the same trap." );
+ConVar zm_sv_ai_zm_hidden_max( "zm_sv_ai_zm_hidden_max", "5", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Max hidden spawns per 2-minute window." );
+ConVar zm_sv_ai_zm_plan_pause( "zm_sv_ai_zm_plan_pause", "8.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Seconds to pause between completing one plan and starting the next." );
 
 CZMAIZombieMaster g_ZMAIZombieMaster;
 
 
 CZMAIZombieMaster::CZMAIZombieMaster()
 {
+    m_TrapCooldowns.SetLessFunc( DefLessFunc( int ) );
     Reset();
 }
 
@@ -53,6 +58,11 @@ void CZMAIZombieMaster::Reset()
     m_flNextHiddenSpawnTime = 0.0f;
     m_flLastUpdateTime = 0.0f;
     m_bLoggedSpawners = false;
+    m_flPlanCooldownUntil = 0.0f;
+    m_TrapCooldowns.RemoveAll();
+    m_nHiddenSpawnsThisWindow = 0;
+    m_flHiddenSpawnWindowStart = 0.0f;
+    m_flNextBarrelDetonateTime = 0.0f;
 }
 
 bool CZMAIZombieMaster::IsActive() const
@@ -258,6 +268,7 @@ ZombieClass_t CZMAIZombieMaster::PickClassForSpawner( CZMEntZombieSpawn* pSpawne
 CZMEntManipulate* CZMAIZombieMaster::FindBestTrap() const
 {
     float flTrapRange = zm_sv_ai_zm_trap_range.GetFloat();
+    float flTrapCooldown = zm_sv_ai_zm_trap_cooldown.GetFloat();
 
     CZMEntManipulate* pBest = nullptr;
     float flBestDist = FLT_MAX;
@@ -268,6 +279,14 @@ CZMEntManipulate* CZMAIZombieMaster::FindBestTrap() const
         CZMEntManipulate* pTrap = dynamic_cast<CZMEntManipulate*>( pEnt );
         if ( !pTrap || !pTrap->IsActive() )
             continue;
+
+        // Per-trap cooldown: skip if this trap was used recently
+        int idx = m_TrapCooldowns.Find( pTrap->entindex() );
+        if ( idx != m_TrapCooldowns.InvalidIndex() )
+        {
+            if ( gpGlobals->curtime < m_TrapCooldowns[idx] + flTrapCooldown )
+                continue;
+        }
 
         float dist = 0.0f;
         CBasePlayer* pNearest = FindNearestHuman( pTrap->GetAbsOrigin(), &dist );
@@ -499,6 +518,9 @@ void CZMAIZombieMaster::ExecutePlanStep( CZMPlayer* pZM )
 {
     if ( m_Plan.Count() == 0 || m_iPlanStep >= m_Plan.Count() )
     {
+        // Respect post-plan cooldown before building a new plan
+        if ( gpGlobals->curtime < m_flPlanCooldownUntil )
+            return;
         BuildNewPlan();
         return;
     }
@@ -581,8 +603,9 @@ void CZMAIZombieMaster::ExecutePlanStep( CZMPlayer* pZM )
         else
         {
             if ( zm_sv_ai_zm_debug.GetBool() )
-                Msg( "[AI ZM] Plan complete! Building next plan.\n" );
-            BuildNewPlan();
+                Msg( "[AI ZM] Plan complete! Pausing %.1f seconds before next plan.\n", zm_sv_ai_zm_plan_pause.GetFloat() );
+            m_flPlanCooldownUntil = gpGlobals->curtime + zm_sv_ai_zm_plan_pause.GetFloat();
+            m_Plan.Purge();
         }
     }
     else
@@ -623,8 +646,15 @@ void CZMAIZombieMaster::UpdateTrapOpportunism( CZMPlayer* pZM )
 
     pTrap->Trigger( pZM );
 
+    // Record per-trap cooldown by entity index
+    int trapIdx = m_TrapCooldowns.Find( pTrap->entindex() );
+    if ( trapIdx != m_TrapCooldowns.InvalidIndex() )
+        m_TrapCooldowns[trapIdx] = gpGlobals->curtime;
+    else
+        m_TrapCooldowns.Insert( pTrap->entindex(), gpGlobals->curtime );
+
     if ( zm_sv_ai_zm_debug.GetBool() )
-        Msg( "[AI ZM] Triggered trap (cost: %i, res left: %i)\n", trapCost, pZM->GetResources() );
+        Msg( "[AI ZM] Triggered trap (cost: %i, res left: %i, cooldown: %.1fs)\n", trapCost, pZM->GetResources(), zm_sv_ai_zm_trap_cooldown.GetFloat() );
 
     float flAggression = clamp( zm_sv_ai_zm_aggression.GetFloat(), 0.1f, 3.0f );
     // Shorter cooldown when survivors are still in range, longer otherwise
@@ -638,6 +668,20 @@ void CZMAIZombieMaster::TryHiddenSpawn( CZMPlayer* pZM )
 {
     if ( gpGlobals->curtime < m_flNextHiddenSpawnTime )
         return;
+
+    // Rate limit: max N hidden spawns per 2-minute window
+    int maxPerWindow = zm_sv_ai_zm_hidden_max.GetInt();
+    float flWindowLen = 120.0f;
+    if ( m_flHiddenSpawnWindowStart == 0.0f || gpGlobals->curtime - m_flHiddenSpawnWindowStart >= flWindowLen )
+    {
+        m_flHiddenSpawnWindowStart = gpGlobals->curtime;
+        m_nHiddenSpawnsThisWindow = 0;
+    }
+    if ( m_nHiddenSpawnsThisWindow >= maxPerWindow )
+    {
+        m_flNextHiddenSpawnTime = m_flHiddenSpawnWindowStart + flWindowLen;
+        return;
+    }
 
     // Need at least some resources to attempt a hidden spawn
     int minCost = 30;
@@ -693,6 +737,8 @@ void CZMAIZombieMaster::TryHiddenSpawn( CZMPlayer* pZM )
                     CZMBaseZombie::ClassToName( zclass ), pTarget->GetPlayerName(),
                     spawnPos.x, spawnPos.y, spawnPos.z, resCost );
 
+            m_nHiddenSpawnsThisWindow++;
+
             // Longer cooldown after success
             float flAggression = clamp( zm_sv_ai_zm_aggression.GetFloat(), 0.1f, 3.0f );
             m_flNextHiddenSpawnTime = gpGlobals->curtime + random->RandomFloat( 15.0f, 30.0f ) / flAggression;
@@ -702,6 +748,57 @@ void CZMAIZombieMaster::TryHiddenSpawn( CZMPlayer* pZM )
 
     // All attempts failed, retry sooner
     m_flNextHiddenSpawnTime = gpGlobals->curtime + 5.0f;
+}
+
+void CZMAIZombieMaster::TryDetonateBarrel( CZMPlayer* pZM )
+{
+    if ( gpGlobals->curtime < m_flNextBarrelDetonateTime )
+        return;
+
+    float flTriggerRange = 200.0f; // Survivor must be this close to a barrel
+
+    CBreakableProp* pBestBarrel = nullptr;
+    float flBestDist = FLT_MAX;
+
+    CBaseEntity* pEnt = nullptr;
+    while ( (pEnt = gEntList.FindEntityByClassname( pEnt, "prop_physics*" )) != nullptr )
+    {
+        CBreakableProp* pProp = dynamic_cast<CBreakableProp*>( pEnt );
+        if ( !pProp || !pProp->IsAlive() )
+            continue;
+
+        if ( pProp->GetExplosiveDamage() <= 0.0f )
+            continue;
+
+        float dist = 0.0f;
+        CBasePlayer* pNearest = FindNearestHuman( pProp->GetAbsOrigin(), &dist );
+        if ( !pNearest || dist > flTriggerRange )
+            continue;
+
+        if ( dist < flBestDist )
+        {
+            flBestDist = dist;
+            pBestBarrel = pProp;
+        }
+    }
+
+    if ( !pBestBarrel )
+    {
+        m_flNextBarrelDetonateTime = gpGlobals->curtime + 5.0f;
+        return;
+    }
+
+    // Detonate the barrel by applying blast damage
+    CTakeDamageInfo info( pZM, pZM, 1000.0f, DMG_BLAST );
+    info.SetDamagePosition( pBestBarrel->GetAbsOrigin() );
+    pBestBarrel->TakeDamage( info );
+
+    if ( zm_sv_ai_zm_debug.GetBool() )
+        Msg( "[AI ZM] Detonated explosive barrel at (%.0f,%.0f,%.0f)\n",
+            pBestBarrel->GetAbsOrigin().x, pBestBarrel->GetAbsOrigin().y, pBestBarrel->GetAbsOrigin().z );
+
+    // 5 minute cooldown
+    m_flNextBarrelDetonateTime = gpGlobals->curtime + 300.0f;
 }
 
 void CZMAIZombieMaster::Update()
@@ -742,6 +839,9 @@ void CZMAIZombieMaster::Update()
 
     // Occasionally try a hidden spawn to surprise survivors
     TryHiddenSpawn( pZM );
+
+    // Detonate explosive barrels when survivors are close
+    TryDetonateBarrel( pZM );
 
     // Rally idle zombies toward survivors
     RallyZombiesToSurvivors();

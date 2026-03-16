@@ -4,6 +4,8 @@
 #include "soundent.h"
 
 #include "zmr_survivor_follow.h"
+#include "zmr_entities.h"
+#include "zmr_voicelines.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -19,6 +21,13 @@ CSurvivorFollowSchedule::CSurvivorFollowSchedule()
     m_bHasDefendPos = false;
     m_vecHeardLookAt = vec3_origin;
     m_iMixedBehavior = -1;
+    m_bScavenging = false;
+    m_vecPreScavengePos = vec3_origin;
+    m_hScavengeTarget.Set( nullptr );
+    m_flExploreScanPitch = 0.0f;
+    m_flExploreScanYawOffset = 0.0f;
+    m_bExploreIdling = false;
+    m_bFleeingExplosion = false;
 }
 
 CSurvivorFollowSchedule::~CSurvivorFollowSchedule()
@@ -46,6 +55,71 @@ void CSurvivorFollowSchedule::OnUpdate()
     }
 
     pOuter->CheckObstacleJump();
+
+    // Dodge ZM explosions - scan for nearby buildup explosions and flee
+    if ( !m_NextExplosionCheck.HasStarted() || m_NextExplosionCheck.IsElapsed() )
+    {
+        m_NextExplosionCheck.Start( 0.3f );
+
+        CBaseEntity* pExp = nullptr;
+        CBaseEntity* pClosestExp = nullptr;
+        float flClosestDistSqr = FLT_MAX;
+        float flDangerRadius = 0.0f;
+        Vector myPos = pOuter->GetAbsOrigin();
+
+        while ( (pExp = gEntList.FindEntityByClassname( pExp, "env_delayed_physexplosion" )) != nullptr )
+        {
+            CZMPhysExplosion* pPhysExp = dynamic_cast<CZMPhysExplosion*>( pExp );
+            if ( !pPhysExp ) continue;
+
+            float radius = pPhysExp->GetRadius();
+            float distSqr = myPos.DistToSqr( pPhysExp->GetAbsOrigin() );
+
+            // Add safety margin to radius
+            float dangerRadiusSqr = (radius + 64.0f) * (radius + 64.0f);
+            if ( distSqr < dangerRadiusSqr && distSqr < flClosestDistSqr )
+            {
+                flClosestDistSqr = distSqr;
+                pClosestExp = pPhysExp;
+                flDangerRadius = radius;
+            }
+        }
+
+        if ( pClosestExp )
+        {
+            // Flee directly away from the explosion
+            Vector vecAway = myPos - pClosestExp->GetAbsOrigin();
+            vecAway.z = 0.0f;
+            float flLen = vecAway.NormalizeInPlace();
+            if ( flLen < 1.0f )
+                vecAway = Vector( 1.0f, 0.0f, 0.0f );
+
+            Vector vecFleeGoal = myPos + vecAway * (flDangerRadius + 128.0f);
+
+            CNavArea* pStart = pOuter->GetLastKnownArea();
+            CNavArea* pGoal = TheNavMesh->GetNearestNavArea( vecFleeGoal, true, 512.0f, false );
+            if ( pStart && pGoal )
+            {
+                m_PathCost.SetStepHeight( pOuter->GetMotor()->GetStepHeight() );
+                m_PathCost.SetStartPos( myPos, pStart );
+                m_FleePath.Compute( myPos, vecFleeGoal, pStart, pGoal, m_PathCost );
+                if ( !m_bFleeingExplosion )
+                    ZMGetVoiceLines()->OnVoiceLine( pOuter, 7 ); // Alert
+                m_bFleeingExplosion = true;
+            }
+        }
+        else
+        {
+            m_bFleeingExplosion = false;
+        }
+    }
+
+    // If fleeing an explosion, run the flee path and skip everything else
+    if ( m_bFleeingExplosion && m_FleePath.IsValid() )
+    {
+        m_FleePath.Update( pOuter );
+        return;
+    }
 
     // Periodically look for weapons to pick up
     TryPickupNearbyWeapons();
@@ -102,6 +176,53 @@ void CSurvivorFollowSchedule::OnUpdate()
         }
     }
 
+    // Handle commanded grab object (player held E on a physics object)
+    CBaseEntity* pGrabTarget = pOuter->GetCommandedGrabTarget();
+    if ( pGrabTarget )
+    {
+        Vector vecTarget = pGrabTarget->GetAbsOrigin();
+        float flDist = pOuter->GetAbsOrigin().DistTo( vecTarget );
+
+        if ( flDist < 80.0f )
+        {
+            // Close enough - switch to fists and grab it
+            if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) )
+                pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS );
+
+            pOuter->GetMotor()->FaceTowards( pGrabTarget->WorldSpaceCenter() );
+            pOuter->PressUse( 0.15f );
+            pOuter->ClearCommandedGrabTarget();
+        }
+        else
+        {
+            // Walk to the object
+            CNavArea* pStart = pOuter->GetLastKnownArea();
+            CNavArea* pGoal = TheNavMesh->GetNearestNavArea( vecTarget, true, 256.0f, false );
+
+            if ( pStart && pGoal )
+            {
+                if ( !m_ObjPath.IsValid() || !m_NextObjectiveScan.HasStarted() || m_NextObjectiveScan.IsElapsed() )
+                {
+                    Vector vecMyPos = pOuter->GetAbsOrigin();
+                    m_PathCost.SetStepHeight( pOuter->GetMotor()->GetStepHeight() );
+                    m_PathCost.SetStartPos( vecMyPos, pStart );
+                    m_ObjPath.Compute( vecMyPos, vecTarget, pStart, pGoal, m_PathCost );
+                    m_NextObjectiveScan.Start( 3.0f );
+                }
+
+                bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
+                if ( m_ObjPath.IsValid() && !bBusy )
+                    m_ObjPath.Update( pOuter );
+            }
+        }
+        return;
+    }
+    else if ( pGrabTarget )
+    {
+        // Target was removed/destroyed
+        pOuter->ClearCommandedGrabTarget();
+    }
+
     int behavior = zm_sv_bot_default_behavior.GetInt();
 
     // If the bot was told to stay put, don't follow anyone
@@ -128,8 +249,11 @@ void CSurvivorFollowSchedule::OnUpdate()
         return;
     }
 
-    // No explicit follow target - use the default behavior mode
-    switch ( behavior )
+    // Voice command override takes priority over default behavior
+    int effectiveBehavior = ( pOuter->GetBehaviorOverride() >= 0 ) ? pOuter->GetBehaviorOverride() : behavior;
+
+    // No explicit follow target - use the effective behavior mode
+    switch ( effectiveBehavior )
     {
     case 1: // Explore
         UpdateExploreMode();
@@ -182,6 +306,7 @@ void CSurvivorFollowSchedule::OnSpawn()
 
     // Re-randomize mixed mode behavior each round
     m_iMixedBehavior = -1;
+    m_bExploreIdling = false;
 }
 
 void CSurvivorFollowSchedule::OnHeardSound( CSound* pSound )
@@ -366,6 +491,47 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
 {
     CZMPlayerBot* pOuter = GetOuter();
 
+    // Scan for weapons/ammo while exploring
+    TryPickupNearbyWeapons();
+
+    // Hunt zombies: if one is nearby, face it so combat schedule can engage
+    CBaseEntity* pZombie = FindNearestZombie( 800.0f );
+    if ( pZombie )
+    {
+        m_vecHeardLookAt = pZombie->WorldSpaceCenter();
+        m_NextHeardLook.Start( 1.5f );
+    }
+
+    // Idle pause: periodically stop and look around before continuing
+    if ( m_bExploreIdling )
+    {
+        if ( !m_ExploreIdlePause.IsElapsed() )
+        {
+            // Still idling - look around
+            UpdateExploreLookAngles();
+            return;
+        }
+        // Done idling, resume moving
+        m_bExploreIdling = false;
+    }
+
+    // Randomly trigger an idle pause when reaching a waypoint or after some travel time
+    if ( m_ExplorePath.IsValid() && !m_ExploreIdlePause.HasStarted() )
+    {
+        m_ExploreIdlePause.Start( random->RandomFloat( 6.0f, 14.0f ) );
+    }
+    else if ( m_ExploreIdlePause.HasStarted() && m_ExploreIdlePause.IsElapsed() && !m_bExploreIdling )
+    {
+        // Time for a pause - stop and look around for 2-4 seconds
+        m_bExploreIdling = true;
+        m_ExploreIdlePause.Start( random->RandomFloat( 2.0f, 4.0f ) );
+        m_ExplorePath.Invalidate();
+        return;
+    }
+
+    // Natural look angles while moving
+    UpdateExploreLookAngles();
+
     if ( !m_NextExplorePath.HasStarted() || m_NextExplorePath.IsElapsed() || !m_ExplorePath.IsValid() )
     {
         // Pick a random nav area and walk to it
@@ -418,14 +584,106 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
     }
 }
 
+void CSurvivorFollowSchedule::UpdateExploreLookAngles()
+{
+    CZMPlayerBot* pOuter = GetOuter();
+
+    // Periodically shift the scan pitch and yaw offset for natural head movement
+    if ( !m_ExploreLookScan.HasStarted() || m_ExploreLookScan.IsElapsed() )
+    {
+        m_ExploreLookScan.Start( random->RandomFloat( 1.5f, 4.0f ) );
+
+        if ( m_bExploreIdling )
+        {
+            // While idling, look around more dramatically
+            m_flExploreScanPitch = random->RandomFloat( -15.0f, 10.0f );
+            m_flExploreScanYawOffset = random->RandomFloat( -90.0f, 90.0f );
+        }
+        else
+        {
+            // While moving, gentle scanning - mostly forward, slight up/down variation
+            m_flExploreScanPitch = random->RandomFloat( -8.0f, 5.0f );
+            m_flExploreScanYawOffset = random->RandomFloat( -30.0f, 30.0f );
+        }
+    }
+
+    QAngle angCur = pOuter->EyeAngles();
+
+    // Smoothly interpolate pitch toward target scan pitch
+    float flPitchDiff = m_flExploreScanPitch - angCur.x;
+    float flPitchStep = gpGlobals->frametime * 30.0f;
+    if ( fabsf( flPitchDiff ) > flPitchStep )
+        angCur.x += ( flPitchDiff > 0 ? flPitchStep : -flPitchStep );
+    else
+        angCur.x = m_flExploreScanPitch;
+
+    // Apply yaw offset while idling (while moving, Approach handles yaw)
+    if ( m_bExploreIdling )
+    {
+        float flYawTarget = angCur.y + m_flExploreScanYawOffset;
+        pOuter->GetMotor()->FaceTowards( flYawTarget );
+    }
+
+    // Clamp pitch to natural range
+    angCur.x = clamp( angCur.x, -20.0f, 15.0f );
+    pOuter->SetEyeAngles( angCur );
+}
+
+CBaseEntity* CSurvivorFollowSchedule::FindNearestZombie( float flMaxRange ) const
+{
+    CZMPlayerBot* pOuter = GetOuter();
+    Vector myPos = pOuter->GetAbsOrigin();
+    float flBestDistSqr = flMaxRange * flMaxRange;
+    CBaseEntity* pBest = nullptr;
+
+    static const char* s_szZombieClasses[] = {
+        "npc_zombie", "npc_fastzombie", "npc_poisonzombie",
+        "npc_burnzombie", "npc_dragzombie",
+    };
+
+    for ( int c = 0; c < ARRAYSIZE( s_szZombieClasses ); c++ )
+    {
+        CBaseEntity* pEnt = nullptr;
+        while ( (pEnt = gEntList.FindEntityByClassname( pEnt, s_szZombieClasses[c] )) != nullptr )
+        {
+            if ( !pEnt->IsAlive() ) continue;
+            float dSqr = pEnt->GetAbsOrigin().DistToSqr( myPos );
+            if ( dSqr < flBestDistSqr )
+            {
+                flBestDistSqr = dSqr;
+                pBest = pEnt;
+            }
+        }
+    }
+
+    return pBest;
+}
+
 void CSurvivorFollowSchedule::UpdateDefendMode()
 {
     CZMPlayerBot* pOuter = GetOuter();
 
-    if ( !m_bHasDefendPos )
+    // Use player-commanded defend position if available
+    if ( pOuter->HasCommandedDefendPos() )
+    {
+        m_vecDefendPos = pOuter->GetCommandedDefendPos();
+        m_bHasDefendPos = true;
+    }
+    else if ( !m_bHasDefendPos )
     {
         m_vecDefendPos = pOuter->GetAbsOrigin();
         m_bHasDefendPos = true;
+    }
+
+    // Scan for weapons/ammo while defending
+    TryPickupNearbyWeapons();
+
+    // Hunt zombies nearby so we actively defend
+    CBaseEntity* pZombie = FindNearestZombie( 600.0f );
+    if ( pZombie )
+    {
+        m_vecHeardLookAt = pZombie->WorldSpaceCenter();
+        m_NextHeardLook.Start( 1.5f );
     }
 
     // Stay near the defend position
@@ -462,6 +720,13 @@ void CSurvivorFollowSchedule::UpdateMixedMode()
     if ( m_iMixedBehavior < 0 )
     {
         m_iMixedBehavior = random->RandomInt( 0, 2 );
+
+        // Initialize defend position for mixed mode defend bots
+        if ( m_iMixedBehavior == 2 && !m_bHasDefendPos )
+        {
+            m_vecDefendPos = GetOuter()->GetAbsOrigin();
+            m_bHasDefendPos = true;
+        }
     }
 
     switch ( m_iMixedBehavior )
@@ -474,18 +739,41 @@ void CSurvivorFollowSchedule::UpdateMixedMode()
         return;
     default:
     {
-        // Follow mode - same logic as the default follow behavior
+        // Follow mode - scan for weapons/ammo and hunt zombies while following
+        TryPickupNearbyWeapons();
+
+        CBaseEntity* pZombie = FindNearestZombie( 600.0f );
+        if ( pZombie )
+        {
+            m_vecHeardLookAt = pZombie->WorldSpaceCenter();
+            m_NextHeardLook.Start( 1.5f );
+        }
+
+        // Ensure the follow target timer is running
+        if ( !m_NextFollowTarget.HasStarted() || m_NextFollowTarget.IsElapsed() )
+        {
+            m_NextFollowTarget.Start( 0.1f );
+            NextFollow();
+        }
+
         auto* pFollow = m_hFollowTarget.Get();
-        if ( (pFollow && !IsValidFollowTarget( pFollow )) || m_NextFollowTarget.IsElapsed() )
+        if ( pFollow && !IsValidFollowTarget( pFollow ) )
         {
             NextFollow();
             pFollow = m_hFollowTarget.Get();
         }
+
         if ( !pFollow )
         {
-            UpdateDefendMode();
+            // No human to follow - explore instead of just standing
+            UpdateExploreMode();
             return;
         }
+
+        // Make sure we have a path to follow target
+        if ( !m_Path.IsValid() && pFollow )
+            StartFollow( pFollow );
+
         bool bBusy = GetOuter()->IsBusy() == NPCR::RES_YES;
         if ( m_Path.IsValid() && pFollow && !bBusy && ShouldMoveCloser( pFollow ) )
         {
@@ -498,14 +786,68 @@ void CSurvivorFollowSchedule::UpdateMixedMode()
 
 void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
 {
-    if ( !m_NextWeaponScan.IsElapsed() )
-        return;
-
-    m_NextWeaponScan.Start( 3.0f );
-
     CZMPlayerBot* pOuter = GetOuter();
     if ( !pOuter->IsAlive() )
         return;
+
+    // If we're currently scavenging, handle the walk-to-item logic
+    CBaseEntity* pScavTarget = m_hScavengeTarget.Get();
+    if ( m_bScavenging )
+    {
+        if ( !pScavTarget )
+        {
+            // Target was picked up or removed - return to pre-scavenge position
+            m_bScavenging = false;
+            m_hScavengeTarget.Set( nullptr );
+
+            // Path back to where we were before
+            Vector vecMyPos = pOuter->GetAbsOrigin();
+            if ( m_vecPreScavengePos.DistTo( vecMyPos ) > 64.0f )
+            {
+                CNavArea* pStart = pOuter->GetLastKnownArea();
+                CNavArea* pGoal = TheNavMesh->GetNearestNavArea( m_vecPreScavengePos, true, 256.0f, false );
+                if ( pStart && pGoal )
+                {
+                    m_PathCost.SetStepHeight( pOuter->GetMotor()->GetStepHeight() );
+                    m_PathCost.SetStartPos( vecMyPos, pStart );
+                    m_ObjPath.Compute( vecMyPos, m_vecPreScavengePos, pStart, pGoal, m_PathCost );
+                }
+            }
+            return;
+        }
+
+        float flDist = pOuter->GetAbsOrigin().DistTo( pScavTarget->GetAbsOrigin() );
+        if ( flDist < 64.0f )
+        {
+            pOuter->GetMotor()->FaceTowards( pScavTarget->GetAbsOrigin() );
+            pOuter->PressUse( 0.15f );
+            m_bScavenging = false;
+            m_hScavengeTarget.Set( nullptr );
+            m_NextWeaponScan.Start( 1.0f );
+        }
+        else
+        {
+            // Keep walking toward the item
+            bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
+            if ( m_ObjPath.IsValid() && !bBusy )
+                m_ObjPath.Update( pOuter );
+        }
+        return;
+    }
+
+    // If returning from a scavenge trip, keep walking the return path
+    if ( m_ObjPath.IsValid() )
+    {
+        bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
+        if ( !bBusy )
+            m_ObjPath.Update( pOuter );
+        return;
+    }
+
+    if ( !m_NextWeaponScan.IsElapsed() )
+        return;
+
+    m_NextWeaponScan.Start( 2.0f );
 
     // Determine what loadout slots we still need
     bool bNeedMainGun = !pOuter->HasWeaponOfType( BOTWEPRANGE_MAINGUN );
@@ -514,10 +856,10 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
     bool bNeedGrenade = !pOuter->HasWeaponOfType( BOTWEPRANGE_THROWABLE );
 
     // Check if we need ammo for any ranged weapon we carry
-    // Only scan for ammo if we have the weapon but are low on reserve ammo
+    // Trigger when missing at least one clip's worth of reserve ammo
     bool bNeedAmmo = false;
-    int iNeededAmmoType = -1;  // ammo type index of the weapon with lowest ammo
-    float flLowestAmmoRatio = 0.75f;  // only pick up ammo if below 75% reserve
+    int iNeededAmmoType = -1;
+    int iLowestAmmoMissing = 0;
     for ( int i = 0; i < MAX_WEAPONS; i++ )
     {
         CZMBaseWeapon* pWep = ToZMBaseWeapon( pOuter->GetWeapon( i ) );
@@ -525,7 +867,7 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
             continue;
 
         ZMBotWeaponTypeRange_t wtype = CZMPlayerBot::GetWeaponType( pWep );
-        if ( wtype != BOTWEPRANGE_MAINGUN && wtype != BOTWEPRANGE_SECONDARYWEAPON )
+        if ( wtype == BOTWEPRANGE_FISTS || wtype == BOTWEPRANGE_MELEE || wtype == BOTWEPRANGE_INVALID )
             continue;
 
         int iAmmoType = pWep->GetPrimaryAmmoType();
@@ -537,10 +879,15 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
         if ( iMax <= 0 )
             continue;
 
-        float flRatio = (float)iCurrent / (float)iMax;
-        if ( flRatio < flLowestAmmoRatio )
+        // Get the weapon's clip size as the threshold
+        int iClipSize = pWep->GetMaxClip1();
+        if ( iClipSize <= 0 )
+            iClipSize = 10; // fallback
+
+        int iMissing = iMax - iCurrent;
+        if ( iMissing >= iClipSize && iMissing > iLowestAmmoMissing )
         {
-            flLowestAmmoRatio = flRatio;
+            iLowestAmmoMissing = iMissing;
             iNeededAmmoType = iAmmoType;
             bNeedAmmo = true;
         }
@@ -552,7 +899,8 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
 
     Vector myPos = pOuter->GetAbsOrigin();
     Vector eyePos = pOuter->EyePosition();
-    float flBestDist = zm_sv_bot_weapon_search_range.GetFloat();
+    float flSearchRange = zm_sv_bot_weapon_search_range.GetFloat();
+    float flBestDist = flSearchRange;
     CBaseEntity* pBestWeapon = nullptr;
     int nBestPriority = 0;
 
@@ -580,7 +928,6 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
             if ( !pWep || pWep->GetOwner() )
                 continue;
 
-            // Determine if we actually need this weapon type
             ZMBotWeaponTypeRange_t wepType = CZMPlayerBot::GetWeaponType( pWep->GetClassname() );
             int nPriority = 0;
             switch ( wepType )
@@ -595,16 +942,14 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
                 continue;
 
             float dist = myPos.DistTo( pWep->GetAbsOrigin() );
+            if ( dist > flSearchRange )
+                continue;
 
-            // Prefer higher priority weapons, or closer ones at same priority
             if ( nPriority < nBestPriority )
                 continue;
             if ( nPriority == nBestPriority && dist >= flBestDist )
                 continue;
-            if ( dist > 512.0f )
-                continue;
 
-            // Check line of sight - don't try to pick up weapons behind solid walls
             trace_t tr;
             UTIL_TraceLine( eyePos, pWep->WorldSpaceCenter(),
                 MASK_VISIBLE, pOuter, COLLISION_GROUP_NONE, &tr );
@@ -633,7 +978,6 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
 
         for ( int a = 0; a < ARRAYSIZE( s_szAmmoClassnames ); a++ )
         {
-            // Only scan for ammo types that match our needed type
             int iBoxAmmoType = GetAmmoDef()->Index( s_szAmmoClassnames[a].ammoname );
             if ( iBoxAmmoType != iNeededAmmoType )
                 continue;
@@ -642,10 +986,11 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
             while ( (pAmmoEnt = gEntList.FindEntityByClassname( pAmmoEnt, s_szAmmoClassnames[a].classname )) != nullptr )
             {
                 float dist = myPos.DistTo( pAmmoEnt->GetAbsOrigin() );
-                if ( dist > 512.0f )
+                if ( dist > flSearchRange )
                     continue;
 
-                int nPriority = 1;  // ammo is lower priority than missing weapons
+                // Ammo is high priority when we need it - same as sidearm
+                int nPriority = 3;
                 if ( nPriority < nBestPriority )
                     continue;
                 if ( nPriority == nBestPriority && dist >= flBestDist )
@@ -675,7 +1020,11 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
     }
     else
     {
-        Vector vecMyPos = pOuter->GetAbsOrigin();
+        // Save current position so we can return after picking up the item
+        m_vecPreScavengePos = myPos;
+        m_bScavenging = true;
+        m_hScavengeTarget.Set( pBestWeapon );
+
         Vector vecTarget = pBestWeapon->GetAbsOrigin();
         CNavArea* pStart = pOuter->GetLastKnownArea();
         CNavArea* pGoal = TheNavMesh->GetNearestNavArea( vecTarget, true, 256.0f, false );
@@ -683,12 +1032,19 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
         if ( pStart && pGoal )
         {
             m_PathCost.SetStepHeight( pOuter->GetMotor()->GetStepHeight() );
-            m_PathCost.SetStartPos( vecMyPos, pStart );
+            m_PathCost.SetStartPos( myPos, pStart );
 
-            if ( !m_ExplorePath.Compute( vecMyPos, vecTarget, pStart, pGoal, m_PathCost ) )
+            if ( !m_ObjPath.Compute( myPos, vecTarget, pStart, pGoal, m_PathCost ) )
             {
+                m_bScavenging = false;
+                m_hScavengeTarget.Set( nullptr );
                 m_NextWeaponScan.Start( 10.0f );
             }
+        }
+        else
+        {
+            m_bScavenging = false;
+            m_hScavengeTarget.Set( nullptr );
         }
     }
 }
