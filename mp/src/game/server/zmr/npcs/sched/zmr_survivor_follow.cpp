@@ -126,32 +126,47 @@ void CSurvivorFollowSchedule::OnUpdate()
         return;
     }
 
-    // Combat takes priority over scavenging - if a zombie is close, abort scavenging
-    if ( m_bScavenging || m_ObjPath.IsValid() )
+    // Determine effective behavior early so we can route explore bots correctly
+    int behavior = zm_sv_bot_default_behavior.GetInt();
+    int effectiveBehavior = ( pOuter->GetBehaviorOverride() >= 0 ) ? pOuter->GetBehaviorOverride() : behavior;
+
+    // Mixed Mode: assign a permanent random sub-behavior (0/1/2) on first update
+    if ( effectiveBehavior == 3 )
     {
-        CBaseEntity* pThreat = FindNearestZombie( 400.0f );
-        if ( pThreat )
+        if ( m_iMixedBehavior < 0 )
         {
-            // Abort scavenging to fight
-            m_bScavenging = false;
-            m_hScavengeTarget.Set( nullptr );
-            m_ObjPath.Invalidate();
-            m_nScavengeStuckCount = 0;
-            m_flLastScavengeDist = FLT_MAX;
-            pOuter->EquipBestWeapon();
+            m_iMixedBehavior = random->RandomInt( 0, 2 );
+
+            if ( zm_sv_bot_debug.GetBool() )
+            {
+                const char* names[] = { "Follow", "Explore", "Defend" };
+                Msg( "[Bot %s] Mixed mode assigned: %s (%i)\n",
+                    GetOuter()->GetPlayerName(), names[m_iMixedBehavior], m_iMixedBehavior );
+            }
+
+            if ( m_iMixedBehavior == 2 && !m_bHasDefendPos )
+            {
+                m_vecDefendPos = GetOuter()->GetAbsOrigin();
+                m_bHasDefendPos = true;
+            }
         }
-        else
-        {
-            TryPickupNearbyWeapons();
-            return;
-        }
+        effectiveBehavior = m_iMixedBehavior;
     }
 
-    // Periodically look for weapons to pick up
-    TryPickupNearbyWeapons();
+    bool bIsExploreMode = ( effectiveBehavior == 1 );
 
-    // Keep the best weapon equipped when not in combat
-    pOuter->EquipBestWeapon();
+    // Explore mode bots should not be held back by StayingPut - the convar/override behavior wins
+    if ( bIsExploreMode && pOuter->IsStayingPut() )
+    {
+        pOuter->SetStayPut( false );
+    }
+
+    // If we heard something interesting recently, look toward it
+    if ( m_NextHeardLook.HasStarted() && !m_NextHeardLook.IsElapsed() && m_vecHeardLookAt != vec3_origin )
+    {
+        if ( !pOuter->GetMotor()->IsFacing( m_vecHeardLookAt ) )
+            pOuter->GetMotor()->FaceTowards( m_vecHeardLookAt );
+    }
 
     // Position deconfliction: nudge away from other bots to avoid stacking
     if ( !m_NextDeconflict.HasStarted() || m_NextDeconflict.IsElapsed() )
@@ -177,7 +192,6 @@ void CSurvivorFollowSchedule::OnUpdate()
             }
             else if ( flDist <= 1.0f )
             {
-                // Nearly identical position - push in a random direction
                 nudge.x += random->RandomFloat( -24.0f, 24.0f );
                 nudge.y += random->RandomFloat( -24.0f, 24.0f );
                 nTooClose++;
@@ -191,12 +205,65 @@ void CSurvivorFollowSchedule::OnUpdate()
         }
     }
 
-    // If we heard something interesting recently, look toward it
-    if ( m_NextHeardLook.HasStarted() && !m_NextHeardLook.IsElapsed() && m_vecHeardLookAt != vec3_origin )
+    // Explore mode: skip scavenging, grab targets, threat scanning etc.
+    // UpdateExploreMode handles its own lightweight pickup and threat detection.
+    if ( bIsExploreMode )
     {
-        if ( !pOuter->GetMotor()->IsFacing( m_vecHeardLookAt ) )
-            pOuter->GetMotor()->FaceTowards( m_vecHeardLookAt );
+        // Throttle debug output
+        bool bDebugThisTick = false;
+        if ( zm_sv_bot_debug.GetBool() && ( !m_NextDebugLog.HasStarted() || m_NextDebugLog.IsElapsed() ) )
+        {
+            bDebugThisTick = true;
+            m_NextDebugLog.Start( 5.0f );
+
+            CZMBaseWeapon* pActive = pOuter->GetActiveWeapon();
+            Msg( "[Bot %s] --- State (Explore) ---\n", pOuter->GetPlayerName() );
+            Msg( "  Active weapon: %s\n", pActive ? pActive->GetClassname() : "(none)" );
+            Msg( "  ExplorePath=%i  Idling=%i\n",
+                m_ExplorePath.IsValid() ? 1 : 0, m_bExploreIdling ? 1 : 0 );
+        }
+
+        // Abort any lingering scavenge state from before we entered explore mode
+        if ( m_bScavenging )
+        {
+            m_bScavenging = false;
+            m_hScavengeTarget.Set( nullptr );
+            m_ObjPath.Invalidate();
+            m_nScavengeStuckCount = 0;
+            m_flLastScavengeDist = FLT_MAX;
+        }
+
+        UpdateExploreMode();
+        return;
     }
+
+    // --- Non-explore behaviors: Follow / Defend ---
+
+    // Combat takes priority over scavenging - if a zombie is close, abort scavenging
+    if ( m_bScavenging || m_ObjPath.IsValid() )
+    {
+        CBaseEntity* pThreat = FindNearestZombie( 400.0f );
+        if ( pThreat )
+        {
+            m_bScavenging = false;
+            m_hScavengeTarget.Set( nullptr );
+            m_ObjPath.Invalidate();
+            m_nScavengeStuckCount = 0;
+            m_flLastScavengeDist = FLT_MAX;
+            pOuter->EquipBestWeapon();
+        }
+        else
+        {
+            TryPickupNearbyWeapons();
+            return;
+        }
+    }
+
+    // Periodically look for weapons to pick up (Follow/Defend only)
+    TryPickupNearbyWeapons();
+
+    // Keep the best weapon equipped when not in combat
+    pOuter->EquipBestWeapon();
 
     // Periodically scan for threats in peripheral vision (zombie near follow target or us)
     if ( !m_NextPeripheralScan.HasStarted() || m_NextPeripheralScan.IsElapsed() )
@@ -207,7 +274,6 @@ void CSurvivorFollowSchedule::OnUpdate()
         float flThreatDistSqr = 600.0f * 600.0f;
         Vector myPos = pOuter->GetAbsOrigin();
 
-        // Check our follow target's position too, so we react to threats near them
         Vector checkPos = myPos;
         auto* pFollow = m_hFollowTarget.Get();
         if ( pFollow )
@@ -234,7 +300,6 @@ void CSurvivorFollowSchedule::OnUpdate()
 
         if ( pClosestThreat )
         {
-            // Turn to face the threat - the combat schedule will handle attacking
             m_vecHeardLookAt = pClosestThreat->WorldSpaceCenter();
             m_NextHeardLook.Start( 1.5f );
         }
@@ -249,7 +314,6 @@ void CSurvivorFollowSchedule::OnUpdate()
 
         if ( flDist < 80.0f )
         {
-            // Close enough - switch to fists and grab it
             if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) )
                 pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS );
 
@@ -259,7 +323,6 @@ void CSurvivorFollowSchedule::OnUpdate()
         }
         else
         {
-            // Walk to the object
             CNavArea* pStart = pOuter->GetLastKnownArea();
             CNavArea* pGoal = TheNavMesh->GetNearestNavArea( vecTarget, true, 256.0f, false );
 
@@ -283,11 +346,8 @@ void CSurvivorFollowSchedule::OnUpdate()
     }
     else if ( pGrabTarget )
     {
-        // Target was removed/destroyed
         pOuter->ClearCommandedGrabTarget();
     }
-
-    int behavior = zm_sv_bot_default_behavior.GetInt();
 
     // Throttle debug output to once every 5 seconds per bot
     bool bDebugThisTick = false;
@@ -296,7 +356,6 @@ void CSurvivorFollowSchedule::OnUpdate()
         bDebugThisTick = true;
         m_NextDebugLog.Start( 5.0f );
 
-        // Full inventory and state dump
         CZMBaseWeapon* pActive = pOuter->GetActiveWeapon();
         Msg( "[Bot %s] --- State ---\n", pOuter->GetPlayerName() );
         Msg( "  Active weapon: %s\n", pActive ? pActive->GetClassname() : "(none)" );
@@ -341,7 +400,6 @@ void CSurvivorFollowSchedule::OnUpdate()
             return;
         }
 
-        // Follow the explicit target
         if ( m_hFollowTarget.Get() != pExplicitFollow || !m_Path.IsValid() )
             StartFollow( pExplicitFollow );
 
@@ -353,42 +411,13 @@ void CSurvivorFollowSchedule::OnUpdate()
         return;
     }
 
-    // Voice command override takes priority over default behavior
-    int effectiveBehavior = ( pOuter->GetBehaviorOverride() >= 0 ) ? pOuter->GetBehaviorOverride() : behavior;
-
     if ( bDebugThisTick )
         Msg( "[Bot %s] Behavior: convar=%i override=%i effective=%i\n",
             pOuter->GetPlayerName(), behavior, pOuter->GetBehaviorOverride(), effectiveBehavior );
 
-    // Mixed Mode: assign a permanent random sub-behavior (0/1/2) on first update
-    if ( effectiveBehavior == 3 )
-    {
-        if ( m_iMixedBehavior < 0 )
-        {
-            m_iMixedBehavior = random->RandomInt( 0, 2 );
-
-            if ( zm_sv_bot_debug.GetBool() )
-            {
-                const char* names[] = { "Follow", "Explore", "Defend" };
-                Msg( "[Bot %s] Mixed mode assigned: %s (%i)\n",
-                    GetOuter()->GetPlayerName(), names[m_iMixedBehavior], m_iMixedBehavior );
-            }
-
-            if ( m_iMixedBehavior == 2 && !m_bHasDefendPos )
-            {
-                m_vecDefendPos = GetOuter()->GetAbsOrigin();
-                m_bHasDefendPos = true;
-            }
-        }
-        effectiveBehavior = m_iMixedBehavior;
-    }
-
-    // No explicit follow target - use the effective behavior mode
+    // Dispatch to behavior mode
     switch ( effectiveBehavior )
     {
-    case 1: // Explore
-        UpdateExploreMode();
-        return;
     case 2: // Defend Spawn
         UpdateDefendMode();
         return;
