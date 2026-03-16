@@ -1105,12 +1105,14 @@ void CZMPlayer::GiveDefaultItems()
             if ( !pCheck ) continue;
             if ( FClassnameIs( pCheck, "weapon_zm_fistscarry" ) ) continue;
             bHasRealWeapon = true;
+            DevMsg( "[StartWep] Player '%s' already has '%s' from loadout, skipping random weapon\n", GetPlayerName(), pCheck->GetClassname() );
             break;
         }
 
         if ( !bHasRealWeapon )
         {
             const char* wepClass = PickRandomStartWeapon( startWepType );
+            DevMsg( "[StartWep] Player '%s' type=%i picked='%s'\n", GetPlayerName(), startWepType, wepClass ? wepClass : "NULL" );
             if ( wepClass )
             {
                 GiveNamedItem( wepClass );
@@ -2092,10 +2094,35 @@ void CZMPlayer::PlayerUse()
                 }
                 else if ( pBot->IsHuman() && pBot->IsAlive() )
                 {
-                    // Possess a survivor bot - swap the spectator into the bot's body
+                    // Possess a survivor bot - transfer full inventory
                     Vector vecPos = pBot->GetAbsOrigin();
                     QAngle angEye = pBot->EyeAngles();
                     int iHealth = pBot->GetHealth();
+                    int iArmor = pBot->ArmorValue();
+
+                    char szModel[256];
+                    Q_strncpy( szModel, STRING( pBot->GetModelName() ), sizeof( szModel ) );
+
+                    // Save weapon inventory
+                    struct { char cls[64]; int clip1; int clip2; } savedWeps[MAX_WEAPONS];
+                    int nSavedWeps = 0;
+                    const char* pszActiveClass = nullptr;
+                    for ( int w = 0; w < MAX_WEAPONS; w++ )
+                    {
+                        CBaseCombatWeapon* pWep = pBot->GetWeapon( w );
+                        if ( !pWep ) continue;
+                        Q_strncpy( savedWeps[nSavedWeps].cls, pWep->GetClassname(), 64 );
+                        savedWeps[nSavedWeps].clip1 = pWep->m_iClip1;
+                        savedWeps[nSavedWeps].clip2 = pWep->m_iClip2;
+                        if ( pWep == pBot->GetActiveWeapon() )
+                            pszActiveClass = savedWeps[nSavedWeps].cls;
+                        nSavedWeps++;
+                    }
+
+                    // Save ammo
+                    int savedAmmo[MAX_AMMO_SLOTS];
+                    for ( int a = 0; a < MAX_AMMO_SLOTS; a++ )
+                        savedAmmo[a] = pBot->GetAmmoCount( a );
 
                     // Remove the bot
                     engine->ServerCommand( UTIL_VarArgs( "kickid %i\n", pBot->GetUserID() ) );
@@ -2103,9 +2130,39 @@ void CZMPlayer::PlayerUse()
                     // Respawn the player as a human at the bot's location
                     ChangeTeam( ZMTEAM_HUMAN );
                     Spawn();
+
+                    if ( szModel[0] )
+                        SetModel( szModel );
+
                     SetAbsOrigin( vecPos );
                     SnapEyeAngles( angEye );
                     SetHealth( iHealth );
+                    SetArmorValue( iArmor );
+
+                    // Strip default items and restore bot's inventory
+                    RemoveAllItems( false );
+
+                    CBaseCombatWeapon* pActiveWep = nullptr;
+                    for ( int w = 0; w < nSavedWeps; w++ )
+                    {
+                        CBaseCombatWeapon* pWep = dynamic_cast<CBaseCombatWeapon*>( GiveNamedItem( savedWeps[w].cls ) );
+                        if ( pWep )
+                        {
+                            pWep->m_iClip1 = savedWeps[w].clip1;
+                            pWep->m_iClip2 = savedWeps[w].clip2;
+                            if ( pszActiveClass && Q_stricmp( savedWeps[w].cls, pszActiveClass ) == 0 )
+                                pActiveWep = pWep;
+                        }
+                    }
+
+                    for ( int a = 0; a < MAX_AMMO_SLOTS; a++ )
+                    {
+                        if ( savedAmmo[a] > 0 )
+                            SetAmmoCount( savedAmmo[a], a );
+                    }
+
+                    if ( pActiveWep )
+                        Weapon_Switch( pActiveWep );
 
                     ClientPrint( this, HUD_PRINTCENTER, "You took control of a survivor!" );
                     return;

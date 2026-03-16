@@ -13,6 +13,8 @@
 extern ConVar zm_sv_bot_default_behavior;
 extern ConVar zm_sv_bot_weapon_search_range;
 
+static ConVar zm_sv_bot_debug( "zm_sv_bot_debug", "0", FCVAR_CHEAT, "Enable AI survivor bot debug logging. 0=off, 1=on." );
+
 
 CSurvivorFollowSchedule::CSurvivorFollowSchedule()
 {
@@ -228,6 +230,8 @@ void CSurvivorFollowSchedule::OnUpdate()
     // If the bot was told to stay put, don't follow anyone
     if ( pOuter->IsStayingPut() )
     {
+        if ( zm_sv_bot_debug.GetBool() )
+            Msg( "[Bot %s] Staying put - skipping behavior update\n", pOuter->GetPlayerName() );
         m_hFollowTarget.Set( nullptr );
         m_Path.Invalidate();
         return;
@@ -237,6 +241,9 @@ void CSurvivorFollowSchedule::OnUpdate()
     auto* pExplicitFollow = pOuter->GetFollowTarget();
     if ( pExplicitFollow && IsValidFollowTarget( pExplicitFollow, true ) )
     {
+        if ( zm_sv_bot_debug.GetBool() )
+            Msg( "[Bot %s] Explicit follow target: %s\n", pOuter->GetPlayerName(), pExplicitFollow->GetPlayerName() );
+
         // Follow the explicit target
         if ( m_hFollowTarget.Get() != pExplicitFollow || !m_Path.IsValid() )
             StartFollow( pExplicitFollow );
@@ -251,6 +258,10 @@ void CSurvivorFollowSchedule::OnUpdate()
 
     // Voice command override takes priority over default behavior
     int effectiveBehavior = ( pOuter->GetBehaviorOverride() >= 0 ) ? pOuter->GetBehaviorOverride() : behavior;
+
+    if ( zm_sv_bot_debug.GetBool() )
+        Msg( "[Bot %s] Behavior: convar=%i override=%i effective=%i\n",
+            pOuter->GetPlayerName(), behavior, pOuter->GetBehaviorOverride(), effectiveBehavior );
 
     // No explicit follow target - use the effective behavior mode
     switch ( effectiveBehavior )
@@ -721,6 +732,13 @@ void CSurvivorFollowSchedule::UpdateMixedMode()
     {
         m_iMixedBehavior = random->RandomInt( 0, 2 );
 
+        if ( zm_sv_bot_debug.GetBool() )
+        {
+            const char* names[] = { "Follow", "Explore", "Defend" };
+            Msg( "[Bot %s] Mixed mode assigned: %s (%i)\n",
+                GetOuter()->GetPlayerName(), names[m_iMixedBehavior], m_iMixedBehavior );
+        }
+
         // Initialize defend position for mixed mode defend bots
         if ( m_iMixedBehavior == 2 && !m_bHasDefendPos )
         {
@@ -895,7 +913,15 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
 
     // Fully loaded - nothing to pick up at all
     if ( !bNeedMainGun && !bNeedSidearm && !bNeedMelee && !bNeedGrenade && !bNeedAmmo )
+    {
+        if ( zm_sv_bot_debug.GetBool() )
+            Msg( "[Bot %s] TryPickup: fully loaded, nothing needed\n", pOuter->GetPlayerName() );
         return;
+    }
+
+    if ( zm_sv_bot_debug.GetBool() )
+        Msg( "[Bot %s] TryPickup: need main=%i side=%i melee=%i nade=%i ammo=%i (ammoType=%i)\n",
+            pOuter->GetPlayerName(), bNeedMainGun, bNeedSidearm, bNeedMelee, bNeedGrenade, bNeedAmmo, iNeededAmmoType );
 
     Vector myPos = pOuter->GetAbsOrigin();
     Vector eyePos = pOuter->EyePosition();
@@ -1010,16 +1036,28 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
     }
 
     if ( !pBestWeapon )
+    {
+        if ( zm_sv_bot_debug.GetBool() )
+            Msg( "[Bot %s] TryPickup: nothing found in range %.0f\n", pOuter->GetPlayerName(), flSearchRange );
         return;
+    }
+
+    if ( zm_sv_bot_debug.GetBool() )
+        Msg( "[Bot %s] TryPickup: found '%s' at dist=%.0f priority=%i\n",
+            pOuter->GetPlayerName(), pBestWeapon->GetClassname(), myPos.DistTo( pBestWeapon->GetAbsOrigin() ), nBestPriority );
 
     float flPickupDist = myPos.DistTo( pBestWeapon->GetAbsOrigin() );
     if ( flPickupDist < 64.0f )
     {
+        if ( zm_sv_bot_debug.GetBool() )
+            Msg( "[Bot %s] TryPickup: close enough, pressing USE on '%s'\n", pOuter->GetPlayerName(), pBestWeapon->GetClassname() );
         pOuter->GetMotor()->FaceTowards( pBestWeapon->GetAbsOrigin() );
         pOuter->PressUse( 0.15f );
     }
     else
     {
+        if ( zm_sv_bot_debug.GetBool() )
+            Msg( "[Bot %s] TryPickup: walking to '%s' (%.0f units away)\n", pOuter->GetPlayerName(), pBestWeapon->GetClassname(), flPickupDist );
         // Save current position so we can return after picking up the item
         m_vecPreScavengePos = myPos;
         m_bScavenging = true;
