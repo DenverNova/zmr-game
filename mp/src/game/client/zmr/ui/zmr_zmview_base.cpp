@@ -424,6 +424,18 @@ void CZMViewBase::OnMouseWheeled( int delta )
         CycleHiddenSpawnClass( delta > 0 ? 1 : -1 );
         // Recreate the ghost model for the new class
         FreeTempHiddenZombie();
+
+        // Force immediate update so text and ghost refresh instantly
+        m_flLastHiddenSpawnUpdate = 0.0f;
+        int mx, my;
+        if ( IsMouseInputEnabled() )
+            ::input->GetFullscreenMousePos( &mx, &my );
+        else
+        {
+            mx = ScreenWidth() / 2;
+            my = ScreenHeight() / 2;
+        }
+        UpdateHiddenSpawnSpot( mx, my );
         return;
     }
 
@@ -636,6 +648,14 @@ void CZMViewBase::CheckBorderScrolling()
 // Return -1 to pass through.
 int CZMViewBase::ZMKeyInput( ButtonCode_t keynum, int down )
 {
+    // Escape cancels any active placement mode
+    if ( keynum == KEY_ESCAPE && down && GetClickMode() != ZMCLICKMODE_NORMAL )
+    {
+        FreeTempHiddenZombie();
+        SetClickMode( ZMCLICKMODE_NORMAL );
+        return 0;
+    }
+
     // We only care about number keys right now.
     bool bNumber = keynum >= KEY_0 && keynum <= KEY_9;
     bool bNumpad = keynum >= KEY_PAD_0 && keynum <= KEY_PAD_9;
@@ -794,6 +814,14 @@ void CZMViewBase::OnLeftRelease()
 
 void CZMViewBase::OnRightClick()
 {
+    // Right-click cancels any active placement mode
+    if ( GetClickMode() != ZMCLICKMODE_NORMAL )
+    {
+        FreeTempHiddenZombie();
+        SetClickMode( ZMCLICKMODE_NORMAL );
+        return;
+    }
+
     m_BoxSelect->SetVisible( false );
 
     int mx, my;
