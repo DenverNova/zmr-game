@@ -239,6 +239,20 @@ void CSurvivorFollowSchedule::OnUpdate()
 
     // --- Non-explore behaviors: Follow / Defend ---
 
+    // If carrying a physics object and a zombie is nearby, drop it and fight
+    {
+        CZMBaseWeapon* pActiveWep = pOuter->GetActiveWeapon();
+        if ( pActiveWep && FStrEq( pActiveWep->GetClassname() + sizeof("weapon_zm_") - 1, "fistscarry" ) )
+        {
+            CBaseEntity* pNearZombie = FindNearestZombie( 400.0f );
+            if ( pNearZombie )
+            {
+                pOuter->ForceDropOfCarriedPhysObjects( nullptr );
+                pOuter->EquipBestWeapon();
+            }
+        }
+    }
+
     // Combat takes priority over scavenging - if a zombie is close, abort scavenging
     if ( m_bScavenging || m_ObjPath.IsValid() )
     {
@@ -475,6 +489,8 @@ void CSurvivorFollowSchedule::OnSpawn()
     // Re-randomize mixed mode behavior each round
     m_iMixedBehavior = -1;
     m_bExploreIdling = false;
+    m_NextExplorePath.Invalidate();
+    m_ExplorePath.Invalidate();
 
     // Reset scavenge state
     m_bScavenging = false;
@@ -674,7 +690,30 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
 {
     CZMPlayerBot* pOuter = GetOuter();
 
-    // Pick up weapons and ammo we walk near (within 128 units) while exploring
+    // Initial scavenge phase: for the first few seconds after spawn, use normal
+    // scavenging to pick up nearby weapons and ammo before heading out to explore.
+    // m_NextWeaponScan is initialized to 2.0s on spawn, so it won't be elapsed immediately.
+    if ( !m_NextExplorePath.HasStarted() )
+    {
+        // First time entering explore mode this round - allow scavenging for a bit
+        TryPickupNearbyWeapons();
+        pOuter->EquipBestWeapon();
+
+        // If actively walking to a scavenge target, let it finish
+        if ( m_bScavenging && m_ObjPath.IsValid() )
+        {
+            m_ObjPath.Update( pOuter );
+            return;
+        }
+
+        // Done scavenging or nothing nearby - start exploring
+        m_bScavenging = false;
+        m_hScavengeTarget.Set( nullptr );
+        m_ObjPath.Invalidate();
+        m_NextExplorePath.Start( 0.1f );
+    }
+
+    // While exploring, pick up weapons and ammo we walk near (within 128 units)
     if ( m_NextWeaponScan.IsElapsed() )
     {
         m_NextWeaponScan.Start( 0.5f );
@@ -709,12 +748,31 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
         pOuter->EquipBestWeapon();
     }
 
-    // Hunt zombies: if one is nearby, face it so combat schedule can engage
-    CBaseEntity* pZombie = FindNearestZombie( 800.0f );
+    // If carrying a physics object and a zombie is nearby, drop it and fight
+    CZMBaseWeapon* pActiveWep = pOuter->GetActiveWeapon();
+    if ( pActiveWep && FStrEq( pActiveWep->GetClassname() + sizeof("weapon_zm_") - 1, "fistscarry" ) )
+    {
+        CBaseEntity* pNearZombie = FindNearestZombie( 400.0f );
+        if ( pNearZombie )
+        {
+            pOuter->ForceDropOfCarriedPhysObjects( nullptr );
+            pOuter->EquipBestWeapon();
+        }
+    }
+
+    // Combat engagement: when a zombie is nearby, stop exploring and let combat schedule handle it
+    CBaseEntity* pZombie = FindNearestZombie( 600.0f );
     if ( pZombie )
     {
+        // Stop moving so the combat schedule can properly intercept
+        m_ExplorePath.Invalidate();
         m_vecHeardLookAt = pZombie->WorldSpaceCenter();
         m_NextHeardLook.Start( 1.5f );
+
+        // Face the zombie and let combat take over
+        pOuter->GetMotor()->FaceTowards( pZombie->WorldSpaceCenter() );
+        pOuter->EquipBestWeapon();
+        return;
     }
 
     // Continuously explore: when path is done or invalid, immediately pick a new destination
@@ -739,10 +797,14 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
         Vector vecMyPos = pOuter->GetAbsOrigin();
         bool bPathFound = false;
 
-        // Try up to 8 random areas to find a reachable one far away
-        for ( int attempt = 0; attempt < 8 && !bPathFound; attempt++ )
+        // Use per-bot entropy so each bot picks different areas.
+        // Entity index + current time ensures unique random sequences per bot.
+        int botSeed = pOuter->entindex() * 7919 + (int)(gpGlobals->curtime * 1000.0f);
+
+        for ( int attempt = 0; attempt < 10 && !bPathFound; attempt++ )
         {
-            int n = random->RandomInt( 0, navCount - 1 );
+            // Mix the attempt number into the seed for variety across retries
+            int n = abs( (botSeed + attempt * 6271) % navCount );
 
             class CAreaPick
             {
@@ -766,7 +828,6 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
             if ( !pGoal || pGoal == pStart )
                 continue;
 
-            // Skip areas that are very close - we want real exploration
             Vector vecGoal = pGoal->GetCenter();
             if ( vecMyPos.DistToSqr( vecGoal ) < (512.0f * 512.0f) )
                 continue;
@@ -904,16 +965,22 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
     }
     else
     {
-        // No zombies nearby - look around defensively
+        // No zombies nearby - look around calmly in different directions
         if ( !m_DefendLookTimer.HasStarted() || m_DefendLookTimer.IsElapsed() )
         {
-            m_DefendLookTimer.Start( random->RandomFloat( 2.0f, 5.0f ) );
-            m_flDefendLookYaw = random->RandomFloat( -120.0f, 120.0f );
+            m_DefendLookTimer.Start( random->RandomFloat( 3.0f, 6.0f ) );
+
+            // Pick a new absolute target yaw (not an offset from current)
+            QAngle angBase = pOuter->EyeAngles();
+            m_flDefendLookYaw = anglemod( angBase.y + random->RandomFloat( -120.0f, 120.0f ) );
         }
 
-        QAngle angCur = pOuter->EyeAngles();
-        float flTargetYaw = anglemod( angCur.y + m_flDefendLookYaw );
-        pOuter->GetMotor()->FaceTowards( flTargetYaw );
+        // Smoothly face the absolute target direction using a world-space point
+        Vector fwd;
+        QAngle lookAng( 0.0f, m_flDefendLookYaw, 0.0f );
+        AngleVectors( lookAng, &fwd );
+        Vector vecLookTarget = pOuter->EyePosition() + fwd * 512.0f;
+        pOuter->GetMotor()->FaceTowards( vecLookTarget );
     }
 
     // Stay near the defend position
@@ -994,19 +1061,19 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
         }
         else
         {
-            // Stuck detection: if we haven't made meaningful progress, give up
-            if ( flDist >= m_flLastScavengeDist - 4.0f )
+            // Stuck detection: if we haven't made meaningful progress, give up quickly
+            if ( flDist >= m_flLastScavengeDist - 8.0f )
                 m_nScavengeStuckCount++;
             else
                 m_nScavengeStuckCount = 0;
             m_flLastScavengeDist = flDist;
 
-            if ( m_nScavengeStuckCount > 30 || !m_ObjPath.IsValid() )
+            if ( m_nScavengeStuckCount > 15 || !m_ObjPath.IsValid() )
             {
                 // Blacklist this item so we don't try again soon
                 m_BlacklistedItems.AddToTail( m_hScavengeTarget );
                 if ( !m_BlacklistClearTimer.HasStarted() )
-                    m_BlacklistClearTimer.Start( 60.0f );
+                    m_BlacklistClearTimer.Start( 120.0f );
 
                 if ( zm_sv_bot_debug.GetBool() )
                     Msg( "[Bot %s] Scavenge stuck on '%s' (dist=%.0f, stuck=%i) - blacklisting\n",
@@ -1278,13 +1345,21 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
 
             if ( !m_ObjPath.Compute( myPos, vecTarget, pStart, pGoal, m_PathCost ) )
             {
+                // Path failed - blacklist this item so we don't keep trying
+                m_BlacklistedItems.AddToTail( EHANDLE( pBestWeapon ) );
+                if ( !m_BlacklistClearTimer.HasStarted() )
+                    m_BlacklistClearTimer.Start( 120.0f );
                 m_bScavenging = false;
                 m_hScavengeTarget.Set( nullptr );
-                m_NextWeaponScan.Start( 10.0f );
+                m_NextWeaponScan.Start( 2.0f );
             }
         }
         else
         {
+            // No nav area found near item - blacklist it
+            m_BlacklistedItems.AddToTail( EHANDLE( pBestWeapon ) );
+            if ( !m_BlacklistClearTimer.HasStarted() )
+                m_BlacklistClearTimer.Start( 120.0f );
             m_bScavenging = false;
             m_hScavengeTarget.Set( nullptr );
         }

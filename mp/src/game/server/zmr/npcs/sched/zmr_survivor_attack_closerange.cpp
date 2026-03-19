@@ -99,21 +99,15 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
     }
 
 
-    auto* pFollow = pOuter->GetFollowTarget();
-
-    if ( pFollow && pFollow->GetAbsOrigin().DistToSqr( pOuter->GetAbsOrigin() ) > (256.0f*256.0f) )
-    {
-        End( "Follow target was too far away to attack anymore!" );
-        return;
-    }
-
+    // Don't restrict combat by follow target distance - let bots fight freely
+    // Follow behavior will resume once combat schedule ends
 
 
     if ( !m_NextRangeCheck.HasStarted() || m_NextRangeCheck.IsElapsed() )
     {
-        m_NextRangeCheck.Start( 0.1f );
+        m_NextRangeCheck.Start( 0.15f );
 
-
+        // Always try to back away from threats first (kiting)
         if ( !m_bMovingOutOfRange && ShouldMoveBack( pEnemy ) )
         {
             MoveBackFromThreat( pEnemy );
@@ -136,26 +130,24 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
     }
 
 
-    Vector vecAimTarget;
-
-
-    // TODO: Aim at head?
-    vecAimTarget = pEnemy->WorldSpaceCenter();
-
+    Vector vecAimTarget = pEnemy->WorldSpaceCenter();
 
     pOuter->GetMotor()->FaceTowards( vecAimTarget );
 
 
-    // Fix this grace stuff as the bot will not aim accurately.
-    float grace = IsMeleeing() ? 60.0f : 8.0f;
+    float grace = IsMeleeing() ? 60.0f : 12.0f;
 
 
     if ( IsInRangeToAttack( pEnemy ) && pOuter->GetMotor()->IsFacing( vecAimTarget, grace ) )
     {
-        if (pOuter->GetSenses()->CanSee( vecAimTarget ) &&
-            (!pOuter->MustStopToShoot() || pOuter->GetLocalVelocity().IsLengthLessThan( 1.0f )))
+        if ( pOuter->GetSenses()->CanSee( vecAimTarget ) )
         {
-            pOuter->PressFire1( 0.1f );
+            // Run-and-gun: fire while moving for most weapons
+            // Only stop for precision weapons (rifle, revolver)
+            if ( !pOuter->MustStopToShoot() || pOuter->GetLocalVelocity().IsLengthLessThan( 10.0f ) )
+            {
+                pOuter->PressFire1( 0.15f );
+            }
         }
     }
 }
@@ -191,7 +183,9 @@ bool CSurvivorAttackCloseRangeSchedule::ShouldMoveBack( CBaseEntity* pEnemy ) co
 {
     float flDistSqr = pEnemy->GetAbsOrigin().DistToSqr( GetOuter()->GetPosition() );
 
-    float flMoveBackRange = IsMeleeing() ? 32.0f : 128.0f;
+    // Melee: retreat after getting a hit in (hit-and-run) - back off when within 80 units
+    // Ranged: kite backwards when zombie gets within 200 units
+    float flMoveBackRange = IsMeleeing() ? 80.0f : 200.0f;
 
     if ( flDistSqr > (flMoveBackRange*flMoveBackRange) )
         return false;
@@ -208,7 +202,6 @@ void CSurvivorAttackCloseRangeSchedule::MoveToShootingRange( CBaseEntity* pEnemy
     const Vector vecMyPos = pOuter->GetPosition();
 
     Vector dir = (vecMyPos - vecEnemyPos).Normalized();
-
 
     float flDist = pOuter->GetOptimalAttackDistance();
 
@@ -240,11 +233,15 @@ void CSurvivorAttackCloseRangeSchedule::MoveBackFromThreat( CBaseEntity* pEnemy 
     const Vector vecMyPos = pOuter->GetPosition();
 
     Vector dir = (vecMyPos - vecEnemyPos).Normalized();
+    if ( dir.IsLengthLessThan( 0.1f ) )
+        dir = Vector( 1.0f, 0.0f, 0.0f );
 
-    Vector vecTarget = vecMyPos + dir * 128.0f;
+    // Melee: retreat further for hit-and-run; ranged: kite back a good distance
+    float flRetreatDist = IsMeleeing() ? 192.0f : 256.0f;
+    Vector vecTarget = vecMyPos + dir * flRetreatDist;
 
     CNavArea* pStart = pOuter->GetLastKnownArea();
-    CNavArea* pGoal = TheNavMesh->GetNearestNavArea( vecTarget, true, 128.0f, false );
+    CNavArea* pGoal = TheNavMesh->GetNearestNavArea( vecTarget, true, 256.0f, false );
 
     if ( pGoal )
     {
@@ -260,5 +257,7 @@ void CSurvivorAttackCloseRangeSchedule::MoveBackFromThreat( CBaseEntity* pEnemy 
     m_bMovingOutOfRange = m_Path.IsValid();
     m_bMovingToRange = false;
 
-    m_NextMovingToRange.Start( IsMeleeing() ? 1.5f : 0.4f );
+    // Melee: wait longer before re-engaging (hit-and-run rhythm)
+    // Ranged: quickly re-evaluate for continuous kiting
+    m_NextMovingToRange.Start( IsMeleeing() ? 2.0f : 0.3f );
 }
