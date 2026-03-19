@@ -137,6 +137,18 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
 
     float grace = IsMeleeing() ? 60.0f : 12.0f;
 
+    float flEnemyDist = pEnemy->GetAbsOrigin().DistTo( pOuter->GetPosition() );
+
+    if ( IsMeleeing() && m_bMovingToRange && pOuter->GetMotor()->IsFacing( vecAimTarget, grace ) )
+    {
+        // Melee wind-up prediction: start swinging before arriving so the hit
+        // lands right as we reach the zombie. Start attack at ~2x melee range.
+        float flWindUpRange = pOuter->GetMaxAttackDistance() * 2.5f;
+        if ( flEnemyDist < flWindUpRange && flEnemyDist > pOuter->GetMaxAttackDistance() * 0.5f )
+        {
+            pOuter->PressFire1( 0.15f );
+        }
+    }
 
     if ( IsInRangeToAttack( pEnemy ) && pOuter->GetMotor()->IsFacing( vecAimTarget, grace ) )
     {
