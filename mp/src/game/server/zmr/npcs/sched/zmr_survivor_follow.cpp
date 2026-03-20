@@ -422,6 +422,11 @@ void CSurvivorFollowSchedule::OnUpdate()
         {
             m_Path.Update( pOuter, pExplicitFollow, m_PathCost );
         }
+        else if ( !m_Path.IsValid() && !bBusy )
+        {
+            // No navmesh or path failed - walk directly toward the target
+            pOuter->GetMotor()->Approach( pExplicitFollow->GetAbsOrigin() );
+        }
         return;
     }
 
@@ -471,6 +476,11 @@ void CSurvivorFollowSchedule::OnUpdate()
     if ( m_Path.IsValid() && !bBusy )
     {
         m_Path.Update( pOuter, pFollow, m_PathCost );
+    }
+    else if ( !m_Path.IsValid() && !bBusy )
+    {
+        // No navmesh or path failed - walk directly toward the target
+        pOuter->GetMotor()->Approach( pFollow->GetAbsOrigin() );
     }
 }
 
@@ -1010,6 +1020,11 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
         if ( m_ExplorePath.IsValid() && !bBusy )
         {
             m_ExplorePath.Update( pOuter );
+        }
+        else if ( !m_ExplorePath.IsValid() && !bBusy )
+        {
+            // No navmesh - walk directly toward defend position
+            pOuter->GetMotor()->Approach( m_vecDefendPos );
         }
     }
 }

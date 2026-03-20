@@ -293,8 +293,11 @@ static void BotVoiceCommand_Go( CZMPlayer* pCaller )
 {
     float flRange = zm_sv_bot_command_range.GetFloat();
     float flRangeSqr = flRange * flRange;
-    Vector callerPos = pCaller->GetAbsOrigin();
+    Vector eyePos = pCaller->EyePosition();
+    Vector fwd;
+    AngleVectors( pCaller->EyeAngles(), &fwd );
 
+    int nCommanded = 0;
     for ( int i = 1; i <= gpGlobals->maxClients; i++ )
     {
         CBasePlayer* pPlayer = UTIL_PlayerByIndex( i );
@@ -307,20 +310,30 @@ static void BotVoiceCommand_Go( CZMPlayer* pCaller )
         if ( !pBot )
             continue;
 
-        // Only affect bots not already following a human player
-        CBasePlayer* pCurrentFollow = pBot->GetFollowTarget();
-        if ( pCurrentFollow && !pCurrentFollow->IsBot() )
-            continue;
-
-        float distSqr = pPlayer->GetAbsOrigin().DistToSqr( callerPos );
+        float distSqr = pPlayer->GetAbsOrigin().DistToSqr( pCaller->GetAbsOrigin() );
         if ( distSqr > flRangeSqr )
             continue;
 
-        // Clear follow target and set behavior override to explore
+        // Only affect bots the player is looking at (within a cone)
+        Vector toBot = pPlayer->GetAbsOrigin() + Vector( 0, 0, 36 ) - eyePos;
+        float dist = toBot.NormalizeInPlace();
+        if ( dist > flRange )
+            continue;
+        float dot = fwd.Dot( toBot );
+        if ( dot < 0.7f )
+            continue;
+
+        // Set to explore mode
         pBot->SetFollowTarget( nullptr );
         pBot->SetStayPut( false );
+        pBot->ClearCommandedDefendPos();
         pBot->SetBehaviorOverride( 1 ); // 1 = Explore
+        ZMGetVoiceLines()->OnVoiceLine( pBot, 0 );
+        nCommanded++;
     }
+
+    if ( nCommanded > 0 )
+        ClientPrint( pCaller, HUD_PRINTCENTER, UTIL_VarArgs( "%d bot(s): Exploring", nCommanded ) );
 }
 
 #define VOICE_INDEX_HELP    2

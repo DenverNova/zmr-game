@@ -22,6 +22,8 @@ ConVar zm_sv_debug_bot_lookat( "zm_sv_debug_bot_lookat", "0" );
 class CZMPlayerSenses : public NPCR::CBaseSenses
 {
 public:
+    typedef NPCR::CBaseSenses BaseClass;
+
     CZMPlayerSenses( CZMPlayerBot* pNPC ) : NPCR::CBaseSenses( pNPC )
     {
     }
@@ -42,6 +44,18 @@ public:
                     vListEntities.AddToTail( pEnt );
             }
         }
+    }
+
+    // Proximity sense: zombies within 300 units are always detected
+    // regardless of FOV - only require line of sight.
+    virtual bool CanSeeCharacter( CBaseEntity* pEnt ) const OVERRIDE
+    {
+        float flDistSqr = pEnt->GetAbsOrigin().DistToSqr( GetOuter()->GetAbsOrigin() );
+        if ( flDistSqr < (300.0f * 300.0f) )
+        {
+            return HasLOS( pEnt->WorldSpaceCenter() );
+        }
+        return BaseClass::CanSeeCharacter( pEnt );
     }
 
     virtual int GetSoundMask() const OVERRIDE { return SOUND_COMBAT | SOUND_DANGER | SOUND_BULLET_IMPACT | SOUND_PLAYER | SOUND_WORLD; }

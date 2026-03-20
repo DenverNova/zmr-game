@@ -173,11 +173,8 @@ void CZMAIZombieMaster::GatherActiveSpawners( CUtlVector<CZMEntZombieSpawn*>& sp
         CZMEntZombieSpawn* pSpawn = dynamic_cast<CZMEntZombieSpawn*>( pEnt );
         if ( !pSpawn )
             continue;
-        // Must have zombie flags (classes) and be active (visible to ZM).
         // IsActive() respects the same gating as human ZMs - spawners hidden
         // until map triggers reveal them should stay hidden for the AI too.
-        if ( pSpawn->GetZombieFlags() == 0 )
-            continue;
         if ( !pSpawn->IsActive() )
             continue;
         spawners.AddToTail( pSpawn );
@@ -215,7 +212,7 @@ void CZMAIZombieMaster::LogAllSpawners() const
             }
         }
         if ( flags == 0 )
-            Q_strncpy( classStr, "(none/disabled)", sizeof(classStr) );
+            Q_strncpy( classStr, "all (default)", sizeof(classStr) );
 
         Msg( "  Spawner %i: pos=(%.0f,%.0f,%.0f) active=%s flags=0x%X classes=[%s]\n",
             total - 1, pos.x, pos.y, pos.z, bActive ? "YES" : "NO", flags, classStr );
@@ -227,7 +224,8 @@ void CZMAIZombieMaster::LogAllSpawners() const
 bool CZMAIZombieMaster::SpawnerSupportsClass( CZMEntZombieSpawn* pSpawner, ZombieClass_t zclass ) const
 {
     if ( !pSpawner || zclass == ZMCLASS_INVALID ) return false;
-    return ( pSpawner->GetZombieFlags() & (1 << (int)zclass) ) != 0;
+    int flags = pSpawner->GetZombieFlags();
+    return ( flags == 0 || (flags & (1 << (int)zclass)) != 0 );
 }
 
 bool CZMAIZombieMaster::IsClassCheap( ZombieClass_t zclass ) const
@@ -546,8 +544,8 @@ void CZMAIZombieMaster::ExecutePlanStep( CZMPlayer* pZM )
     if ( step.iSpawnerIndex >= 0 && step.iSpawnerIndex < m_PlanSpawners.Count() )
     {
         pSpawner = m_PlanSpawners[ step.iSpawnerIndex ];
-        // Validate it's still usable
-        if ( pSpawner && pSpawner->GetZombieFlags() == 0 )
+        // Validate it's still active
+        if ( pSpawner && !pSpawner->IsActive() )
             pSpawner = nullptr;
     }
 

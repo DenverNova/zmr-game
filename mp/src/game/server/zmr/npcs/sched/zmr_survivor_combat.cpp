@@ -66,7 +66,7 @@ void CSurvivorCombatSchedule::OnUpdate()
 
     if ( !m_NextEnemyScan.HasStarted() || m_NextEnemyScan.IsElapsed() )
     {
-        m_NextEnemyScan.Start( 0.2f );
+        m_NextEnemyScan.Start( 0.1f );
 
 
         CBaseEntity* pClosestEnemy = pOuter->GetSenses()->GetClosestEntity();

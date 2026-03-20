@@ -32,8 +32,8 @@ float NPCR::CPlayerMotor::GetYawRate( float delta ) const
 
 bool NPCR::CPlayerMotor::ShouldDoFullMove() const
 {
-    // We're in water, we can go up and down.
-    return GetOuter()->GetWaterLevel() >= 2;
+    // Allow full 3D movement in water or on ladders.
+    return GetOuter()->GetWaterLevel() >= 2 || GetOuter()->GetMoveType() == MOVETYPE_LADDER;
 }
 
 void NPCR::CPlayerMotor::Approach( const Vector& vecDesiredGoal )
@@ -41,13 +41,16 @@ void NPCR::CPlayerMotor::Approach( const Vector& vecDesiredGoal )
     // Snap yaw instantly to movement direction so Move() decomposes correctly.
     // Smooth facing is fine for enemies; for movement it causes sideways walking.
     Vector vecDir = vecDesiredGoal - GetOuter()->GetAbsOrigin();
-    vecDir.z = 0.0f;
+    if ( !ShouldDoFullMove() )
+        vecDir.z = 0.0f;
     if ( vecDir.LengthSqr() > 1.0f )
     {
         QAngle angMove;
         VectorAngles( vecDir, angMove );
         QAngle angCur = GetNPC()->GetEyeAngles();
         angCur.y = angMove.y;
+        if ( ShouldDoFullMove() )
+            angCur.x = angMove.x;
         GetNPC()->SetEyeAngles( angCur );
     }
 

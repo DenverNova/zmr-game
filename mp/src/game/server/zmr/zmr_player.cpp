@@ -2206,6 +2206,59 @@ void CZMPlayer::PlayerUse()
 	{
 		m_bHoldUseConsumed = true;
 
+		// If the player is currently carrying a physics object, drop it and
+		// command the nearest bot to pick it up.
+		CBaseEntity* pPlayerHeld = nullptr;
+		{
+			CBaseCombatWeapon* pWep = GetActiveWeapon();
+			if ( pWep )
+			{
+				const char* szClass = pWep->GetClassname();
+				if ( szClass && Q_stristr( szClass, "fistscarry" ) )
+				{
+					// Player is carrying something via the hands weapon
+					pPlayerHeld = GetUseEntity();
+				}
+			}
+		}
+
+		if ( pPlayerHeld )
+		{
+			// Drop the object from the player's grip
+			ForceDropOfCarriedPhysObjects( nullptr );
+
+			// Find the closest bot to send to grab it
+			CZMPlayerBot* pClosestBot = nullptr;
+			float flClosestDist = FLT_MAX;
+			for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+			{
+				CBasePlayer* pOther = UTIL_PlayerByIndex( i );
+				if ( !pOther || !pOther->IsBot() || !pOther->IsAlive() )
+					continue;
+				if ( pOther->GetTeamNumber() != ZMTEAM_HUMAN )
+					continue;
+
+				CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pOther );
+				if ( !pBot )
+					continue;
+
+				float dist = pBot->GetAbsOrigin().DistToSqr( GetAbsOrigin() );
+				if ( dist < flClosestDist )
+				{
+					flClosestDist = dist;
+					pClosestBot = pBot;
+				}
+			}
+
+			if ( pClosestBot )
+			{
+				pClosestBot->SetCommandedGrabTarget( pPlayerHeld );
+				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Grabbing object", pClosestBot->GetPlayerName() ) );
+				ZMGetVoiceLines()->OnVoiceLine( pClosestBot, 0 );
+			}
+			return;
+		}
+
 		Vector eyePos = EyePosition();
 		Vector fwd;
 		AngleVectors( EyeAngles(), &fwd );
@@ -2218,13 +2271,13 @@ void CZMPlayer::PlayerUse()
 			CBaseEntity* pHitEnt = tr.m_pEnt;
 			bool bHandled = false;
 
-			// Check if we hit a grabbable physics object
+			// Check if we hit a grabbable physics object on the ground
 			if ( pHitEnt && !pHitEnt->IsWorld() )
 			{
 				IPhysicsObject* pPhys = pHitEnt->VPhysicsGetObject();
 				if ( pPhys && pPhys->IsMoveable() && !pPhys->IsAttachedToConstraint(false) )
 				{
-					// Find the closest following bot to send to grab it
+					// Find the closest bot (any nearby bot, not just followers)
 					CZMPlayerBot* pClosestBot = nullptr;
 					float flClosestDist = FLT_MAX;
 
@@ -2237,7 +2290,7 @@ void CZMPlayer::PlayerUse()
 							continue;
 
 						CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pOther );
-						if ( !pBot || pBot->GetFollowTarget() != this )
+						if ( !pBot )
 							continue;
 
 						float dist = pBot->GetAbsOrigin().DistToSqr( pHitEnt->GetAbsOrigin() );
@@ -2251,7 +2304,8 @@ void CZMPlayer::PlayerUse()
 					if ( pClosestBot )
 					{
 						pClosestBot->SetCommandedGrabTarget( pHitEnt );
-						ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Grabbing object", pClosestBot->GetPlayerName() ) );
+						pClosestBot->SetFollowTarget( this );
+						ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Fetching object", pClosestBot->GetPlayerName() ) );
 						ZMGetVoiceLines()->OnVoiceLine( pClosestBot, 0 );
 						bHandled = true;
 					}
@@ -2344,18 +2398,24 @@ void CZMPlayer::PlayerUse()
 				}
 			}
 
-			bool bIsFollowing = !pBestBot->IsStayingPut();
-			if ( bIsFollowing )
+			// Bot is "following me" if it has me as explicit follow target,
+			// isn't staying put, and has no behavior override active.
+			bool bIsFollowingMe = ( pBestBot->GetFollowTarget() == this &&
+									!pBestBot->IsStayingPut() &&
+									pBestBot->GetBehaviorOverride() < 0 );
+			if ( bIsFollowingMe )
 			{
 				pBestBot->SetFollowTarget( nullptr );
 				pBestBot->SetStayPut( true );
 				pBestBot->ClearCommandedDefendPos();
+				pBestBot->SetBehaviorOverride( -1 );
 				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Staying", pBestBot->GetPlayerName() ) );
 				ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
 			}
 			else
 			{
 				pBestBot->SetFollowTarget( this );
+				pBestBot->SetStayPut( false );
 				pBestBot->ClearCommandedDefendPos();
 				pBestBot->SetBehaviorOverride( -1 );
 				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Following", pBestBot->GetPlayerName() ) );
