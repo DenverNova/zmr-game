@@ -2206,59 +2206,6 @@ void CZMPlayer::PlayerUse()
 	{
 		m_bHoldUseConsumed = true;
 
-		// If the player is currently carrying a physics object, drop it and
-		// command the nearest bot to pick it up.
-		CBaseEntity* pPlayerHeld = nullptr;
-		{
-			CBaseCombatWeapon* pWep = GetActiveWeapon();
-			if ( pWep )
-			{
-				const char* szClass = pWep->GetClassname();
-				if ( szClass && Q_stristr( szClass, "fistscarry" ) )
-				{
-					// Player is carrying something via the hands weapon
-					pPlayerHeld = GetUseEntity();
-				}
-			}
-		}
-
-		if ( pPlayerHeld )
-		{
-			// Drop the object from the player's grip
-			ForceDropOfCarriedPhysObjects( nullptr );
-
-			// Find the closest bot to send to grab it
-			CZMPlayerBot* pClosestBot = nullptr;
-			float flClosestDist = FLT_MAX;
-			for ( int i = 1; i <= gpGlobals->maxClients; i++ )
-			{
-				CBasePlayer* pOther = UTIL_PlayerByIndex( i );
-				if ( !pOther || !pOther->IsBot() || !pOther->IsAlive() )
-					continue;
-				if ( pOther->GetTeamNumber() != ZMTEAM_HUMAN )
-					continue;
-
-				CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pOther );
-				if ( !pBot )
-					continue;
-
-				float dist = pBot->GetAbsOrigin().DistToSqr( GetAbsOrigin() );
-				if ( dist < flClosestDist )
-				{
-					flClosestDist = dist;
-					pClosestBot = pBot;
-				}
-			}
-
-			if ( pClosestBot )
-			{
-				pClosestBot->SetCommandedGrabTarget( pPlayerHeld );
-				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Grabbing object", pClosestBot->GetPlayerName() ) );
-				ZMGetVoiceLines()->OnVoiceLine( pClosestBot, 0 );
-			}
-			return;
-		}
-
 		Vector eyePos = EyePosition();
 		Vector fwd;
 		AngleVectors( EyeAngles(), &fwd );
@@ -2312,37 +2259,40 @@ void CZMPlayer::PlayerUse()
 				}
 			}
 
-			// If we didn't hit a grabbable object, check for navigable ground
+			// If we didn't hit a grabbable object, send bots to defend the exact aim point
 			if ( !bHandled )
 			{
 				Vector vecHitPos = tr.endpos;
-				CNavArea* pNavArea = TheNavMesh->GetNearestNavArea( vecHitPos, true, 256.0f, false );
 
-				if ( pNavArea )
+				int nCommanded = 0;
+				float flCmdRange = 1024.0f * 1024.0f;
+				for ( int i = 1; i <= gpGlobals->maxClients; i++ )
 				{
-					int nCommanded = 0;
-					for ( int i = 1; i <= gpGlobals->maxClients; i++ )
-					{
-						CBasePlayer* pOther = UTIL_PlayerByIndex( i );
-						if ( !pOther || !pOther->IsBot() || !pOther->IsAlive() )
-							continue;
-						if ( pOther->GetTeamNumber() != ZMTEAM_HUMAN )
-							continue;
+					CBasePlayer* pOther = UTIL_PlayerByIndex( i );
+					if ( !pOther || !pOther->IsBot() || !pOther->IsAlive() )
+						continue;
+					if ( pOther->GetTeamNumber() != ZMTEAM_HUMAN )
+						continue;
 
-						CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pOther );
-						if ( !pBot || pBot->GetFollowTarget() != this )
-							continue;
+					CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pOther );
+					if ( !pBot )
+						continue;
 
-						pBot->SetFollowTarget( nullptr );
-						pBot->SetCommandedDefendPos( vecHitPos );
-						pBot->SetBehaviorOverride( 2 ); // Defend
-						ZMGetVoiceLines()->OnVoiceLine( pBot, 0 );
-						nCommanded++;
-					}
+					// Only command bots that are following us or nearby
+					if ( pBot->GetFollowTarget() != this &&
+						 pBot->GetAbsOrigin().DistToSqr( GetAbsOrigin() ) > flCmdRange )
+						continue;
 
-					if ( nCommanded > 0 )
-						ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%d bot(s): Defending position", nCommanded ) );
+					pBot->SetFollowTarget( nullptr );
+					pBot->SetStayPut( false );
+					pBot->SetCommandedDefendPos( vecHitPos );
+					pBot->SetBehaviorOverride( 2 ); // Defend
+					ZMGetVoiceLines()->OnVoiceLine( pBot, 0 );
+					nCommanded++;
 				}
+
+				if ( nCommanded > 0 )
+					ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%d bot(s): Defending position", nCommanded ) );
 			}
 		}
 		return;
@@ -2383,19 +2333,16 @@ void CZMPlayer::PlayerUse()
 
 		if ( pBestBot )
 		{
-			// If we're holding an object, hand it to the bot instead of toggling follow
-			CZMWeaponHands* pHands = dynamic_cast<CZMWeaponHands*>( GetActiveWeapon() );
-			if ( pHands && pHands->IsCarryingObject() )
+			// If the bot is carrying a physics object, make them drop it
+			CZMBaseWeapon* pBotWep = pBestBot->GetActiveWeapon();
+			if ( pBotWep && Q_stristr( pBotWep->GetClassname(), "fistscarry" ) )
 			{
-				CBaseEntity* pHeld = pHands->GetHeldObject();
-				if ( pHeld )
-				{
-					pHands->ForceDrop( pHeld );
-					pBestBot->SetCommandedGrabTarget( pHeld );
-					ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Taking object", pBestBot->GetPlayerName() ) );
-					ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
-					return;
-				}
+				pBestBot->ForceDropOfCarriedPhysObjects( nullptr );
+				pBestBot->EquipBestWeapon();
+				pBestBot->ClearCommandedGrabTarget();
+				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Dropped object", pBestBot->GetPlayerName() ) );
+				ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
+				return;
 			}
 
 			// Bot is "following me" if it has me as explicit follow target,

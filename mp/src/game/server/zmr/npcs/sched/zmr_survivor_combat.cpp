@@ -2,6 +2,7 @@
 
 #include "zmr_survivor_follow.h"
 #include "zmr_survivor_combat.h"
+#include "zmr_voicelines.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
@@ -71,7 +72,18 @@ void CSurvivorCombatSchedule::OnUpdate()
 
         CBaseEntity* pClosestEnemy = pOuter->GetSenses()->GetClosestEntity();
 
-        //CBaseEntity* pCurEnemy = m_hLastCombatTarget.Get();
+        // Taunt on kill: if our last target died, 25% chance to taunt (30s cooldown)
+        CBaseEntity* pLastTarget = m_hLastCombatTarget.Get();
+        if ( pLastTarget && !pLastTarget->IsAlive() )
+        {
+            if ( !m_NextTauntVoice.HasStarted() || m_NextTauntVoice.IsElapsed() )
+            {
+                m_NextTauntVoice.Start( 30.0f );
+                if ( random->RandomFloat( 0.0f, 1.0f ) < 0.25f )
+                    ZMGetVoiceLines()->OnVoiceLine( pOuter, 4 ); // Taunt
+            }
+            m_hLastCombatTarget.Set( nullptr );
+        }
 
         if ( pClosestEnemy && pOuter->ShouldChase( pClosestEnemy ) != NPCR::RES_NO )
         {
@@ -215,28 +227,47 @@ void CSurvivorCombatSchedule::OnSpawn()
 
 void CSurvivorCombatSchedule::OnHeardSound( CSound* pSound )
 {
-    if ( !m_bMovingOutOfRange && (!m_NextHeardLook.HasStarted() || m_NextHeardLook.IsElapsed()) )
+    if ( m_bMovingOutOfRange )
+        return;
+
+    int soundType = pSound->SoundType();
+
+    // Priority: danger/combat > gunfire > player/world
+    int nPriority = 0;
+    if ( soundType & SOUND_DANGER )
+        nPriority = 4;
+    else if ( soundType & SOUND_COMBAT )
+        nPriority = 3;
+    else if ( soundType & SOUND_BULLET_IMPACT )
+        nPriority = 2;
+    else if ( soundType & (SOUND_PLAYER | SOUND_WORLD) )
+        nPriority = 1;
+
+    if ( nPriority == 0 )
+        return;
+
+    // High-priority sounds can interrupt the cooldown
+    if ( m_NextHeardLook.HasStarted() && !m_NextHeardLook.IsElapsed() )
     {
-        m_NextHeardLook.Start( 2.0f );
-        m_NextLookAround.Start( 2.0f );
+        if ( nPriority < 3 )
+            return;
+    }
 
+    float flCooldown = ( nPriority >= 3 ) ? 1.0f : 2.0f;
+    m_NextHeardLook.Start( flCooldown );
+    m_NextLookAround.Start( flCooldown );
 
-        auto* pOwner = pSound->m_hOwner.Get();
+    auto* pOwner = pSound->m_hOwner.Get();
 
-        if ( pOwner && pOwner->IsPlayer() )
-        {
-            // Face shooter's direction.
-            Vector fwd;
-            AngleVectors( pOwner->EyeAngles(), &fwd );
-                
-            m_vecLookAt = pOwner->EyePosition() + fwd * 1024.0f;
-        }
-        else
-        {
-            // Look directly at the sound origin (zombie growls, attacks, world sounds, etc.)
-            m_vecLookAt = pSound->GetSoundOrigin();
-        }
-            
+    if ( pOwner && pOwner->IsPlayer() && pOwner->GetTeamNumber() == ZMTEAM_HUMAN )
+    {
+        Vector fwd;
+        AngleVectors( pOwner->EyeAngles(), &fwd );
+        m_vecLookAt = pOwner->EyePosition() + fwd * 1024.0f;
+    }
+    else
+    {
+        m_vecLookAt = pSound->GetSoundOrigin();
     }
 }
 

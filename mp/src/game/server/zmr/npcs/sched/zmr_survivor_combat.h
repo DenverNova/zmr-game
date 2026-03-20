@@ -64,6 +64,7 @@ private:
 
     bool m_bMovingOutOfRange;
     CHandle<CBaseEntity> m_hLastCombatTarget;
+    CountdownTimer m_NextTauntVoice;       // Cooldown for kill taunt (30s)
 
     CSurvivorAttackCloseRangeSchedule* m_pAttackCloseRangeSched;
     CSurvivorAttackLongRangeSchedule* m_pAttackLongRangeSched;

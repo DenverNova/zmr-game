@@ -33,6 +33,9 @@ CSurvivorFollowSchedule::CSurvivorFollowSchedule()
     m_bExploreIdling = false;
     m_bFleeingExplosion = false;
     m_flDefendLookYaw = 0.0f;
+    m_vecLastExplorePos = vec3_origin;
+    m_nExploreStuckCount = 0;
+    m_hTargetCrate.Set( nullptr );
 }
 
 CSurvivorFollowSchedule::~CSurvivorFollowSchedule()
@@ -126,6 +129,31 @@ void CSurvivorFollowSchedule::OnUpdate()
         return;
     }
 
+    // Voice line: 50% chance to yell for help when health falls below 30%
+    if ( pOuter->GetHealth() < pOuter->GetMaxHealth() * 0.3f )
+    {
+        if ( !m_NextHelpVoice.HasStarted() || m_NextHelpVoice.IsElapsed() )
+        {
+            m_NextHelpVoice.Start( 15.0f );
+            if ( random->RandomFloat( 0.0f, 1.0f ) < 0.5f )
+                ZMGetVoiceLines()->OnVoiceLine( pOuter, 2 ); // Help
+        }
+    }
+
+    // Voice line: 25% chance to alert on first zombie sight (60s cooldown)
+    {
+        CBaseEntity* pNearby = FindNearestZombie( 600.0f );
+        if ( pNearby )
+        {
+            if ( !m_NextAlertVoice.HasStarted() || m_NextAlertVoice.IsElapsed() )
+            {
+                m_NextAlertVoice.Start( 60.0f );
+                if ( random->RandomFloat( 0.0f, 1.0f ) < 0.25f )
+                    ZMGetVoiceLines()->OnVoiceLine( pOuter, 7 ); // Alert
+            }
+        }
+    }
+
     // Determine effective behavior early so we can route explore bots correctly
     int behavior = zm_sv_bot_default_behavior.GetInt();
     int effectiveBehavior = ( pOuter->GetBehaviorOverride() >= 0 ) ? pOuter->GetBehaviorOverride() : behavior;
@@ -203,6 +231,40 @@ void CSurvivorFollowSchedule::OnUpdate()
             Vector vecGoal = myPos + nudge;
             pOuter->GetMotor()->Approach( vecGoal );
         }
+    }
+
+    // If a player explicitly told this bot to follow (via E key), always obey
+    // regardless of behavior mode. This must be checked BEFORE explore dispatch.
+    auto* pExplicitFollow = pOuter->GetFollowTarget();
+    if ( pExplicitFollow && IsValidFollowTarget( pExplicitFollow, true ) )
+    {
+        // Clear explore mode state so we don't fight with it
+        if ( bIsExploreMode )
+        {
+            m_ExplorePath.Invalidate();
+            m_bExploreIdling = false;
+        }
+
+        if ( !ShouldMoveCloser( pExplicitFollow ) )
+        {
+            m_Path.Invalidate();
+        }
+        else
+        {
+            if ( m_hFollowTarget.Get() != pExplicitFollow || !m_Path.IsValid() )
+                StartFollow( pExplicitFollow );
+
+            bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
+            if ( m_Path.IsValid() && !bBusy )
+            {
+                m_Path.Update( pOuter, pExplicitFollow, m_PathCost );
+            }
+            else if ( !m_Path.IsValid() && !bBusy )
+            {
+                pOuter->GetMotor()->Approach( pExplicitFollow->GetAbsOrigin() );
+            }
+        }
+        return;
     }
 
     // Explore mode: skip scavenging, grab targets, threat scanning etc.
@@ -402,30 +464,30 @@ void CSurvivorFollowSchedule::OnUpdate()
     }
 
     // If a player explicitly told this bot to follow (via E key), always do that
-    auto* pExplicitFollow = pOuter->GetFollowTarget();
-    if ( pExplicitFollow && IsValidFollowTarget( pExplicitFollow, true ) )
+    auto* pExplicitFollow2 = pOuter->GetFollowTarget();
+    if ( pExplicitFollow2 && IsValidFollowTarget( pExplicitFollow2, true ) )
     {
         if ( bDebugThisTick )
-            Msg( "[Bot %s] Explicit follow target: %s\n", pOuter->GetPlayerName(), pExplicitFollow->GetPlayerName() );
+            Msg( "[Bot %s] Explicit follow target: %s\n", pOuter->GetPlayerName(), pExplicitFollow2->GetPlayerName() );
 
-        if ( !ShouldMoveCloser( pExplicitFollow ) )
+        if ( !ShouldMoveCloser( pExplicitFollow2 ) )
         {
             m_Path.Invalidate();
             return;
         }
 
-        if ( m_hFollowTarget.Get() != pExplicitFollow || !m_Path.IsValid() )
-            StartFollow( pExplicitFollow );
+        if ( m_hFollowTarget.Get() != pExplicitFollow2 || !m_Path.IsValid() )
+            StartFollow( pExplicitFollow2 );
 
         bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
         if ( m_Path.IsValid() && !bBusy )
         {
-            m_Path.Update( pOuter, pExplicitFollow, m_PathCost );
+            m_Path.Update( pOuter, pExplicitFollow2, m_PathCost );
         }
         else if ( !m_Path.IsValid() && !bBusy )
         {
             // No navmesh or path failed - walk directly toward the target
-            pOuter->GetMotor()->Approach( pExplicitFollow->GetAbsOrigin() );
+            pOuter->GetMotor()->Approach( pExplicitFollow2->GetAbsOrigin() );
         }
         return;
     }
@@ -514,31 +576,55 @@ void CSurvivorFollowSchedule::OnSpawn()
 
 void CSurvivorFollowSchedule::OnHeardSound( CSound* pSound )
 {
-    if ( m_NextHeardLook.HasStarted() && !m_NextHeardLook.IsElapsed() )
+    // Don't react to sounds while actively fighting a zombie
+    CBaseEntity* pThreat = FindNearestZombie( 300.0f );
+    if ( pThreat )
         return;
 
     int soundType = pSound->SoundType();
-    bool bInteresting = false;
 
-    // React to combat, gunfire, danger, and any NPC/world sounds (zombie growls, attacks, etc.)
-    if ( soundType & ( SOUND_COMBAT | SOUND_BULLET_IMPACT | SOUND_DANGER | SOUND_PLAYER | SOUND_WORLD ) )
-        bInteresting = true;
-    if ( !bInteresting )
+    // Assign priority: danger/combat (zombie sounds) > gunfire > player voice > world
+    int nPriority = 0;
+    if ( soundType & SOUND_DANGER )
+        nPriority = 4;
+    else if ( soundType & SOUND_COMBAT )
+        nPriority = 3;
+    else if ( soundType & SOUND_BULLET_IMPACT )
+        nPriority = 2;
+    else if ( soundType & SOUND_PLAYER )
+        nPriority = 1;
+    else if ( soundType & SOUND_WORLD )
+        nPriority = 1;
+
+    if ( nPriority == 0 )
         return;
 
-    auto* pOwner = pSound->m_hOwner.Get();
-    if ( pOwner && pOwner->IsPlayer() )
+    // High-priority sounds (danger, combat) can interrupt the current look cooldown.
+    // Low-priority sounds must wait for the cooldown to expire.
+    if ( m_NextHeardLook.HasStarted() && !m_NextHeardLook.IsElapsed() )
     {
+        if ( nPriority < 3 )
+            return;
+    }
+
+    // Determine what to look at
+    auto* pOwner = pSound->m_hOwner.Get();
+    if ( pOwner && pOwner->IsPlayer() && pOwner->GetTeamNumber() == ZMTEAM_HUMAN )
+    {
+        // Friendly gunfire - look in the direction they're shooting
         Vector fwd;
         AngleVectors( pOwner->EyeAngles(), &fwd );
         m_vecHeardLookAt = pOwner->EyePosition() + fwd * 1024.0f;
     }
     else
     {
+        // Zombie sounds, world sounds - look directly at the source
         m_vecHeardLookAt = pSound->GetSoundOrigin();
     }
 
-    m_NextHeardLook.Start( random->RandomFloat( 1.0f, 2.0f ) );
+    // High-priority sounds get shorter cooldowns so we stay alert
+    float flCooldown = ( nPriority >= 3 ) ? random->RandomFloat( 0.5f, 1.0f ) : random->RandomFloat( 1.5f, 3.0f );
+    m_NextHeardLook.Start( flCooldown );
 }
 
 //NPCR::QueryResult_t CSurvivorFollowSchedule::IsBusy() const
@@ -699,35 +785,29 @@ CBasePlayer* CSurvivorFollowSchedule::FindSurvivorToFollow( CBasePlayer* pIgnore
 void CSurvivorFollowSchedule::UpdateExploreMode()
 {
     CZMPlayerBot* pOuter = GetOuter();
+    Vector myPos = pOuter->GetAbsOrigin();
 
-    // Initial scavenge phase: for the first few seconds after spawn, use normal
-    // scavenging to pick up nearby weapons and ammo before heading out to explore.
-    // m_NextWeaponScan is initialized to 2.0s on spawn, so it won't be elapsed immediately.
-    if ( !m_NextExplorePath.HasStarted() )
+    // Always scavenge nearby weapons/ammo first - don't run off without loading up
+    TryPickupNearbyWeapons();
+
+    // If actively walking to a scavenge target, let it finish before exploring
+    if ( m_bScavenging )
     {
-        // First time entering explore mode this round - allow scavenging for a bit
-        TryPickupNearbyWeapons();
-        pOuter->EquipBestWeapon();
-
-        // If actively walking to a scavenge target, let it finish
-        if ( m_bScavenging && m_ObjPath.IsValid() )
+        if ( m_ObjPath.IsValid() )
         {
-            m_ObjPath.Update( pOuter );
-            return;
+            bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
+            if ( !bBusy )
+                m_ObjPath.Update( pOuter );
         }
-
-        // Done scavenging or nothing nearby - start exploring
-        m_bScavenging = false;
-        m_hScavengeTarget.Set( nullptr );
-        m_ObjPath.Invalidate();
-        m_NextExplorePath.Start( 0.1f );
+        return;
     }
 
-    // While exploring, pick up weapons and ammo we walk near (within 128 units)
+    pOuter->EquipBestWeapon();
+
+    // While exploring, pick up weapons and ammo we walk near (within 256 units)
     if ( m_NextWeaponScan.IsElapsed() )
     {
         m_NextWeaponScan.Start( 0.5f );
-        Vector myPos = pOuter->GetAbsOrigin();
 
         static const char* s_szPickupClasses[] = {
             "weapon_zm_pistol", "weapon_zm_shotgun", "weapon_zm_shotgun_sporting",
@@ -747,7 +827,7 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
                 CBaseCombatWeapon* pWep = pEnt->MyCombatWeaponPointer();
                 if ( pWep && pWep->GetOwner() ) continue;
 
-                if ( myPos.DistTo( pEnt->GetAbsOrigin() ) < 128.0f )
+                if ( myPos.DistTo( pEnt->GetAbsOrigin() ) < 256.0f )
                 {
                     pOuter->GetMotor()->FaceTowards( pEnt->GetAbsOrigin() );
                     pOuter->PressUse( 0.15f );
@@ -755,43 +835,59 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
                 }
             }
         }
-        pOuter->EquipBestWeapon();
-    }
-
-    // If carrying a physics object and a zombie is nearby, drop it and fight
-    CZMBaseWeapon* pActiveWep = pOuter->GetActiveWeapon();
-    if ( pActiveWep && FStrEq( pActiveWep->GetClassname() + sizeof("weapon_zm_") - 1, "fistscarry" ) )
-    {
-        CBaseEntity* pNearZombie = FindNearestZombie( 400.0f );
-        if ( pNearZombie )
-        {
-            pOuter->ForceDropOfCarriedPhysObjects( nullptr );
-            pOuter->EquipBestWeapon();
-        }
     }
 
     // Combat engagement: when a zombie is nearby, stop exploring and let combat schedule handle it
     CBaseEntity* pZombie = FindNearestZombie( 600.0f );
     if ( pZombie )
     {
-        // Stop moving so the combat schedule can properly intercept
         m_ExplorePath.Invalidate();
         m_vecHeardLookAt = pZombie->WorldSpaceCenter();
         m_NextHeardLook.Start( 1.5f );
 
-        // Face the zombie and let combat take over
         pOuter->GetMotor()->FaceTowards( pZombie->WorldSpaceCenter() );
         pOuter->EquipBestWeapon();
         return;
     }
 
-    // Continuously explore: when path is done or invalid, immediately pick a new destination
+    // Stuck detection: if the bot hasn't moved much in a while, pick a new path
+    if ( !m_NextExploreStuckCheck.HasStarted() || m_NextExploreStuckCheck.IsElapsed() )
+    {
+        m_NextExploreStuckCheck.Start( 1.0f );
+
+        if ( m_ExplorePath.IsValid() )
+        {
+            float flMoved = myPos.DistTo( m_vecLastExplorePos );
+            if ( flMoved < 10.0f )
+            {
+                m_nExploreStuckCount++;
+                if ( m_nExploreStuckCount >= 3 )
+                {
+                    if ( zm_sv_bot_debug.GetBool() )
+                        Msg( "[Bot %s] Explore: stuck (moved %.1f in 3s), picking new path\n",
+                            pOuter->GetPlayerName(), flMoved );
+                    m_ExplorePath.Invalidate();
+                    m_nExploreStuckCount = 0;
+
+                    // Jump in case we're caught on a small ledge
+                    pOuter->PressJump( 0.15f );
+                }
+            }
+            else
+            {
+                m_nExploreStuckCount = 0;
+            }
+        }
+        m_vecLastExplorePos = myPos;
+    }
+
+    // Pick a new explore destination when the current path is done or invalid
     if ( !m_ExplorePath.IsValid() || m_NextExplorePath.IsElapsed() )
     {
         CNavArea* pStart = pOuter->GetLastKnownArea();
         if ( !pStart )
         {
-            pStart = TheNavMesh->GetNearestNavArea( pOuter->GetAbsOrigin(), true, 512.0f, false );
+            pStart = TheNavMesh->GetNearestNavArea( myPos, true, 512.0f, false );
             if ( !pStart )
             {
                 if ( zm_sv_bot_debug.GetBool() )
@@ -804,16 +900,12 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
         if ( navCount <= 0 )
             return;
 
-        Vector vecMyPos = pOuter->GetAbsOrigin();
         bool bPathFound = false;
 
-        // Use per-bot entropy so each bot picks different areas.
-        // Entity index + current time ensures unique random sequences per bot.
         int botSeed = pOuter->entindex() * 7919 + (int)(gpGlobals->curtime * 1000.0f);
 
-        for ( int attempt = 0; attempt < 10 && !bPathFound; attempt++ )
+        for ( int attempt = 0; attempt < 15 && !bPathFound; attempt++ )
         {
-            // Mix the attempt number into the seed for variety across retries
             int n = abs( (botSeed + attempt * 6271) % navCount );
 
             class CAreaPick
@@ -839,21 +931,25 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
                 continue;
 
             Vector vecGoal = pGoal->GetCenter();
-            if ( vecMyPos.DistToSqr( vecGoal ) < (512.0f * 512.0f) )
+
+            // Accept closer destinations too (min 256 units instead of 512)
+            if ( myPos.DistToSqr( vecGoal ) < (256.0f * 256.0f) )
                 continue;
 
             m_PathCost.SetStepHeight( pOuter->GetMotor()->GetStepHeight() );
-            m_PathCost.SetStartPos( vecMyPos, pStart );
+            m_PathCost.SetStartPos( myPos, pStart );
             m_PathCost.SetGoalPos( vecGoal, pGoal );
 
-            if ( m_ExplorePath.Compute( vecMyPos, vecGoal, pStart, pGoal, m_PathCost ) )
+            if ( m_ExplorePath.Compute( myPos, vecGoal, pStart, pGoal, m_PathCost ) )
             {
                 bPathFound = true;
                 m_NextExplorePath.Start( 30.0f );
+                m_nExploreStuckCount = 0;
+                m_vecLastExplorePos = myPos;
 
                 if ( zm_sv_bot_debug.GetBool() )
                     Msg( "[Bot %s] Explore: heading to area %i (dist=%.0f)\n",
-                        pOuter->GetPlayerName(), pGoal->GetID(), vecMyPos.DistTo( vecGoal ) );
+                        pOuter->GetPlayerName(), pGoal->GetID(), myPos.DistTo( vecGoal ) );
             }
         }
 
@@ -869,6 +965,11 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
     if ( m_ExplorePath.IsValid() && !bBusy )
     {
         m_ExplorePath.Update( pOuter );
+    }
+    else if ( !m_ExplorePath.IsValid() && !bBusy )
+    {
+        // No navmesh - walk directly toward a random direction
+        pOuter->GetMotor()->Approach( myPos + Vector( random->RandomFloat(-512,512), random->RandomFloat(-512,512), 0 ) );
     }
 }
 
@@ -1168,7 +1269,7 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
             iClipSize = 10; // fallback
 
         int iMissing = iMax - iCurrent;
-        if ( iMissing >= iClipSize && iMissing > iLowestAmmoMissing )
+        if ( iMissing > 0 && iMissing > iLowestAmmoMissing )
         {
             iLowestAmmoMissing = iMissing;
             iNeededAmmoType = iAmmoType;

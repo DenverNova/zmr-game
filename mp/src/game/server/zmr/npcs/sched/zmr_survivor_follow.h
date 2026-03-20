@@ -105,4 +105,18 @@ private:
     CountdownTimer m_NextExplosionCheck;   // Periodic scan for nearby ZM explosions
     NPCR::CFollowNavPath m_FleePath;      // Path to flee from explosion
     bool m_bFleeingExplosion;              // Currently running from an explosion
+
+    // Explore stuck detection
+    Vector m_vecLastExplorePos;            // Last recorded position during explore
+    int m_nExploreStuckCount;              // Consecutive checks where bot hasn't moved much
+    CountdownTimer m_NextExploreStuckCheck; // Timer for stuck checks during explore
+
+    // Voice line cooldowns
+    CountdownTimer m_NextAlertVoice;       // Cooldown for zombie sight alert (60s)
+    CountdownTimer m_NextTauntVoice;       // Cooldown for kill taunt (30s)
+    CountdownTimer m_NextHelpVoice;        // Cooldown for low-health help call
+
+    // Ammo crate smashing
+    CountdownTimer m_NextCrateCheck;       // Timer for scanning nearby ammo crates
+    EHANDLE m_hTargetCrate;                // Crate we're walking to smash
 };

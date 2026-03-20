@@ -615,28 +615,40 @@ void CZMAIZombieMaster::ExecutePlanStep( CZMPlayer* pZM )
 
 void CZMAIZombieMaster::UpdateTrapOpportunism( CZMPlayer* pZM )
 {
-    if ( gpGlobals->curtime < m_flNextTrapTime )
-        return;
+    float flTrapRange = zm_sv_ai_zm_trap_range.GetFloat();
 
+    // Find the best trap candidate (handles per-trap cooldown internally)
     CZMEntManipulate* pTrap = FindBestTrap();
     if ( !pTrap )
     {
-        m_flNextTrapTime = gpGlobals->curtime + 3.0f;
+        // No valid traps right now - check again soon
+        if ( gpGlobals->curtime >= m_flNextTrapTime )
+            m_flNextTrapTime = gpGlobals->curtime + 2.0f;
         return;
     }
 
+    // How close is the nearest survivor to this trap?
+    float flSurvivorDist = 0.0f;
+    FindNearestHuman( pTrap->GetAbsOrigin(), &flSurvivorDist );
+
+    // If a survivor is very close (within half the trap range), bypass the global cooldown
+    // and trigger immediately - this is a high-priority opportunity
+    bool bUrgent = ( flSurvivorDist < flTrapRange * 0.5f );
+
+    if ( !bUrgent && gpGlobals->curtime < m_flNextTrapTime )
+        return;
+
     int trapCost = pTrap->GetCost();
 
-    // Reserve enough resources for at least one cheap spawn before spending on traps.
-    // This prevents traps from eating ALL resources and starving the spawn plan.
-    int reserveForSpawn = 30; // Rough minimum cost for one zombie
+    // Only reserve resources for spawns if the trap isn't urgent
+    int reserveForSpawn = bUrgent ? 0 : 15;
     int totalNeeded = trapCost + reserveForSpawn;
     if ( trapCost > 0 && pZM->GetResources() < totalNeeded )
     {
         if ( zm_sv_ai_zm_debug.GetBool() )
-            Msg( "[AI ZM] Trap available (cost %i) but reserving %i for spawns (res=%i), skipping\n",
-                trapCost, reserveForSpawn, pZM->GetResources() );
-        m_flNextTrapTime = gpGlobals->curtime + 4.0f;
+            Msg( "[AI ZM] Trap available (cost %i) but need %i (res=%i), skipping\n",
+                trapCost, totalNeeded, pZM->GetResources() );
+        m_flNextTrapTime = gpGlobals->curtime + 3.0f;
         return;
     }
 
@@ -653,14 +665,15 @@ void CZMAIZombieMaster::UpdateTrapOpportunism( CZMPlayer* pZM )
         m_TrapCooldowns.Insert( pTrap->entindex(), gpGlobals->curtime );
 
     if ( zm_sv_ai_zm_debug.GetBool() )
-        Msg( "[AI ZM] Triggered trap (cost: %i, res left: %i, cooldown: %.1fs)\n", trapCost, pZM->GetResources(), zm_sv_ai_zm_trap_cooldown.GetFloat() );
+        Msg( "[AI ZM] Triggered trap (cost: %i, res left: %i, survivor dist: %.0f, urgent: %s, per-trap cd: %.1fs)\n",
+            trapCost, pZM->GetResources(), flSurvivorDist, bUrgent ? "YES" : "NO", zm_sv_ai_zm_trap_cooldown.GetFloat() );
 
     float flAggression = clamp( zm_sv_ai_zm_aggression.GetFloat(), 0.1f, 3.0f );
-    // Shorter cooldown when survivors are still in range, longer otherwise
+    // Global cooldown between any trap triggers - shorter when survivors are still near traps
     float baseCooldown = HasSurvivorNearTrap()
-        ? zm_sv_ai_zm_trap_interval.GetFloat() * 0.5f
-        : zm_sv_ai_zm_trap_interval.GetFloat();
-    m_flNextTrapTime = gpGlobals->curtime + MAX( baseCooldown / flAggression, 4.0f );
+        ? zm_sv_ai_zm_trap_interval.GetFloat() * 0.3f
+        : zm_sv_ai_zm_trap_interval.GetFloat() * 0.6f;
+    m_flNextTrapTime = gpGlobals->curtime + MAX( baseCooldown / flAggression, 3.0f );
 }
 
 void CZMAIZombieMaster::TryHiddenSpawn( CZMPlayer* pZM )
@@ -754,36 +767,48 @@ void CZMAIZombieMaster::TryDetonateBarrel( CZMPlayer* pZM )
     if ( gpGlobals->curtime < m_flNextBarrelDetonateTime )
         return;
 
-    float flTriggerRange = 200.0f; // Survivor must be this close to a barrel
+    float flTriggerRange = 350.0f; // Survivor must be this close to a barrel
 
     CBreakableProp* pBestBarrel = nullptr;
     float flBestDist = FLT_MAX;
 
-    CBaseEntity* pEnt = nullptr;
-    while ( (pEnt = gEntList.FindEntityByClassname( pEnt, "prop_physics*" )) != nullptr )
+    // Scan both prop_physics and prop_physics_multiplayer
+    static const char* s_szPropClasses[] = { "prop_physics", "prop_physics_multiplayer" };
+    for ( int pc = 0; pc < ARRAYSIZE( s_szPropClasses ); pc++ )
     {
-        CBreakableProp* pProp = dynamic_cast<CBreakableProp*>( pEnt );
-        if ( !pProp || !pProp->IsAlive() )
-            continue;
-
-        if ( pProp->GetExplosiveDamage() <= 0.0f )
-            continue;
-
-        float dist = 0.0f;
-        CBasePlayer* pNearest = FindNearestHuman( pProp->GetAbsOrigin(), &dist );
-        if ( !pNearest || dist > flTriggerRange )
-            continue;
-
-        if ( dist < flBestDist )
+        CBaseEntity* pEnt = nullptr;
+        while ( (pEnt = gEntList.FindEntityByClassname( pEnt, s_szPropClasses[pc] )) != nullptr )
         {
-            flBestDist = dist;
-            pBestBarrel = pProp;
+            CBreakableProp* pProp = dynamic_cast<CBreakableProp*>( pEnt );
+            if ( !pProp || !pProp->IsAlive() )
+                continue;
+
+            if ( pProp->GetExplosiveDamage() <= 0.0f )
+                continue;
+
+            float dist = 0.0f;
+            CBasePlayer* pNearest = FindNearestHuman( pProp->GetAbsOrigin(), &dist );
+            if ( !pNearest || dist > flTriggerRange )
+                continue;
+
+            if ( dist < flBestDist )
+            {
+                flBestDist = dist;
+                pBestBarrel = pProp;
+            }
         }
     }
 
     if ( !pBestBarrel )
     {
-        m_flNextBarrelDetonateTime = gpGlobals->curtime + 5.0f;
+        m_flNextBarrelDetonateTime = gpGlobals->curtime + 3.0f;
+        return;
+    }
+
+    // 70% chance to detonate for more natural, unpredictable behavior
+    if ( random->RandomFloat( 0.0f, 1.0f ) > 0.7f )
+    {
+        m_flNextBarrelDetonateTime = gpGlobals->curtime + 2.0f;
         return;
     }
 
@@ -793,11 +818,11 @@ void CZMAIZombieMaster::TryDetonateBarrel( CZMPlayer* pZM )
     pBestBarrel->TakeDamage( info );
 
     if ( zm_sv_ai_zm_debug.GetBool() )
-        Msg( "[AI ZM] Detonated explosive barrel at (%.0f,%.0f,%.0f)\n",
-            pBestBarrel->GetAbsOrigin().x, pBestBarrel->GetAbsOrigin().y, pBestBarrel->GetAbsOrigin().z );
+        Msg( "[AI ZM] Detonated explosive barrel at (%.0f,%.0f,%.0f), survivor %.0f units away\n",
+            pBestBarrel->GetAbsOrigin().x, pBestBarrel->GetAbsOrigin().y, pBestBarrel->GetAbsOrigin().z, flBestDist );
 
-    // 5 minute cooldown
-    m_flNextBarrelDetonateTime = gpGlobals->curtime + 300.0f;
+    // Cooldown before trying another barrel
+    m_flNextBarrelDetonateTime = gpGlobals->curtime + 20.0f;
 }
 
 void CZMAIZombieMaster::Update()
