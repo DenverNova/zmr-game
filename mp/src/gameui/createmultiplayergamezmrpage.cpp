@@ -30,7 +30,6 @@ CCreateMultiplayerGameZMRPage::CCreateMultiplayerGameZMRPage( vgui::Panel *paren
     m_pFlashlightInfinite = new CheckButton( this, "FlashlightInfinite", "" );
     m_pAFKTimer = new TextEntry( this, "AFKTimer" );
     m_pAIZMSpawnInterval = new TextEntry( this, "AIZMSpawnInterval" );
-    m_pAIZMTrapInterval = new TextEntry( this, "AIZMTrapInterval" );
     m_pAIZMAggression = new TextEntry( this, "AIZMAggression" );
 
     LoadControlSettings( "Resource/CreateMultiplayerGameZMRPage.res" );
@@ -83,10 +82,6 @@ void CCreateMultiplayerGameZMRPage::LoadValues()
     ConVarRef spawnInterval( "zm_sv_ai_zm_spawn_interval" );
     if ( spawnInterval.IsValid() )
         m_pAIZMSpawnInterval->SetText( spawnInterval.GetString() );
-
-    ConVarRef trapInterval( "zm_sv_ai_zm_trap_interval" );
-    if ( trapInterval.IsValid() )
-        m_pAIZMTrapInterval->SetText( trapInterval.GetString() );
 
     ConVarRef aggression( "zm_sv_ai_zm_aggression" );
     if ( aggression.IsValid() )
@@ -149,6 +144,5 @@ void CCreateMultiplayerGameZMRPage::OnApplyChanges()
     ApplyConVarCheck( "zm_sv_flashlight_infinite", "FlashlightInfinite" );
     ApplyConVar( "zm_sv_antiafk", "AFKTimer" );
     ApplyConVar( "zm_sv_ai_zm_spawn_interval", "AIZMSpawnInterval", true );
-    ApplyConVar( "zm_sv_ai_zm_trap_interval", "AIZMTrapInterval", true );
     ApplyConVar( "zm_sv_ai_zm_aggression", "AIZMAggression", true );
 }

@@ -1,5 +1,6 @@
 #include "cbase.h"
 
+#include "props.h"
 #include "zmr_survivor_follow.h"
 #include "zmr_survivor_combat.h"
 #include "zmr_voicelines.h"
@@ -20,6 +21,9 @@ CSurvivorCombatSchedule::CSurvivorCombatSchedule()
     m_pLastLookArea = nullptr;
     m_flIdleSince = 0.0f;
     m_bWasMoving = false;
+    m_RetreatPosition = vec3_origin;
+    m_RetreatTime = 0.0f;
+    m_nRetreatAttempts = 0;
 }
 
 CSurvivorCombatSchedule::~CSurvivorCombatSchedule()
@@ -41,6 +45,9 @@ void CSurvivorCombatSchedule::OnStart()
     m_NextHeardLook.Invalidate();
     m_NextLookAround.Invalidate();
     m_hLastCombatTarget.Set( nullptr );
+    m_RetreatPosition = vec3_origin;
+    m_RetreatTime = 0.0f;
+    m_nRetreatAttempts = 0;
 }
 
 void CSurvivorCombatSchedule::OnContinue()
@@ -64,6 +71,73 @@ void CSurvivorCombatSchedule::OnUpdate()
     }
 
 
+
+    // Explosive barrel targeting: if we have a ranged weapon, check for barrels
+    // with 5+ zombies clustered nearby and shoot them for massive damage
+    if ( pOuter->HasAnyEffectiveRangeWeapons() && (!m_NextBarrelScan.HasStarted() || m_NextBarrelScan.IsElapsed()) )
+    {
+        m_NextBarrelScan.Start( 1.0f );
+
+        CBaseEntity* pBestBarrel = nullptr;
+        int nBestZombies = 0;
+
+        CBaseEntity* pProp = nullptr;
+        while ( (pProp = gEntList.FindEntityByClassname( pProp, "prop_physics*" )) != nullptr )
+        {
+            if ( !pProp->IsAlive() )
+                continue;
+
+            CBreakableProp* pBreakable = dynamic_cast<CBreakableProp*>( pProp );
+            if ( !pBreakable || pBreakable->GetExplosiveDamage() <= 0.0f )
+                continue;
+
+            // Must be within reasonable shooting distance and visible
+            float flBarrelDist = pProp->GetAbsOrigin().DistTo( pOuter->GetPosition() );
+            if ( flBarrelDist > 1024.0f || flBarrelDist < 200.0f )
+                continue;
+
+            if ( !pOuter->GetSenses()->HasLOS( pProp->WorldSpaceCenter() ) )
+                continue;
+
+            // Count zombies near this barrel
+            int nNearby = 0;
+            float flBlastRadius = 350.0f;
+            static const char* s_szZombies[] = {
+                "npc_zombie", "npc_fastzombie", "npc_poisonzombie",
+                "npc_burnzombie", "npc_dragzombie",
+            };
+            for ( int z = 0; z < ARRAYSIZE( s_szZombies ); z++ )
+            {
+                CBaseEntity* pZombie = nullptr;
+                while ( (pZombie = gEntList.FindEntityByClassname( pZombie, s_szZombies[z] )) != nullptr )
+                {
+                    if ( !pZombie->IsAlive() ) continue;
+                    if ( pZombie->GetAbsOrigin().DistTo( pProp->GetAbsOrigin() ) < flBlastRadius )
+                        nNearby++;
+                }
+            }
+
+            if ( nNearby >= 5 && nNearby > nBestZombies )
+            {
+                nBestZombies = nNearby;
+                pBestBarrel = pProp;
+            }
+        }
+
+        if ( pBestBarrel )
+        {
+            // Equip a ranged weapon and shoot the barrel
+            if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_MAINGUN ) )
+                pOuter->EquipWeaponOfType( BOTWEPRANGE_MAINGUN );
+            if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_MAINGUN ) && !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_SECONDARYWEAPON ) )
+                pOuter->EquipWeaponOfType( BOTWEPRANGE_SECONDARYWEAPON );
+
+            Vector vecBarrel = pBestBarrel->WorldSpaceCenter();
+            pOuter->GetMotor()->FaceTowards( vecBarrel );
+            if ( pOuter->GetMotor()->IsFacing( vecBarrel, 15.0f ) )
+                pOuter->PressFire1( 0.15f );
+        }
+    }
 
     if ( !m_NextEnemyScan.HasStarted() || m_NextEnemyScan.IsElapsed() )
     {
@@ -107,12 +181,23 @@ void CSurvivorCombatSchedule::OnUpdate()
                 }
             }
 
-            // Melee fallback: engage with fists/melee if no ranged weapons or enemy is close
-            if ( !IsIntercepted() && flDist < 512.0f )
+            // Melee fallback: only fight with fists/melee when cornered (enemy very close).
+            // If the enemy is further away, the bot should try to flee and find guns/ammo.
+            if ( !IsIntercepted() )
             {
-                m_pAttackCloseRangeSched->SetAttackTarget( pClosestEnemy );
-                m_pAttackCloseRangeSched->SetMeleeing( true );
-                Intercept( m_pAttackCloseRangeSched, "Trying to attack with melee!" );
+                // Cornered threshold: if zombie is within 200u, we must fight
+                // Otherwise try to kite/flee and let the follow schedule find weapons
+                if ( flDist < 200.0f )
+                {
+                    m_pAttackCloseRangeSched->SetAttackTarget( pClosestEnemy );
+                    m_pAttackCloseRangeSched->SetMeleeing( true );
+                    Intercept( m_pAttackCloseRangeSched, "Cornered - fighting with melee!" );
+                }
+                else
+                {
+                    // Flee from the zombie - move back and let weapon scavenging happen
+                    MoveBackFromThreat( pClosestEnemy );
+                }
             }
 
             if ( IsIntercepted() )
@@ -142,12 +227,26 @@ void CSurvivorCombatSchedule::OnUpdate()
     if ( m_Path.IsValid() && !bBusy )
     {
         m_Path.Update( pOuter );
+
+        // Wall-running stuck detection: if retreating but barely moved, try a new direction
+        if ( m_bMovingOutOfRange && m_RetreatPosition != vec3_origin )
+        {
+            float flDistMoved = (pOuter->GetPosition() - m_RetreatPosition).Length2D();
+            if ( flDistMoved < 10.0f && gpGlobals->curtime - m_RetreatTime > 1.0f )
+            {
+                m_Path.Invalidate();
+                CBaseEntity* pEnemy = m_hLastCombatTarget.Get();
+                if ( pEnemy )
+                    MoveBackFromThreat( pEnemy );
+            }
+        }
     }
     else
     {
         m_Path.Invalidate();
 
         m_bMovingOutOfRange = false;
+        m_nRetreatAttempts = 0;
     }
 
 
@@ -317,9 +416,26 @@ void CSurvivorCombatSchedule::MoveBackFromThreat( CBaseEntity* pEnemy )
     Vector dir = (vecMyPos - vecEnemyPos);
     dir.z = 0.0f;
     dir.NormalizeInPlace();
+    if ( dir.IsLengthLessThan( 0.1f ) )
+        dir = Vector( 1.0f, 0.0f, 0.0f );
+
+    // If stuck retreating, try perpendicular directions
+    if ( m_nRetreatAttempts > 0 )
+    {
+        float flRotate = ( m_nRetreatAttempts % 2 == 1 ) ? 90.0f : -90.0f;
+        if ( m_nRetreatAttempts >= 3 )
+            flRotate = ( m_nRetreatAttempts % 2 == 1 ) ? 135.0f : -135.0f;
+        float rad = DEG2RAD( flRotate );
+        float c = cos( rad );
+        float s = sin( rad );
+        Vector rotated;
+        rotated.x = dir.x * c - dir.y * s;
+        rotated.y = dir.x * s + dir.y * c;
+        rotated.z = 0.0f;
+        dir = rotated;
+    }
 
     Vector vecTarget = vecMyPos + dir * 128.0f;
-    Vector vecOriginalTarget = vecTarget;
 
     CNavArea* pStart = pOuter->GetLastKnownArea();
     CNavArea* pGoal = TheNavMesh->GetNearestNavArea( vecTarget, true, 200.0f, false );
@@ -328,20 +444,41 @@ void CSurvivorCombatSchedule::MoveBackFromThreat( CBaseEntity* pEnemy )
     {
         pGoal->GetClosestPointOnArea( vecTarget, &vecTarget );
 
-        // We don't want to go forward!
-        if ( (vecTarget - vecMyPos).Normalized().Dot( dir ) < 0.0f )
+        // Reject paths toward the enemy
+        Vector toTarget = (vecTarget - vecMyPos);
+        toTarget.z = 0.0f;
+        Vector toEnemy = (vecEnemyPos - vecMyPos);
+        toEnemy.z = 0.0f;
+        if ( toTarget.LengthSqr() > 1.0f && toEnemy.LengthSqr() > 1.0f )
         {
-            vecTarget = vecOriginalTarget;
+            if ( toTarget.Normalized().Dot( toEnemy.Normalized() ) > 0.5f )
+            {
+                m_nRetreatAttempts++;
+                if ( m_nRetreatAttempts > 5 )
+                    m_nRetreatAttempts = 0;
+                return;
+            }
         }
     }
 
     m_PathCost.SetStartPos( vecMyPos, pStart );
     m_PathCost.SetGoalPos( vecTarget, pGoal );
 
-    m_Path.Compute( vecMyPos, vecTarget, pStart, pGoal, m_PathCost );
-
+    if ( m_Path.Compute( vecMyPos, vecTarget, pStart, pGoal, m_PathCost ) )
+    {
+        m_RetreatPosition = vecMyPos;
+        m_RetreatTime = gpGlobals->curtime;
+        m_nRetreatAttempts++;
+    }
+    else
+    {
+        m_nRetreatAttempts++;
+    }
 
     m_bMovingOutOfRange = m_Path.IsValid();
+
+    if ( m_nRetreatAttempts > 5 )
+        m_nRetreatAttempts = 0;
 
     m_vecLookAt = pEnemy->WorldSpaceCenter();
 }

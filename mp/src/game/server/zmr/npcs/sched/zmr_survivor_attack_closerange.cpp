@@ -11,6 +11,9 @@
 CSurvivorAttackCloseRangeSchedule::CSurvivorAttackCloseRangeSchedule()
 {
     m_bAllowMelee = false;
+    m_RetreatPosition = vec3_origin;
+    m_RetreatTime = 0.0f;
+    m_nRetreatAttempts = 0;
 }
 
 CSurvivorAttackCloseRangeSchedule::~CSurvivorAttackCloseRangeSchedule()
@@ -20,9 +23,13 @@ CSurvivorAttackCloseRangeSchedule::~CSurvivorAttackCloseRangeSchedule()
 void CSurvivorAttackCloseRangeSchedule::OnStart()
 {
     m_bMovingToRange = false;
+    m_bMovingOutOfRange = false;
     m_Path.Invalidate();
     m_NextRangeCheck.Invalidate();
     m_NextMovingToRange.Invalidate();
+    m_RetreatPosition = vec3_origin;
+    m_RetreatTime = 0.0f;
+    m_nRetreatAttempts = 0;
 
 
     CZMPlayerBot* pOuter = GetOuter();
@@ -173,18 +180,38 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
         }
     }
 
-    if ( IsInRangeToAttack( pEnemy ) && pOuter->GetMotor()->IsFacing( vecAimTarget, grace ) )
+    if ( pOuter->GetMotor()->IsFacing( vecAimTarget, grace ) )
     {
-        // Use direct LOS trace instead of CanSee (which has FOV restrictions)
-        // The bot is already facing the enemy, we just need line of sight
-        if ( pOuter->GetSenses()->HasLOS( vecAimTarget ) )
+        // Point-blank override: if the enemy is extremely close, just shoot - don't rely on
+        // range checks or LOS traces that can fail at very short distances
+        if ( flEnemyDist < 100.0f )
         {
-            // Run-and-gun: fire while moving for most weapons
-            // Only stop for precision weapons (rifle, revolver)
-            if ( !pOuter->MustStopToShoot() || pOuter->GetLocalVelocity().IsLengthLessThan( 10.0f ) )
+            pOuter->PressFire1( 0.15f );
+        }
+        else if ( IsInRangeToAttack( pEnemy ) )
+        {
+            // Use direct LOS trace instead of CanSee (which has FOV restrictions)
+            if ( pOuter->GetSenses()->HasLOS( vecAimTarget ) )
             {
-                pOuter->PressFire1( 0.15f );
+                // Run-and-gun: fire while moving for most weapons
+                // Only stop for precision weapons (rifle, revolver)
+                if ( !pOuter->MustStopToShoot() || pOuter->GetLocalVelocity().IsLengthLessThan( 10.0f ) )
+                {
+                    pOuter->PressFire1( 0.15f );
+                }
             }
+        }
+    }
+
+    // Wall-running stuck detection
+    if ( m_bMovingOutOfRange && m_RetreatPosition != vec3_origin )
+    {
+        float flDistMoved = (pOuter->GetPosition() - m_RetreatPosition).Length();
+        if ( flDistMoved < 10.0f && gpGlobals->curtime - m_RetreatTime > 1.0f )
+        {
+            // Invalidate path and try a perpendicular escape direction
+            m_Path.Invalidate();
+            MoveBackFromThreat( pEnemy );
         }
     }
 }
@@ -221,8 +248,8 @@ bool CSurvivorAttackCloseRangeSchedule::ShouldMoveBack( CBaseEntity* pEnemy ) co
     float flDistSqr = pEnemy->GetAbsOrigin().DistToSqr( GetOuter()->GetPosition() );
 
     // Melee: retreat after getting a hit in (hit-and-run) - back off when within 80 units
-    // Ranged: kite backwards when zombie gets within 200 units
-    float flMoveBackRange = IsMeleeing() ? 80.0f : 200.0f;
+    // Ranged: kite backwards when zombie gets within 300 units to maintain safe distance
+    float flMoveBackRange = IsMeleeing() ? 80.0f : 300.0f;
 
     if ( flDistSqr > (flMoveBackRange*flMoveBackRange) )
         return false;
@@ -269,9 +296,30 @@ void CSurvivorAttackCloseRangeSchedule::MoveBackFromThreat( CBaseEntity* pEnemy 
     const Vector vecEnemyPos = pEnemy->GetAbsOrigin();
     const Vector vecMyPos = pOuter->GetPosition();
 
-    Vector dir = (vecMyPos - vecEnemyPos).Normalized();
+    Vector dir = (vecMyPos - vecEnemyPos);
+    dir.z = 0.0f;
+    dir.NormalizeInPlace();
     if ( dir.IsLengthLessThan( 0.1f ) )
         dir = Vector( 1.0f, 0.0f, 0.0f );
+
+    // If we've been stuck retreating, try perpendicular directions
+    if ( m_nRetreatAttempts > 0 )
+    {
+        // Alternate between left and right perpendicular
+        float flRotate = ( m_nRetreatAttempts % 2 == 1 ) ? 90.0f : -90.0f;
+        // On 3rd+ attempt, go further off-axis
+        if ( m_nRetreatAttempts >= 3 )
+            flRotate = ( m_nRetreatAttempts % 2 == 1 ) ? 135.0f : -135.0f;
+
+        float rad = DEG2RAD( flRotate );
+        float c = cos( rad );
+        float s = sin( rad );
+        Vector rotated;
+        rotated.x = dir.x * c - dir.y * s;
+        rotated.y = dir.x * s + dir.y * c;
+        rotated.z = 0.0f;
+        dir = rotated;
+    }
 
     // Melee: retreat further for hit-and-run; ranged: kite back a good distance
     float flRetreatDist = IsMeleeing() ? 192.0f : 256.0f;
@@ -283,13 +331,35 @@ void CSurvivorAttackCloseRangeSchedule::MoveBackFromThreat( CBaseEntity* pEnemy 
     if ( pGoal )
     {
         pGoal->GetClosestPointOnArea( vecTarget, &vecTarget );
+
+        // Reject paths that would move us toward the enemy
+        Vector toTarget = vecTarget - vecMyPos;
+        toTarget.z = 0.0f;
+        Vector toEnemy = vecEnemyPos - vecMyPos;
+        toEnemy.z = 0.0f;
+        if ( toTarget.LengthSqr() > 1.0f && toEnemy.LengthSqr() > 1.0f )
+        {
+            if ( toTarget.Normalized().Dot( toEnemy.Normalized() ) > 0.5f )
+            {
+                m_nRetreatAttempts++;
+                return;
+            }
+        }
     }
 
     m_PathCost.SetStartPos( vecMyPos, pStart );
     m_PathCost.SetGoalPos( vecTarget, pGoal );
 
-    m_Path.Compute( vecMyPos, vecTarget, pStart, pGoal, m_PathCost );
-
+    if ( m_Path.Compute( vecMyPos, vecTarget, pStart, pGoal, m_PathCost ) )
+    {
+        m_RetreatPosition = vecMyPos;
+        m_RetreatTime = gpGlobals->curtime;
+        m_nRetreatAttempts++;
+    }
+    else
+    {
+        m_nRetreatAttempts++;
+    }
 
     m_bMovingOutOfRange = m_Path.IsValid();
     m_bMovingToRange = false;
@@ -297,4 +367,8 @@ void CSurvivorAttackCloseRangeSchedule::MoveBackFromThreat( CBaseEntity* pEnemy 
     // Melee: wait longer before re-engaging (hit-and-run rhythm)
     // Ranged: quickly re-evaluate for continuous kiting
     m_NextMovingToRange.Start( IsMeleeing() ? 2.0f : 0.3f );
+
+    // Reset retreat attempts if we've tried too many times
+    if ( m_nRetreatAttempts > 5 )
+        m_nRetreatAttempts = 0;
 }

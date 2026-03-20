@@ -38,6 +38,10 @@ CSurvivorFollowSchedule::CSurvivorFollowSchedule()
     m_vecLastExplorePos = vec3_origin;
     m_nExploreStuckCount = 0;
     m_hTargetCrate.Set( nullptr );
+    m_nPosHistoryIndex = 0;
+    m_nOscillationCount = 0;
+    for ( int i = 0; i < OSCILLATION_HISTORY; i++ )
+        m_vecPosHistory[i] = vec3_origin;
 }
 
 CSurvivorFollowSchedule::~CSurvivorFollowSchedule()
@@ -281,6 +285,65 @@ void CSurvivorFollowSchedule::OnUpdate()
         }
     }
 
+    // Oscillation detection: detect bots running back and forth in a tiny area.
+    // Record positions every 0.5s and check if the bounding box of recent positions is tiny.
+    if ( !m_NextOscillationCheck.HasStarted() || m_NextOscillationCheck.IsElapsed() )
+    {
+        m_NextOscillationCheck.Start( 0.5f );
+
+        Vector curPos = pOuter->GetAbsOrigin();
+        m_vecPosHistory[ m_nPosHistoryIndex % OSCILLATION_HISTORY ] = curPos;
+        m_nPosHistoryIndex++;
+
+        // Only check once we have a full ring buffer of samples (3 seconds of data)
+        if ( m_nPosHistoryIndex >= OSCILLATION_HISTORY )
+        {
+            Vector mins = curPos, maxs = curPos;
+            for ( int i = 0; i < OSCILLATION_HISTORY; i++ )
+            {
+                Vector p = m_vecPosHistory[i];
+                if ( p == vec3_origin ) continue;
+                mins.x = MIN( mins.x, p.x );
+                mins.y = MIN( mins.y, p.y );
+                maxs.x = MAX( maxs.x, p.x );
+                maxs.y = MAX( maxs.y, p.y );
+            }
+
+            float flSpanX = maxs.x - mins.x;
+            float flSpanY = maxs.y - mins.y;
+
+            // If all recent positions fit in a ~4 foot (48 unit) box, bot is oscillating
+            if ( flSpanX < 48.0f && flSpanY < 48.0f && flSpanX + flSpanY > 5.0f )
+            {
+                m_nOscillationCount++;
+                if ( m_nOscillationCount >= 2 )
+                {
+                    // Break the oscillation: invalidate all paths, jump, and pause
+                    m_Path.Invalidate();
+                    m_ObjPath.Invalidate();
+                    m_ExplorePath.Invalidate();
+                    pOuter->PressJump( 0.15f );
+
+                    // Pick a random direction to walk to break free
+                    float flAngle = random->RandomFloat( 0.0f, 360.0f );
+                    float rad = DEG2RAD( flAngle );
+                    Vector vecEscape = curPos + Vector( cos( rad ), sin( rad ), 0.0f ) * 128.0f;
+                    pOuter->GetMotor()->Approach( vecEscape );
+
+                    m_nOscillationCount = 0;
+                    // Clear the history so we don't immediately re-trigger
+                    for ( int i = 0; i < OSCILLATION_HISTORY; i++ )
+                        m_vecPosHistory[i] = vec3_origin;
+                    m_nPosHistoryIndex = 0;
+                }
+            }
+            else
+            {
+                m_nOscillationCount = 0;
+            }
+        }
+    }
+
     // If a player explicitly told this bot to follow (via E key), always obey
     // regardless of behavior mode. This must be checked BEFORE explore dispatch.
     auto* pExplicitFollow = pOuter->GetFollowTarget();
@@ -315,7 +378,71 @@ void CSurvivorFollowSchedule::OnUpdate()
         return;
     }
 
-    // Explore mode: skip scavenging, grab targets, threat scanning etc.
+    // Handle commanded grab target for ALL bots (including explore mode)
+    // so explore bots respond when the player holds USE on a physics object
+    {
+        CBaseEntity* pGrabTarget = pOuter->GetCommandedGrabTarget();
+        if ( pGrabTarget )
+        {
+            // Reject explosive props
+            CBreakableProp* pGrabProp = dynamic_cast<CBreakableProp*>( pGrabTarget );
+            if ( pGrabProp && pGrabProp->GetExplosiveDamage() > 0.0f )
+            {
+                pOuter->ClearCommandedGrabTarget();
+            }
+            else
+            {
+                // Abort explore mode pathing so the bot focuses on the grab
+                if ( bIsExploreMode )
+                    m_ExplorePath.Invalidate();
+
+                Vector vecTarget = pGrabTarget->GetAbsOrigin();
+                float flDist = pOuter->GetAbsOrigin().DistTo( vecTarget );
+
+                if ( flDist < 80.0f )
+                {
+                    if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) )
+                        pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS );
+
+                    pOuter->GetMotor()->FaceTowards( pGrabTarget->WorldSpaceCenter() );
+                    pOuter->PressUse( 0.15f );
+                    pOuter->ClearCommandedGrabTarget();
+                }
+                else
+                {
+                    CNavArea* pStart = pOuter->GetLastKnownArea();
+                    CNavArea* pGoal = TheNavMesh->GetNearestNavArea( vecTarget, true, 256.0f, false );
+
+                    if ( pStart && pGoal )
+                    {
+                        if ( !m_ObjPath.IsValid() || !m_NextObjectiveScan.HasStarted() || m_NextObjectiveScan.IsElapsed() )
+                        {
+                            Vector vecMyPos = pOuter->GetAbsOrigin();
+                            m_PathCost.SetStepHeight( pOuter->GetMotor()->GetStepHeight() );
+                            m_PathCost.SetStartPos( vecMyPos, pStart );
+                            m_ObjPath.Compute( vecMyPos, vecTarget, pStart, pGoal, m_PathCost );
+                            m_NextObjectiveScan.Start( 3.0f );
+                        }
+
+                        bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
+                        if ( m_ObjPath.IsValid() && !bBusy )
+                            m_ObjPath.Update( pOuter );
+                    }
+                }
+                return;
+            }
+        }
+    }
+
+    // If a player commanded this bot to defend, override explore mode
+    if ( bIsExploreMode && pOuter->HasCommandedDefendPos() && pOuter->GetBehaviorOverride() == 2 )
+    {
+        m_ExplorePath.Invalidate();
+        m_bExploreIdling = false;
+        bIsExploreMode = false; // Fall through to defend mode dispatch below
+    }
+
+    // Explore mode: skip scavenging, threat scanning etc.
     // UpdateExploreMode handles its own lightweight pickup and threat detection.
     if ( bIsExploreMode )
     {
@@ -422,6 +549,12 @@ void CSurvivorFollowSchedule::OnUpdate()
 
                 if ( flDist < 80.0f )
                 {
+                    // Crouch so fists/melee can actually reach the low crate
+                    Vector vecCrateBottom = pCrate->GetAbsOrigin();
+                    Vector vecEye = pOuter->EyePosition();
+                    if ( vecEye.z - vecCrateBottom.z > 36.0f )
+                        pOuter->PressDuck( 0.3f );
+
                     pOuter->GetMotor()->FaceTowards( vecCrate );
                     if ( pOuter->GetMotor()->IsFacing( vecCrate, 40.0f ) )
                         pOuter->PressFire1( 0.2f );
@@ -755,6 +888,13 @@ void CSurvivorFollowSchedule::OnSpawn()
     m_BlacklistedItems.Purge();
     m_BlacklistClearTimer.Invalidate();
     m_flDefendLookYaw = 0.0f;
+
+    // Reset oscillation detection
+    m_nPosHistoryIndex = 0;
+    m_nOscillationCount = 0;
+    m_NextOscillationCheck.Invalidate();
+    for ( int i = 0; i < OSCILLATION_HISTORY; i++ )
+        m_vecPosHistory[i] = vec3_origin;
 }
 
 void CSurvivorFollowSchedule::OnHeardSound( CSound* pSound )
@@ -971,17 +1111,31 @@ void CSurvivorFollowSchedule::UpdateExploreMode()
     Vector myPos = pOuter->GetAbsOrigin();
 
     // Always scavenge nearby weapons/ammo first - don't run off without loading up
+    // Force an immediate scan if we just entered explore mode (timer not started yet)
+    if ( !m_NextWeaponScan.HasStarted() )
+        m_NextWeaponScan.Start( 0.0f );
+
     TryPickupNearbyWeapons();
 
     // If actively walking to a scavenge target, let it finish before exploring
     if ( m_bScavenging )
     {
+        m_ExplorePath.Invalidate(); // Don't run off while scavenging
         if ( m_ObjPath.IsValid() )
         {
             bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
             if ( !bBusy )
                 m_ObjPath.Update( pOuter );
         }
+        return;
+    }
+
+    // If the ObjPath is active (returning from scavenge), let it finish
+    if ( m_ObjPath.IsValid() )
+    {
+        bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
+        if ( !bBusy )
+            m_ObjPath.Update( pOuter );
         return;
     }
 

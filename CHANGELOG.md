@@ -40,8 +40,7 @@ The AI globally tracks all zombie spawners and traps on the map, activates them 
 | `zm_sv_ai_zm_aggression` | `1.0` | Spawn rate/size multiplier (0.1–3.0) |
 | `zm_sv_ai_zm_spawn_interval` | `8.0` | Minimum seconds between spawn waves |
 | `zm_sv_ai_zm_spawn_batch` | `3` | Max zombies per wave |
-| `zm_sv_ai_zm_trap_interval` | `15.0` | Minimum seconds between trap triggers |
-| `zm_sv_ai_zm_trap_range` | `512` | Survivor proximity required to trigger a trap |
+| `zm_sv_ai_zm_trap_range` | `1024` | Survivor proximity required to trigger a trap |
 | `zm_sv_ai_zm_trap_cooldown` | `30.0` | Per-trap cooldown in seconds before the AI can re-use the same trap |
 | `zm_sv_ai_zm_plan_pause` | `8.0` | Seconds to pause between completing one plan and starting the next |
 | `zm_sv_ai_zm_hidden_max` | `5` | Maximum hidden spawns allowed per 2-minute window |
@@ -66,11 +65,15 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 - If you are **holding an object** and press **E** on a bot, the bot will take the object from you and carry it instead of toggling follow/stay
 - Bots automatically search for weapons and ammo on the ground (range configurable via `zm_sv_bot_weapon_search_range`), prioritizing missing loadout slots over ammo and higher-tier weapons over lower-tier. Ammo search triggers when at least one clip's worth is missing (not after every shot). After picking up an item, the bot returns to its original position
 - Bots equip the best available weapon for the situation. When a ranged weapon runs out of ammo mid-combat, bots automatically switch to melee weapons or fists and actively chase nearby enemies (up to 512 units) instead of standing idle
+- When bots only have melee weapons or fists, they prioritize fleeing to find guns and ammo rather than rushing zombies head-on. They will only engage in melee combat when cornered (enemy within 200 units) and no ranged weapons are available
 - Bots look around naturally when idle — each bot waits a random delay after stopping before turning, and faces a different direction from its neighbors
 - While following, bots periodically scan for nearby zombies (within 600 units) and turn to face threats
 - Bots react to all nearby sounds (gunshots, zombie attacks, combat, footsteps, world sounds, bullet impacts) by looking toward the source when not already in combat
 - Bots can shoot while moving when following a player (run-and-gun) instead of stopping to engage
-- Bots engage enemies at appropriate range and fall back when enemies are too close
+- Bots engage enemies at appropriate range and kite backwards when enemies get within 300 units (ranged) or 80 units (melee). If a retreat path is blocked (wall), bots try perpendicular and diagonal escape directions instead of running into the wall repeatedly
+- Bots detect and break out of oscillation loops (running back and forth in a tiny area) by pausing, jumping, and picking a random escape direction
+- Bots crouch when attacking ammo crates with fists or melee weapons so their strikes actually connect with low objects
+- Bots will shoot explosive barrels when 5 or more zombies are clustered around one, using a ranged weapon to detonate it for area damage
 - Bots play **Alert** voicelines when fleeing from ZM explosions
 - Bots play **Yes/acknowledgement** voicelines when given commands (follow, stay, defend, grab)
 - Dead human players can possess a bot by pressing **USE** while spectating it (requires `zm_sv_bot_possess 1`)
@@ -78,6 +81,8 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 **Voice command bot control:**
 - **Help** (voice menu) — Nearby bots within `zm_sv_bot_help_range` come to the caller's location
 - **Follow** (voice menu) — The bot the caller is looking at begins following the caller
+- **Hold E on ground** — Bots following you (and explore-mode bots within 1024 units) move to the aimed position and switch to Defend mode. This overrides their current behavior including Explore mode
+- **Hold E on physics object** — The closest bot walks to the object and picks it up. Works for all bots regardless of their current behavior mode
 
 **ConVars:**
 
@@ -158,7 +163,22 @@ Give all survivors a random weapon at the start of each round if the map loadout
 
 ## Create Server Settings Tab
 
-A dedicated **ZMR Settings** tab is available in the Create Server dialog, exposing all server ConVars listed above in a clean UI. Controls are grouped by type: dropdowns first, then checkboxes, then number/text inputs. No console required for server setup.
+A dedicated **ZMR Settings** tab is available in the Create Server dialog, exposing all server ConVars listed above in a clean UI. No console required for server setup.
+
+**Dropdowns:**
+- **AI Zombie Master Mode** — Off / Always / Fallback (maps to `zm_sv_ai_zm`)
+- **Bot Default Behavior** — Follow / Explore / Defend / Mixed Mode (maps to `zm_sv_bot_default_behavior`)
+- **Random Starting Weapon** — None / Melee / Secondary / Primary / Any (maps to `zm_sv_random_start_weapon`)
+
+**Checkboxes:**
+- **Infinite Flashlight** (`zm_sv_flashlight_infinite`)
+- **Hidden Spawn All Classes** (`zm_sv_hidden_allclasses`)
+- **Physics Explosion Ignite Barrels** (`zm_sv_physexp_ignite_barrels`)
+- **Enable Per-Zombie-Type Limits** (`zm_sv_zombie_type_limits`)
+- **Bot Possess** (`zm_sv_bot_possess`)
+
+**Number Inputs:**
+- AI Survivor Bots count, ZM Aggression, ZM Spawn Interval, Trap Range, Trap Cooldown, Plan Pause, Hidden Max, Rush Prevention timer, Resource Multiplier, Per-Player Resource Mult, Zombie Health/Damage Multipliers, Physics Explosion Damage, Hidden Cost Mult, Weapon Search Range, Help Range, Taunt Chance, and per-zombie-type limits (Banshee, Hulk, Drifter, Immolator)
 
 ---
 

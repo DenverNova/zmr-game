@@ -2277,8 +2277,12 @@ void CZMPlayer::PlayerUse()
 					if ( !pBot )
 						continue;
 
-					// Only command bots that are following us
-					if ( pBot->GetFollowTarget() != this )
+					// Command bots that are following us, OR bots within range that
+					// are in explore mode / have no follow target (they should also obey)
+					bool bIsFollowing = ( pBot->GetFollowTarget() == this );
+					bool bInRange = ( pBot->GetAbsOrigin().DistTo( GetAbsOrigin() ) < 1024.0f );
+					bool bUnassigned = ( pBot->GetFollowTarget() == nullptr );
+					if ( !bIsFollowing && !(bInRange && bUnassigned) )
 						continue;
 
 					pBot->SetFollowTarget( nullptr );

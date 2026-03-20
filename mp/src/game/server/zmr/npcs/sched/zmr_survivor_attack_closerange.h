@@ -57,5 +57,9 @@ private:
     CountdownTimer m_NextRangeCheck;
     CountdownTimer m_NextMovingToRange;
 
+    Vector m_RetreatPosition;
+    float m_RetreatTime;
+    int m_nRetreatAttempts;
+
     bool m_bAllowMelee;
 };

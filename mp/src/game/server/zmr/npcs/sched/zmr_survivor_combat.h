@@ -54,6 +54,7 @@ private:
     NPCR::CPathCostGroundOnly m_PathCost;
     CountdownTimer m_NextEnemyScan;
     CountdownTimer m_NextRangeCheck;
+    CountdownTimer m_NextBarrelScan;
 
     CountdownTimer m_NextHeardLook;
     CountdownTimer m_NextLookAround;
@@ -63,6 +64,9 @@ private:
     bool m_bWasMoving;         // Track moving->stopped transition
 
     bool m_bMovingOutOfRange;
+    Vector m_RetreatPosition;
+    float m_RetreatTime;
+    int m_nRetreatAttempts;
     CHandle<CBaseEntity> m_hLastCombatTarget;
     CountdownTimer m_NextTauntVoice;       // Cooldown for kill taunt (30s)
 

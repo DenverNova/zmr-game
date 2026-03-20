@@ -43,7 +43,6 @@ private:
     vgui::CheckButton *m_pFlashlightInfinite;
     vgui::TextEntry *m_pAFKTimer;
     vgui::TextEntry *m_pAIZMSpawnInterval;
-    vgui::TextEntry *m_pAIZMTrapInterval;
     vgui::TextEntry *m_pAIZMAggression;
 };
 

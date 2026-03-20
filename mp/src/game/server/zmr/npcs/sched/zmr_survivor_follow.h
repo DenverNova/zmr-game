@@ -120,4 +120,11 @@ private:
     CountdownTimer m_NextCrateCheck;       // Timer for scanning nearby ammo crates
     CountdownTimer m_CrateTimeout;         // Give up on a crate after this expires
     EHANDLE m_hTargetCrate;                // Crate we're walking to smash
+
+    // Oscillation / micro-stuck detection (bot running back and forth in tiny area)
+    static const int OSCILLATION_HISTORY = 6;
+    Vector m_vecPosHistory[6];             // Ring buffer of recent positions
+    int m_nPosHistoryIndex;                // Current write index into ring buffer
+    CountdownTimer m_NextOscillationCheck; // Timer for periodic oscillation checks
+    int m_nOscillationCount;               // Consecutive oscillation detections
 };
