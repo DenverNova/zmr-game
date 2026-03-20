@@ -338,8 +338,105 @@ void CSurvivorFollowSchedule::OnUpdate()
     // Periodically look for weapons to pick up (Follow/Defend only)
     TryPickupNearbyWeapons();
 
-    // Keep the best weapon equipped when not in combat
-    pOuter->EquipBestWeapon();
+    // Ammo crate smashing: when low on ammo, find and smash nearby crates
+    if ( m_hTargetCrate.Get() )
+    {
+        CBaseEntity* pCrate = m_hTargetCrate.Get();
+        if ( !pCrate || !pCrate->IsAlive() )
+        {
+            // Crate destroyed or gone - re-equip best weapon and move on
+            m_hTargetCrate.Set( nullptr );
+            pOuter->EquipBestWeapon();
+        }
+        else
+        {
+            // Abort crate smashing if a zombie shows up
+            CBaseEntity* pThreat = FindNearestZombie( 400.0f );
+            if ( pThreat )
+            {
+                m_hTargetCrate.Set( nullptr );
+                pOuter->EquipBestWeapon();
+            }
+            else
+            {
+                Vector vecCrate = pCrate->GetAbsOrigin();
+                float flDist = pOuter->GetAbsOrigin().DistTo( vecCrate );
+
+                if ( flDist < 80.0f )
+                {
+                    // Close enough - switch to melee/fists and attack
+                    if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_MELEE ) &&
+                         !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) )
+                    {
+                        if ( !pOuter->EquipWeaponOfType( BOTWEPRANGE_MELEE ) )
+                            pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS );
+                    }
+                    pOuter->GetMotor()->FaceTowards( pCrate->WorldSpaceCenter() );
+                    if ( pOuter->GetMotor()->IsFacing( pCrate->WorldSpaceCenter(), 30.0f ) )
+                        pOuter->PressFire1( 0.15f );
+                }
+                else
+                {
+                    // Walk toward the crate
+                    pOuter->GetMotor()->Approach( vecCrate );
+                }
+                return;
+            }
+        }
+    }
+    else if ( !m_NextCrateCheck.HasStarted() || m_NextCrateCheck.IsElapsed() )
+    {
+        m_NextCrateCheck.Start( 5.0f );
+
+        // Check if we're low on ammo (missing at least 1 clip worth for any weapon)
+        bool bLowAmmo = false;
+        for ( int w = 0; w < MAX_WEAPONS; w++ )
+        {
+            CZMBaseWeapon* pWep = ToZMBaseWeapon( pOuter->GetWeapon( w ) );
+            if ( !pWep ) continue;
+            int iAmmoType = pWep->GetPrimaryAmmoType();
+            if ( iAmmoType < 0 ) continue;
+            int iClipSize = pWep->GetMaxClip1();
+            if ( iClipSize <= 0 ) continue;
+            int iCurrent = pOuter->GetAmmoCount( iAmmoType );
+            int iMax = GetAmmoDef()->MaxCarry( iAmmoType );
+            if ( iMax > 0 && (iMax - iCurrent) >= iClipSize )
+            {
+                bLowAmmo = true;
+                break;
+            }
+        }
+
+        if ( bLowAmmo )
+        {
+            // Find nearest ammo crate within 768 units
+            CBaseEntity* pBestCrate = nullptr;
+            float flBestDist = 768.0f;
+            CBaseEntity* pEnt = nullptr;
+            while ( (pEnt = gEntList.FindEntityByClassname( pEnt, "item_item_crate" )) != nullptr )
+            {
+                if ( !pEnt->IsAlive() ) continue;
+                float dist = pOuter->GetAbsOrigin().DistTo( pEnt->GetAbsOrigin() );
+                if ( dist < flBestDist )
+                {
+                    flBestDist = dist;
+                    pBestCrate = pEnt;
+                }
+            }
+
+            if ( pBestCrate )
+            {
+                m_hTargetCrate.Set( pBestCrate );
+                if ( zm_sv_bot_debug.GetBool() )
+                    Msg( "[Bot %s] Low on ammo, heading to smash crate at dist=%.0f\n",
+                        pOuter->GetPlayerName(), flBestDist );
+            }
+        }
+    }
+
+    // Keep the best weapon equipped when not in combat (and not smashing a crate)
+    if ( !m_hTargetCrate.Get() )
+        pOuter->EquipBestWeapon();
 
     // Periodically scan for threats in peripheral vision (zombie near follow target or us)
     if ( !m_NextPeripheralScan.HasStarted() || m_NextPeripheralScan.IsElapsed() )

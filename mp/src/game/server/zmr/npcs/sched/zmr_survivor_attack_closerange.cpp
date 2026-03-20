@@ -1,6 +1,7 @@
 #include "cbase.h"
 
 #include "npcr_motor.h"
+#include "npcr_motor_player.h"
 #include "zmr_survivor_attack_closerange.h"
 
 // memdbgon must be the last include file in a .cpp file!!!
@@ -80,6 +81,7 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
     CBaseEntity* pEnemy = GetAttackTarget();
     if ( !pEnemy || !pEnemy->IsAlive() )
     {
+        static_cast<NPCR::CPlayerMotor*>( pOuter->GetMotor() )->SetSuppressYawSnap( false );
         End( "No enemy left!" );
         return;
     }
@@ -118,6 +120,12 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
         }
     }
 
+
+    // When moving with a ranged weapon, suppress yaw snap so the bot can
+    // strafe/backpedal while facing the enemy instead of turning its back.
+    NPCR::CPlayerMotor* pMotor = static_cast<NPCR::CPlayerMotor*>( pOuter->GetMotor() );
+    bool bShouldSuppressYaw = m_Path.IsValid() && !IsMeleeing();
+    pMotor->SetSuppressYawSnap( bShouldSuppressYaw );
 
     if ( m_Path.IsValid() )
     {

@@ -16,6 +16,9 @@ namespace NPCR
         CPlayerMotor( CPlayerCmdHandler* pNPC );
         ~CPlayerMotor();
 
+        void SetSuppressYawSnap( bool b ) { m_bSuppressYawSnap = b; }
+        bool IsSuppressingYawSnap() const { return m_bSuppressYawSnap; }
+
 
         virtual void Update() OVERRIDE;
         virtual void Approach( const Vector& vecDesiredGoal ) OVERRIDE;
@@ -40,5 +43,6 @@ namespace NPCR
 
     private:
         float m_flMoveDist;
+        bool m_bSuppressYawSnap;
     };
 }

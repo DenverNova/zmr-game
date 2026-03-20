@@ -8,6 +8,7 @@ extern ConVar sv_stepsize;
 
 NPCR::CPlayerMotor::CPlayerMotor( CPlayerCmdHandler* pNPC ) : CBaseMotor( pNPC )
 {
+    m_bSuppressYawSnap = false;
 }
 
 NPCR::CPlayerMotor::~CPlayerMotor()
@@ -38,20 +39,24 @@ bool NPCR::CPlayerMotor::ShouldDoFullMove() const
 
 void NPCR::CPlayerMotor::Approach( const Vector& vecDesiredGoal )
 {
-    // Snap yaw instantly to movement direction so Move() decomposes correctly.
-    // Smooth facing is fine for enemies; for movement it causes sideways walking.
-    Vector vecDir = vecDesiredGoal - GetOuter()->GetAbsOrigin();
-    if ( !ShouldDoFullMove() )
-        vecDir.z = 0.0f;
-    if ( vecDir.LengthSqr() > 1.0f )
+    // When suppressed (e.g. combat strafing), don't snap yaw - let the schedule
+    // control facing via FaceTowards while we strafe/backpedal.
+    if ( !m_bSuppressYawSnap )
     {
-        QAngle angMove;
-        VectorAngles( vecDir, angMove );
-        QAngle angCur = GetNPC()->GetEyeAngles();
-        angCur.y = angMove.y;
-        if ( ShouldDoFullMove() )
-            angCur.x = angMove.x;
-        GetNPC()->SetEyeAngles( angCur );
+        // Snap yaw instantly to movement direction so Move() decomposes correctly.
+        Vector vecDir = vecDesiredGoal - GetOuter()->GetAbsOrigin();
+        if ( !ShouldDoFullMove() )
+            vecDir.z = 0.0f;
+        if ( vecDir.LengthSqr() > 1.0f )
+        {
+            QAngle angMove;
+            VectorAngles( vecDir, angMove );
+            QAngle angCur = GetNPC()->GetEyeAngles();
+            angCur.y = angMove.y;
+            if ( ShouldDoFullMove() )
+                angCur.x = angMove.x;
+            GetNPC()->SetEyeAngles( angCur );
+        }
     }
 
     BaseClass::Approach( vecDesiredGoal );
