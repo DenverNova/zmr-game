@@ -2,8 +2,10 @@
 
 #include "ammodef.h"
 #include "soundent.h"
+#include "props.h"
 
 #include "zmr_survivor_follow.h"
+#include "weapons/zmr_fistscarry.h"
 #include "zmr_entities.h"
 #include "zmr_voicelines.h"
 
@@ -158,23 +160,54 @@ void CSurvivorFollowSchedule::OnUpdate()
     int behavior = zm_sv_bot_default_behavior.GetInt();
     int effectiveBehavior = ( pOuter->GetBehaviorOverride() >= 0 ) ? pOuter->GetBehaviorOverride() : behavior;
 
-    // Mixed Mode: assign a permanent random sub-behavior (0/1/2) on first update
+    // Mixed Mode: round-robin assignment so bots distribute evenly across follow/explore/defend
     if ( effectiveBehavior == 3 )
     {
         if ( m_iMixedBehavior < 0 )
         {
-            m_iMixedBehavior = random->RandomInt( 0, 2 );
+            // Count how many bots already have each sub-behavior
+            int counts[3] = { 0, 0, 0 };
+            for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+            {
+                CBasePlayer* pOther = UTIL_PlayerByIndex( i );
+                if ( !pOther || !pOther->IsBot() || !pOther->IsAlive() || pOther == pOuter )
+                    continue;
+                if ( pOther->GetTeamNumber() != ZMTEAM_HUMAN )
+                    continue;
+                CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pOther );
+                if ( !pBot )
+                    continue;
+
+                int iOtherMixed = pBot->GetMixedBehavior();
+                if ( iOtherMixed >= 0 && iOtherMixed < 3 )
+                    counts[ iOtherMixed ]++;
+            }
+
+            // Pick the sub-behavior with the fewest bots assigned
+            int iMinCount = counts[0];
+            int iBest = 0;
+            for ( int b = 1; b < 3; b++ )
+            {
+                if ( counts[b] < iMinCount )
+                {
+                    iMinCount = counts[b];
+                    iBest = b;
+                }
+            }
+            m_iMixedBehavior = iBest;
+            pOuter->SetMixedBehavior( iBest );
 
             if ( zm_sv_bot_debug.GetBool() )
             {
                 const char* names[] = { "Follow", "Explore", "Defend" };
-                Msg( "[Bot %s] Mixed mode assigned: %s (%i)\n",
-                    GetOuter()->GetPlayerName(), names[m_iMixedBehavior], m_iMixedBehavior );
+                Msg( "[Bot %s] Mixed mode assigned: %s (%i) [counts: F=%i E=%i D=%i]\n",
+                    pOuter->GetPlayerName(), names[m_iMixedBehavior], m_iMixedBehavior,
+                    counts[0], counts[1], counts[2] );
             }
 
             if ( m_iMixedBehavior == 2 && !m_bHasDefendPos )
             {
-                m_vecDefendPos = GetOuter()->GetAbsOrigin();
+                m_vecDefendPos = pOuter->GetAbsOrigin();
                 m_bHasDefendPos = true;
             }
         }
@@ -194,6 +227,21 @@ void CSurvivorFollowSchedule::OnUpdate()
     {
         if ( !pOuter->GetMotor()->IsFacing( m_vecHeardLookAt ) )
             pOuter->GetMotor()->FaceTowards( m_vecHeardLookAt );
+    }
+    else
+    {
+        // No active look target - gradually return pitch to forward (0)
+        // to prevent bots from staring at the floor or ceiling
+        QAngle angCur = pOuter->EyeAngles();
+        if ( fabsf( angCur.x ) > 5.0f )
+        {
+            float flRate = 30.0f * gpGlobals->frametime;
+            if ( angCur.x > 0.0f )
+                angCur.x = MAX( 0.0f, angCur.x - flRate );
+            else
+                angCur.x = MIN( 0.0f, angCur.x + flRate );
+            pOuter->SetEyeAngles( angCur );
+        }
     }
 
     // Position deconfliction: nudge away from other bots to avoid stacking
@@ -342,15 +390,17 @@ void CSurvivorFollowSchedule::OnUpdate()
     if ( m_hTargetCrate.Get() )
     {
         CBaseEntity* pCrate = m_hTargetCrate.Get();
-        if ( !pCrate || !pCrate->IsAlive() )
+
+        // Crate removed (broken) or timeout
+        bool bGone = !pCrate || (pCrate->GetHealth() <= 0 && pCrate->m_takedamage == DAMAGE_NO);
+        if ( bGone || m_CrateTimeout.IsElapsed() )
         {
-            // Crate destroyed or gone - re-equip best weapon and move on
             m_hTargetCrate.Set( nullptr );
             pOuter->EquipBestWeapon();
         }
         else
         {
-            // Abort crate smashing if a zombie shows up
+            // Abort if a zombie shows up
             CBaseEntity* pThreat = FindNearestZombie( 400.0f );
             if ( pThreat )
             {
@@ -359,26 +409,27 @@ void CSurvivorFollowSchedule::OnUpdate()
             }
             else
             {
-                Vector vecCrate = pCrate->GetAbsOrigin();
-                float flDist = pOuter->GetAbsOrigin().DistTo( vecCrate );
+                Vector vecCrate = pCrate->WorldSpaceCenter();
+                float flDist = pOuter->GetAbsOrigin().DistTo( pCrate->GetAbsOrigin() );
+
+                // Switch to melee/fists before getting close
+                if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_MELEE ) &&
+                     !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) )
+                {
+                    if ( !pOuter->EquipWeaponOfType( BOTWEPRANGE_MELEE ) )
+                        pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS );
+                }
 
                 if ( flDist < 80.0f )
                 {
-                    // Close enough - switch to melee/fists and attack
-                    if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_MELEE ) &&
-                         !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) )
-                    {
-                        if ( !pOuter->EquipWeaponOfType( BOTWEPRANGE_MELEE ) )
-                            pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS );
-                    }
-                    pOuter->GetMotor()->FaceTowards( pCrate->WorldSpaceCenter() );
-                    if ( pOuter->GetMotor()->IsFacing( pCrate->WorldSpaceCenter(), 30.0f ) )
-                        pOuter->PressFire1( 0.15f );
+                    pOuter->GetMotor()->FaceTowards( vecCrate );
+                    if ( pOuter->GetMotor()->IsFacing( vecCrate, 40.0f ) )
+                        pOuter->PressFire1( 0.2f );
                 }
                 else
                 {
-                    // Walk toward the crate
-                    pOuter->GetMotor()->Approach( vecCrate );
+                    pOuter->GetMotor()->FaceTowards( vecCrate );
+                    pOuter->GetMotor()->Approach( pCrate->GetAbsOrigin() );
                 }
                 return;
             }
@@ -409,13 +460,14 @@ void CSurvivorFollowSchedule::OnUpdate()
 
         if ( bLowAmmo )
         {
-            // Find nearest ammo crate within 768 units
             CBaseEntity* pBestCrate = nullptr;
             float flBestDist = 768.0f;
             CBaseEntity* pEnt = nullptr;
             while ( (pEnt = gEntList.FindEntityByClassname( pEnt, "item_item_crate" )) != nullptr )
             {
-                if ( !pEnt->IsAlive() ) continue;
+                // Skip crates that can't be damaged
+                if ( pEnt->m_takedamage == DAMAGE_NO )
+                    continue;
                 float dist = pOuter->GetAbsOrigin().DistTo( pEnt->GetAbsOrigin() );
                 if ( dist < flBestDist )
                 {
@@ -427,6 +479,7 @@ void CSurvivorFollowSchedule::OnUpdate()
             if ( pBestCrate )
             {
                 m_hTargetCrate.Set( pBestCrate );
+                m_CrateTimeout.Start( 15.0f );
                 if ( zm_sv_bot_debug.GetBool() )
                     Msg( "[Bot %s] Low on ammo, heading to smash crate at dist=%.0f\n",
                         pOuter->GetPlayerName(), flBestDist );
@@ -437,6 +490,28 @@ void CSurvivorFollowSchedule::OnUpdate()
     // Keep the best weapon equipped when not in combat (and not smashing a crate)
     if ( !m_hTargetCrate.Get() )
         pOuter->EquipBestWeapon();
+
+    // Explosive barrel auto-drop: if the bot is carrying an explosive physics object, drop it immediately
+    {
+        CZMBaseWeapon* pActiveWep = pOuter->GetActiveWeapon();
+        CZMWeaponHands* pHands = dynamic_cast<CZMWeaponHands*>( pActiveWep );
+        if ( pHands && pHands->IsCarryingObject() )
+        {
+            CBaseEntity* pHeld = pHands->GetHeldObject();
+            if ( pHeld )
+            {
+                CBreakableProp* pProp = dynamic_cast<CBreakableProp*>( pHeld );
+                if ( pProp && pProp->GetExplosiveDamage() > 0.0f )
+                {
+                    pOuter->ForceDropOfCarriedPhysObjects( nullptr );
+                    pOuter->EquipBestWeapon();
+
+                    if ( zm_sv_bot_debug.GetBool() )
+                        Msg( "[Bot %s] Dropped explosive barrel!\n", pOuter->GetPlayerName() );
+                }
+            }
+        }
+    }
 
     // Periodically scan for threats in peripheral vision (zombie near follow target or us)
     if ( !m_NextPeripheralScan.HasStarted() || m_NextPeripheralScan.IsElapsed() )
@@ -480,6 +555,16 @@ void CSurvivorFollowSchedule::OnUpdate()
 
     // Handle commanded grab object (player held E on a physics object)
     CBaseEntity* pGrabTarget = pOuter->GetCommandedGrabTarget();
+    if ( pGrabTarget )
+    {
+        // Reject explosive props
+        CBreakableProp* pGrabProp = dynamic_cast<CBreakableProp*>( pGrabTarget );
+        if ( pGrabProp && pGrabProp->GetExplosiveDamage() > 0.0f )
+        {
+            pOuter->ClearCommandedGrabTarget();
+            pGrabTarget = nullptr;
+        }
+    }
     if ( pGrabTarget )
     {
         Vector vecTarget = pGrabTarget->GetAbsOrigin();
@@ -655,8 +740,9 @@ void CSurvivorFollowSchedule::OnSpawn()
     m_vecDefendPos = GetOuter()->GetAbsOrigin();
     m_bHasDefendPos = true;
 
-    // Re-randomize mixed mode behavior each round
+    // Re-assign mixed mode behavior each round via round-robin
     m_iMixedBehavior = -1;
+    GetOuter()->SetMixedBehavior( -1 );
     m_bExploreIdling = false;
     m_NextExplorePath.Invalidate();
     m_ExplorePath.Invalidate();
@@ -1173,17 +1259,90 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
     }
     else
     {
-        // No zombies nearby - look around calmly in different directions
+        // No zombies nearby - scan for chokepoints or look around
         if ( !m_DefendLookTimer.HasStarted() || m_DefendLookTimer.IsElapsed() )
         {
             m_DefendLookTimer.Start( random->RandomFloat( 3.0f, 6.0f ) );
 
-            // Pick a new absolute target yaw (not an offset from current)
-            QAngle angBase = pOuter->EyeAngles();
-            m_flDefendLookYaw = anglemod( angBase.y + random->RandomFloat( -120.0f, 120.0f ) );
+            // Chokepoint detection: find narrow nav areas nearby (doorways, corridors)
+            // that zombies would funnel through to reach us
+            bool bFoundChokepoint = false;
+            CNavArea* pMyArea = pOuter->GetLastKnownArea();
+            if ( pMyArea )
+            {
+                CUtlVector<CNavArea*> chokepoints;
+                float flScanRange = 512.0f;
+
+                // Check adjacent areas within scan range for narrow openings
+                for ( int dir = 0; dir < NUM_DIRECTIONS; dir++ )
+                {
+                    const NavConnectVector* pConnections = pMyArea->GetAdjacentAreas( (NavDirType)dir );
+                    if ( !pConnections )
+                        continue;
+
+                    for ( int c = 0; c < pConnections->Count(); c++ )
+                    {
+                        CNavArea* pAdj = (*pConnections)[c].area;
+                        if ( !pAdj )
+                            continue;
+
+                        float distSqr = pOuter->GetAbsOrigin().DistToSqr( pAdj->GetCenter() );
+                        if ( distSqr > flScanRange * flScanRange )
+                            continue;
+
+                        // Narrow areas (width or height < 96 units) are likely doorways/corridors
+                        float flNarrow = MIN( pAdj->GetSizeX(), pAdj->GetSizeY() );
+
+                        if ( flNarrow < 96.0f )
+                        {
+                            chokepoints.AddToTail( pAdj );
+                        }
+
+                        // Also check one level deeper for chokepoints behind adjacent areas
+                        for ( int dir2 = 0; dir2 < NUM_DIRECTIONS; dir2++ )
+                        {
+                            const NavConnectVector* pDeep = pAdj->GetAdjacentAreas( (NavDirType)dir2 );
+                            if ( !pDeep )
+                                continue;
+                            for ( int d = 0; d < pDeep->Count(); d++ )
+                            {
+                                CNavArea* pDeepAdj = (*pDeep)[d].area;
+                                if ( !pDeepAdj || pDeepAdj == pMyArea )
+                                    continue;
+                                float distSqr2 = pOuter->GetAbsOrigin().DistToSqr( pDeepAdj->GetCenter() );
+                                if ( distSqr2 > flScanRange * flScanRange )
+                                    continue;
+                                float flDeepNarrow = MIN( pDeepAdj->GetSizeX(), pDeepAdj->GetSizeY() );
+                                if ( flDeepNarrow < 96.0f )
+                                    chokepoints.AddToTail( pDeepAdj );
+                            }
+                        }
+                    }
+                }
+
+                if ( chokepoints.Count() > 0 )
+                {
+                    // Pick a random chokepoint to watch
+                    CNavArea* pChoke = chokepoints[ random->RandomInt( 0, chokepoints.Count() - 1 ) ];
+                    Vector vecChoke = pChoke->GetCenter();
+                    Vector toChoke = vecChoke - pOuter->GetAbsOrigin();
+                    toChoke.z = 0;
+                    QAngle angChoke;
+                    VectorAngles( toChoke, angChoke );
+                    m_flDefendLookYaw = anglemod( angChoke.y );
+                    bFoundChokepoint = true;
+                }
+            }
+
+            // Fallback: pick a random direction
+            if ( !bFoundChokepoint )
+            {
+                QAngle angBase = pOuter->EyeAngles();
+                m_flDefendLookYaw = anglemod( angBase.y + random->RandomFloat( -120.0f, 120.0f ) );
+            }
         }
 
-        // Smoothly face the absolute target direction using a world-space point
+        // Smoothly face the target direction using a world-space point at eye height
         Vector fwd;
         QAngle lookAng( 0.0f, m_flDefendLookYaw, 0.0f );
         AngleVectors( lookAng, &fwd );
@@ -1191,11 +1350,10 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
         pOuter->GetMotor()->FaceTowards( vecLookTarget );
     }
 
-    // Stay near the defend position
+    // Move to the defend position - tight 64u threshold so bots actually reach it
     float flDist = pOuter->GetAbsOrigin().DistTo( m_vecDefendPos );
-    if ( flDist > 256.0f )
+    if ( flDist > 64.0f )
     {
-        // Need to walk back to the defend zone
         if ( !m_ExplorePath.IsValid() || m_NextExplorePath.IsElapsed() )
         {
             Vector vecMyPos = pOuter->GetAbsOrigin();
@@ -1210,7 +1368,12 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
                 m_PathCost.SetStartPos( vecMyPos, pStart );
                 m_PathCost.SetGoalPos( m_vecDefendPos, pGoal );
                 m_ExplorePath.Compute( vecMyPos, m_vecDefendPos, pStart, pGoal, m_PathCost );
-                m_NextExplorePath.Start( 10.0f );
+                m_NextExplorePath.Start( 3.0f );
+            }
+            else
+            {
+                // No nav areas found, try direct approach
+                pOuter->GetMotor()->Approach( m_vecDefendPos );
             }
         }
 
@@ -1221,7 +1384,6 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
         }
         else if ( !m_ExplorePath.IsValid() && !bBusy )
         {
-            // No navmesh - walk directly toward defend position
             pOuter->GetMotor()->Approach( m_vecDefendPos );
         }
     }

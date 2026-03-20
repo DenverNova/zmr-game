@@ -84,6 +84,9 @@ public:
     void            SetBehaviorOverride( int iBehavior ) { m_iBehaviorOverride = iBehavior; }
     int             GetBehaviorOverride() const { return m_iBehaviorOverride; }
 
+    void            SetMixedBehavior( int iMixed ) { m_iMixedBehavior = iMixed; }
+    int             GetMixedBehavior() const { return m_iMixedBehavior; }
+
     // Player-commanded defend position (Hold E on ground)
     void            SetCommandedDefendPos( const Vector& pos ) { m_vecCommandedDefendPos = pos; m_bHasCommandedDefendPos = true; }
     void            ClearCommandedDefendPos() { m_bHasCommandedDefendPos = false; }
@@ -102,6 +105,7 @@ private:
     float           m_flNextObstacleCheck;
     bool            m_bStayPut;
     int             m_iBehaviorOverride; // -1 = no override, set by voice commands
+    int             m_iMixedBehavior;    // -1 = unassigned, 0=follow, 1=explore, 2=defend (for mixed mode round-robin)
 
     Vector          m_vecCommandedDefendPos;
     bool            m_bHasCommandedDefendPos;

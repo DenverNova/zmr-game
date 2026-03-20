@@ -100,6 +100,12 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
             m_bAllowMelee = true;
     }
 
+    // Auto-reload: if clip is empty but we have reserve ammo, reload immediately
+    if ( pOuter->ShouldReload() )
+    {
+        pOuter->PressReload( 0.15f );
+    }
+
 
     // Don't restrict combat by follow target distance - let bots fight freely
     // Follow behavior will resume once combat schedule ends
@@ -143,16 +149,25 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
     pOuter->GetMotor()->FaceTowards( vecAimTarget );
 
 
-    float grace = IsMeleeing() ? 60.0f : 12.0f;
+    float grace = IsMeleeing() ? 60.0f : 24.0f; // Widen facing grace angle for ranged weapons
 
     float flEnemyDist = pEnemy->GetAbsOrigin().DistTo( pOuter->GetPosition() );
 
-    if ( IsMeleeing() && m_bMovingToRange && pOuter->GetMotor()->IsFacing( vecAimTarget, grace ) )
+    if ( IsMeleeing() && pOuter->GetMotor()->IsFacing( vecAimTarget, grace ) )
     {
-        // Melee wind-up prediction: start swinging before arriving so the hit
-        // lands right as we reach the zombie. Start attack at ~2x melee range.
-        float flWindUpRange = pOuter->GetMaxAttackDistance() * 2.5f;
-        if ( flEnemyDist < flWindUpRange && flEnemyDist > pOuter->GetMaxAttackDistance() * 0.5f )
+        // Melee wind-up prediction: start the swing early so the hit lands when in range.
+        // Heavier weapons (sledge ~1.0s fire rate) need to start much earlier than
+        // light weapons (improvised ~0.5s). Use fire rate as a proxy for wind-up time.
+        CZMBaseWeapon* pWep = pOuter->GetActiveWeapon();
+        float flFireRate = pWep ? pWep->GetFireRate() : 0.5f;
+
+        // Estimated approach speed (~250 units/sec for walking bots)
+        float flApproachSpeed = 250.0f;
+        float flWindUpDist = flFireRate * flApproachSpeed * 0.6f;
+        float flMeleeRange = pOuter->GetMaxAttackDistance();
+        float flSwingStartDist = flMeleeRange + flWindUpDist;
+
+        if ( flEnemyDist < flSwingStartDist && flEnemyDist > flMeleeRange * 0.4f )
         {
             pOuter->PressFire1( 0.15f );
         }
@@ -160,7 +175,9 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
 
     if ( IsInRangeToAttack( pEnemy ) && pOuter->GetMotor()->IsFacing( vecAimTarget, grace ) )
     {
-        if ( pOuter->GetSenses()->CanSee( vecAimTarget ) )
+        // Use direct LOS trace instead of CanSee (which has FOV restrictions)
+        // The bot is already facing the enemy, we just need line of sight
+        if ( pOuter->GetSenses()->HasLOS( vecAimTarget ) )
         {
             // Run-and-gun: fire while moving for most weapons
             // Only stop for precision weapons (rifle, revolver)

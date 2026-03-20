@@ -197,7 +197,9 @@ void CSurvivorCombatSchedule::OnUpdate()
                         if ( pArea && pArea != m_pLastLookArea )
                         {
                             m_pLastLookArea = pArea;
-                            m_vecLookAt = pArea->GetRandomPoint() + Vector( 0.0f, 0.0f, 64.0f );
+                            // Use eye-height offset so bots look forward, not at the floor
+                            Vector vecEyeOfs = pOuter->EyePosition() - pOuter->GetAbsOrigin();
+                            m_vecLookAt = pArea->GetRandomPoint() + vecEyeOfs;
                             break;
                         }
                     }

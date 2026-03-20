@@ -79,6 +79,7 @@ CZMPlayerBot::CZMPlayerBot()
     m_flNextObstacleCheck = 0.0f;
     m_bStayPut = false;
     m_iBehaviorOverride = -1;
+    m_iMixedBehavior = -1;
     m_vecCommandedDefendPos = vec3_origin;
     m_bHasCommandedDefendPos = false;
     m_hCommandedGrabTarget.Set( nullptr );

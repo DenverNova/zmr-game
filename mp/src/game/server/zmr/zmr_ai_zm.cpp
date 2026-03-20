@@ -21,10 +21,9 @@ extern ConVar zm_sv_ai_zm;
 ConVar zm_sv_ai_zm_debug( "zm_sv_ai_zm_debug", "0", FCVAR_CHEAT, "Enable AI ZM debug logging (server console only). 0=off, 1=on." );
 
 ConVar zm_sv_ai_zm_spawn_interval( "zm_sv_ai_zm_spawn_interval", "8.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Base seconds between AI ZM spawn waves." );
-ConVar zm_sv_ai_zm_trap_interval( "zm_sv_ai_zm_trap_interval", "15.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Min seconds between AI ZM trap triggers." );
 ConVar zm_sv_ai_zm_aggression( "zm_sv_ai_zm_aggression", "1.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI ZM aggression. Higher = faster spawns, larger groups. (0.1 - 3.0)" );
 ConVar zm_sv_ai_zm_spawn_batch( "zm_sv_ai_zm_spawn_batch", "3", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Base max zombies per wave (scaled by plan type)." );
-ConVar zm_sv_ai_zm_trap_range( "zm_sv_ai_zm_trap_range", "512", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Distance a survivor must be to a trap for the AI ZM to trigger it." );
+ConVar zm_sv_ai_zm_trap_range( "zm_sv_ai_zm_trap_range", "1024", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Distance a survivor must be to a trap for the AI ZM to trigger it." );
 ConVar zm_sv_ai_zm_spawn_range( "zm_sv_ai_zm_spawn_range", "2048", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Max distance from a survivor for AI ZM to use a spawner." );
 ConVar zm_sv_ai_zm_tactic_min_time( "zm_sv_ai_zm_tactic_min_time", "15.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Min seconds before AI ZM builds a new plan." );
 ConVar zm_sv_ai_zm_tactic_max_time( "zm_sv_ai_zm_tactic_max_time", "40.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Max seconds before AI ZM builds a new plan." );
@@ -631,16 +630,10 @@ void CZMAIZombieMaster::UpdateTrapOpportunism( CZMPlayer* pZM )
     float flSurvivorDist = 0.0f;
     FindNearestHuman( pTrap->GetAbsOrigin(), &flSurvivorDist );
 
-    // If a survivor is very close (within half the trap range), bypass the global cooldown
-    // and trigger immediately - this is a high-priority opportunity
-    bool bUrgent = ( flSurvivorDist < flTrapRange * 0.5f );
-
-    if ( !bUrgent && gpGlobals->curtime < m_flNextTrapTime )
-        return;
-
     int trapCost = pTrap->GetCost();
 
-    // Only reserve resources for spawns if the trap isn't urgent
+    // Reserve some resources for spawns unless a survivor is very close
+    bool bUrgent = ( flSurvivorDist < flTrapRange * 0.5f );
     int reserveForSpawn = bUrgent ? 0 : 15;
     int totalNeeded = trapCost + reserveForSpawn;
     if ( trapCost > 0 && pZM->GetResources() < totalNeeded )
@@ -665,15 +658,11 @@ void CZMAIZombieMaster::UpdateTrapOpportunism( CZMPlayer* pZM )
         m_TrapCooldowns.Insert( pTrap->entindex(), gpGlobals->curtime );
 
     if ( zm_sv_ai_zm_debug.GetBool() )
-        Msg( "[AI ZM] Triggered trap (cost: %i, res left: %i, survivor dist: %.0f, urgent: %s, per-trap cd: %.1fs)\n",
-            trapCost, pZM->GetResources(), flSurvivorDist, bUrgent ? "YES" : "NO", zm_sv_ai_zm_trap_cooldown.GetFloat() );
+        Msg( "[AI ZM] Triggered trap (cost: %i, res left: %i, survivor dist: %.0f, per-trap cd: %.1fs)\n",
+            trapCost, pZM->GetResources(), flSurvivorDist, zm_sv_ai_zm_trap_cooldown.GetFloat() );
 
-    float flAggression = clamp( zm_sv_ai_zm_aggression.GetFloat(), 0.1f, 3.0f );
-    // Global cooldown between any trap triggers - shorter when survivors are still near traps
-    float baseCooldown = HasSurvivorNearTrap()
-        ? zm_sv_ai_zm_trap_interval.GetFloat() * 0.3f
-        : zm_sv_ai_zm_trap_interval.GetFloat() * 0.6f;
-    m_flNextTrapTime = gpGlobals->curtime + MAX( baseCooldown / flAggression, 3.0f );
+    // Short re-check delay to avoid triggering multiple traps in the same frame
+    m_flNextTrapTime = gpGlobals->curtime + 1.0f;
 }
 
 void CZMAIZombieMaster::TryHiddenSpawn( CZMPlayer* pZM )

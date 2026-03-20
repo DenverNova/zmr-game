@@ -537,7 +537,19 @@ void CZMEntZombieSpawn::SpawnThink()
     }
 
     if ( bCreate && !CZMBaseZombie::HasEnoughPopToSpawn( zclass ) )
+    {
+        // Type is at its limit - if there are other queue entries, move this one
+        // to the back so other types can spawn instead of blocking the whole queue
+        if ( m_vSpawnQueue.Count() > 1 )
+        {
+            queue_info_t blocked = m_vSpawnQueue.Element( 0 );
+            m_vSpawnQueue.Remove( 0 );
+            m_vSpawnQueue.AddToTail( blocked );
+            SetNextSpawnThink();
+            return;
+        }
         bCreate = false;
+    }
 
     
     if ( bCreate && CreateZombie( zclass, pPlayer ) )

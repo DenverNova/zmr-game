@@ -118,5 +118,6 @@ private:
 
     // Ammo crate smashing
     CountdownTimer m_NextCrateCheck;       // Timer for scanning nearby ammo crates
+    CountdownTimer m_CrateTimeout;         // Give up on a crate after this expires
     EHANDLE m_hTargetCrate;                // Crate we're walking to smash
 };

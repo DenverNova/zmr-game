@@ -2265,7 +2265,6 @@ void CZMPlayer::PlayerUse()
 				Vector vecHitPos = tr.endpos;
 
 				int nCommanded = 0;
-				float flCmdRange = 1024.0f * 1024.0f;
 				for ( int i = 1; i <= gpGlobals->maxClients; i++ )
 				{
 					CBasePlayer* pOther = UTIL_PlayerByIndex( i );
@@ -2278,9 +2277,8 @@ void CZMPlayer::PlayerUse()
 					if ( !pBot )
 						continue;
 
-					// Only command bots that are following us or nearby
-					if ( pBot->GetFollowTarget() != this &&
-						 pBot->GetAbsOrigin().DistToSqr( GetAbsOrigin() ) > flCmdRange )
+					// Only command bots that are following us
+					if ( pBot->GetFollowTarget() != this )
 						continue;
 
 					pBot->SetFollowTarget( nullptr );
