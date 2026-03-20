@@ -684,6 +684,55 @@ bool CZMRules::CanHavePlayerItem( CBasePlayer* pPlayer, CBaseCombatWeapon* pBase
     return BaseClass::CanHavePlayerItem( pPlayer, pBaseWeapon );
 }
 
+bool CZMRules::ClientConnected( edict_t* pEntity, const char* pszName, const char* pszAddress, char* reject, int maxrejectlen )
+{
+    // When a human player connects and the server is full, kick a bot to make room.
+    // The connecting player's edict is already reserved, so count other occupied slots.
+    int nPlayers = 0;
+    int nBots = 0;
+    CZMPlayerBot* pKickCandidate = nullptr;
+
+    for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+    {
+        edict_t* pEdict = engine->PEntityOfEntIndex( i );
+        if ( !pEdict || pEdict->IsFree() || pEdict == pEntity )
+            continue;
+
+        CBasePlayer* pPlayer = dynamic_cast<CBasePlayer*>( GetContainingEntity( pEdict ) );
+        if ( !pPlayer )
+            continue;
+
+        nPlayers++;
+
+        CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
+        if ( pBot )
+        {
+            nBots++;
+
+            // Prefer kicking survivor bots over the ZM AI bot
+            if ( !pKickCandidate )
+            {
+                pKickCandidate = pBot;
+            }
+            else if ( pBot->IsHuman() && pKickCandidate->IsZM() )
+            {
+                // Survivor bot is a better candidate than a ZM bot
+                pKickCandidate = pBot;
+            }
+        }
+    }
+
+    // If the server is full and we have a bot to kick, make room
+    if ( nPlayers >= gpGlobals->maxClients - 1 && pKickCandidate )
+    {
+        Msg( "Kicking bot '%s' to make room for connecting player '%s'.\n", pKickCandidate->GetPlayerName(), pszName );
+        engine->ServerCommand( UTIL_VarArgs( "kickid %i\n", pKickCandidate->GetUserID() ) );
+        engine->ServerExecute();
+    }
+
+    return BaseClass::ClientConnected( pEntity, pszName, pszAddress, reject, maxrejectlen );
+}
+
 void CZMRules::ClientDisconnected( edict_t* pClient )
 {
     // Check if we should restart the round...
@@ -1254,7 +1303,12 @@ CZMPlayer* CZMRules::ChooseZM()
 
     if ( vZMFirstChoices.Count() > 0 )
     {
-        return vZMFirstChoices[random->RandomInt( 0, vZMFirstChoices.Count() - 1 )];
+        // Round-robin: cycle through candidates fairly so the same person
+        // doesn't get picked repeatedly when multiple players have equal priority
+        static int s_nZMRoundRobin = 0;
+        int pick = s_nZMRoundRobin % vZMFirstChoices.Count();
+        s_nZMRoundRobin++;
+        return vZMFirstChoices[pick];
     }
 
     // AI ZM mode 2 = fallback when no volunteers

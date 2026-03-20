@@ -143,6 +143,7 @@ public:
 
     virtual bool IsSpawnPointValid( CBaseEntity* pSpawn, CBasePlayer* pPlayer ) OVERRIDE;
     
+    virtual bool ClientConnected( edict_t* pEntity, const char* pszName, const char* pszAddress, char* reject, int maxrejectlen ) OVERRIDE;
     virtual void ClientDisconnected( edict_t* pPlayer ) OVERRIDE;
     virtual void PlayerKilled( CBasePlayer* pPlayer, const CTakeDamageInfo& info ) OVERRIDE;
 
