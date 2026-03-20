@@ -10,6 +10,7 @@
 #include "CreateMultiplayerGameGameplayPage.h"
 #include "CreateMultiplayerGameBotPage.h"
 #include "createmultiplayergamezmrpage.h"
+#include "createmultiplayergamemappage.h"
 
 #include "EngineInterface.h"
 #include "ModInfo.h"
@@ -55,6 +56,9 @@ CCreateMultiplayerGameDialog::CCreateMultiplayerGameDialog(vgui::Panel *parent) 
 
 	m_pZMRPage = new CCreateMultiplayerGameZMRPage(this, "ZMRPage");
 	AddPage(m_pZMRPage, "ZMR Settings");
+
+	m_pMapPage = new CCreateMultiplayerGameMapPage(this, "MapPage", m_pServerPage);
+	AddPage(m_pMapPage, "Map Config");
 
 	// create KeyValues object to load/save config options
 	m_pSavedData = new KeyValues( "ServerConfig" );
