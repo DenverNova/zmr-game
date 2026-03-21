@@ -52,6 +52,15 @@ void CSurvivorFollowSchedule::OnStart()
 {
     m_NextFollowTarget.Start( 2.0f );
     m_NextWeaponScan.Start( 1.0f );
+
+    // Configure path cost for player-sized movement so bots can traverse
+    // the same navmesh paths as human players and zombies
+    CZMPlayerBot* pOuter = GetOuter();
+    float flStep = pOuter->GetMotor()->GetStepHeight();
+    m_PathCost.SetStepHeight( flStep );
+    m_PathCost.SetMaxHeightChange( flStep + 4.0f );
+    m_PathCost.SetMaxWalkGap( 48.0f );
+    m_PathCost.SetAbsMaxGap( 200.0f );
 }
 
 void CSurvivorFollowSchedule::OnContinue()
@@ -248,10 +257,11 @@ void CSurvivorFollowSchedule::OnUpdate()
         }
     }
 
-    // Position deconfliction: nudge away from other bots to avoid stacking
+    // Position deconfliction: gentle nudge away from other bots to avoid stacking.
+    // Only nudge when very close and only a small amount to prevent circling.
     if ( !m_NextDeconflict.HasStarted() || m_NextDeconflict.IsElapsed() )
     {
-        m_NextDeconflict.Start( 0.5f );
+        m_NextDeconflict.Start( 1.0f );
         Vector myPos = pOuter->GetAbsOrigin();
         Vector nudge = vec3_origin;
         int nTooClose = 0;
@@ -265,15 +275,9 @@ void CSurvivorFollowSchedule::OnUpdate()
             Vector delta = myPos - pOther->GetAbsOrigin();
             delta.z = 0;
             float flDist = delta.Length();
-            if ( flDist < 48.0f && flDist > 1.0f )
+            if ( flDist < 36.0f && flDist > 1.0f )
             {
-                nudge += delta.Normalized() * (48.0f - flDist);
-                nTooClose++;
-            }
-            else if ( flDist <= 1.0f )
-            {
-                nudge.x += random->RandomFloat( -24.0f, 24.0f );
-                nudge.y += random->RandomFloat( -24.0f, 24.0f );
+                nudge += delta.Normalized() * (36.0f - flDist) * 0.5f;
                 nTooClose++;
             }
         }
@@ -318,17 +322,10 @@ void CSurvivorFollowSchedule::OnUpdate()
                 m_nOscillationCount++;
                 if ( m_nOscillationCount >= 2 )
                 {
-                    // Break the oscillation: invalidate all paths, jump, and pause
+                    // Break the oscillation: invalidate all paths and stop briefly
                     m_Path.Invalidate();
                     m_ObjPath.Invalidate();
                     m_ExplorePath.Invalidate();
-                    pOuter->PressJump( 0.15f );
-
-                    // Pick a random direction to walk to break free
-                    float flAngle = random->RandomFloat( 0.0f, 360.0f );
-                    float rad = DEG2RAD( flAngle );
-                    Vector vecEscape = curPos + Vector( cos( rad ), sin( rad ), 0.0f ) * 128.0f;
-                    pOuter->GetMotor()->Approach( vecEscape );
 
                     m_nOscillationCount = 0;
                     // Clear the history so we don't immediately re-trigger
@@ -404,9 +401,22 @@ void CSurvivorFollowSchedule::OnUpdate()
                     if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) )
                         pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS );
 
-                    pOuter->GetMotor()->FaceTowards( pGrabTarget->WorldSpaceCenter() );
-                    pOuter->PressUse( 0.15f );
-                    pOuter->ClearCommandedGrabTarget();
+                    // Look directly at the object and press USE to pick it up
+                    Vector vecLook = pGrabTarget->WorldSpaceCenter();
+                    pOuter->GetMotor()->FaceTowards( vecLook );
+
+                    // Set eye angles to look at the object center so the carry trace hits
+                    Vector vecToObj = vecLook - pOuter->EyePosition();
+                    QAngle angLook;
+                    VectorAngles( vecToObj, angLook );
+                    pOuter->SetEyeAngles( angLook );
+
+                    // Only press USE once we're actually facing the object
+                    if ( pOuter->GetMotor()->IsFacing( vecLook, 15.0f ) )
+                    {
+                        pOuter->PressUse( 0.3f );
+                        pOuter->ClearCommandedGrabTarget();
+                    }
                 }
                 else
                 {
@@ -708,9 +718,19 @@ void CSurvivorFollowSchedule::OnUpdate()
             if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) )
                 pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS );
 
-            pOuter->GetMotor()->FaceTowards( pGrabTarget->WorldSpaceCenter() );
-            pOuter->PressUse( 0.15f );
-            pOuter->ClearCommandedGrabTarget();
+            Vector vecLook = pGrabTarget->WorldSpaceCenter();
+            pOuter->GetMotor()->FaceTowards( vecLook );
+
+            Vector vecToObj = vecLook - pOuter->EyePosition();
+            QAngle angLook;
+            VectorAngles( vecToObj, angLook );
+            pOuter->SetEyeAngles( angLook );
+
+            if ( pOuter->GetMotor()->IsFacing( vecLook, 15.0f ) )
+            {
+                pOuter->PressUse( 0.3f );
+                pOuter->ClearCommandedGrabTarget();
+            }
         }
         else
         {
@@ -1321,15 +1341,15 @@ void CSurvivorFollowSchedule::UpdateExploreLookAngles()
 
         if ( m_bExploreIdling )
         {
-            // While idling, look around more dramatically
-            m_flExploreScanPitch = random->RandomFloat( -15.0f, 10.0f );
+            // While idling, look around at eye level with wide yaw
+            m_flExploreScanPitch = random->RandomFloat( -5.0f, 3.0f );
             m_flExploreScanYawOffset = random->RandomFloat( -90.0f, 90.0f );
         }
         else
         {
-            // While moving, gentle scanning - mostly forward, slight up/down variation
-            m_flExploreScanPitch = random->RandomFloat( -8.0f, 5.0f );
-            m_flExploreScanYawOffset = random->RandomFloat( -30.0f, 30.0f );
+            // While moving, scan mostly forward at eye level
+            m_flExploreScanPitch = random->RandomFloat( -3.0f, 2.0f );
+            m_flExploreScanYawOffset = random->RandomFloat( -25.0f, 25.0f );
         }
     }
 
@@ -1350,8 +1370,8 @@ void CSurvivorFollowSchedule::UpdateExploreLookAngles()
         pOuter->GetMotor()->FaceTowards( flYawTarget );
     }
 
-    // Clamp pitch to natural range
-    angCur.x = clamp( angCur.x, -20.0f, 15.0f );
+    // Clamp pitch to eye level - bots should look roughly straight ahead
+    angCur.x = clamp( angCur.x, -8.0f, 5.0f );
     pOuter->SetEyeAngles( angCur );
 }
 

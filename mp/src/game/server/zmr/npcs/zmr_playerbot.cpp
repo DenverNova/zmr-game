@@ -2,8 +2,10 @@
 #include "gameinterface.h"
 #include "in_buttons.h"
 #include "soundent.h"
+#include "doors.h"
 
 
+#include "npcr/npcr_motor.h"
 #include "npcr/npcr_schedule.h"
 #include "npcr/npcr_senses.h"
 
@@ -586,13 +588,36 @@ void CZMPlayerBot::CheckObstacleJump()
 
     m_flNextObstacleCheck = gpGlobals->curtime + 0.25f;
 
-    // Trace forward at knee height to detect obstacles
+    // Trace forward at waist height to detect obstacles and doors
     Vector fwd;
     AngleVectors( EyeAngles(), &fwd );
     fwd.z = 0.0f;
     fwd.NormalizeInPlace();
 
     Vector origin = GetAbsOrigin();
+    Vector waistPos = origin + Vector( 0, 0, 36.0f );
+    Vector waistEnd = waistPos + fwd * 48.0f;
+
+    trace_t trWaist;
+    UTIL_TraceLine( waistPos, waistEnd, MASK_PLAYERSOLID, this, COLLISION_GROUP_NONE, &trWaist );
+
+    if ( trWaist.fraction >= 1.0f )
+        return;
+
+    CBaseEntity* pHit = trWaist.m_pEnt;
+
+    // Check if the obstacle is a USE-activatable door
+    if ( pHit && (FClassnameIs( pHit, "func_door" ) || FClassnameIs( pHit, "func_door_rotating" ) || FClassnameIs( pHit, "prop_door_rotating" )) )
+    {
+        if ( pHit->HasSpawnFlags( SF_DOOR_PUSE ) && !pHit->HasSpawnFlags( SF_DOOR_LOCKED ) )
+        {
+            GetMotor()->FaceTowards( pHit->WorldSpaceCenter() );
+            PressUse( 0.3f );
+            return;
+        }
+    }
+
+    // Not a door - check if we can jump over it
     Vector kneePos = origin + Vector( 0, 0, 18.0f );
     Vector kneeEnd = kneePos + fwd * 32.0f;
 
@@ -603,7 +628,6 @@ void CZMPlayerBot::CheckObstacleJump()
     if ( trKnee.fraction >= 1.0f )
         return;
 
-    // Something at knee height - check if we can clear it by jumping
     Vector headPos = origin + Vector( 0, 0, 64.0f );
     Vector headEnd = headPos + fwd * 32.0f;
 

@@ -134,10 +134,10 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
     }
 
 
-    // When moving with a ranged weapon, suppress yaw snap so the bot can
-    // strafe/backpedal while facing the enemy instead of turning its back.
+    // Suppress yaw snap during ALL combat movement (melee and ranged) so bots
+    // face the enemy while backing up instead of turning their back to run.
     NPCR::CPlayerMotor* pMotor = static_cast<NPCR::CPlayerMotor*>( pOuter->GetMotor() );
-    bool bShouldSuppressYaw = m_Path.IsValid() && !IsMeleeing();
+    bool bShouldSuppressYaw = m_Path.IsValid();
     pMotor->SetSuppressYawSnap( bShouldSuppressYaw );
 
     if ( m_Path.IsValid() )

@@ -66,12 +66,14 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 - Bots automatically search for weapons and ammo on the ground (range configurable via `zm_sv_bot_weapon_search_range`), prioritizing missing loadout slots over ammo and higher-tier weapons over lower-tier. Ammo search triggers when at least one clip's worth is missing (not after every shot). After picking up an item, the bot returns to its original position
 - Bots equip the best available weapon for the situation. When a ranged weapon runs out of ammo mid-combat, bots automatically switch to melee weapons or fists and actively chase nearby enemies (up to 512 units) instead of standing idle
 - When bots only have melee weapons or fists, they prioritize fleeing to find guns and ammo rather than rushing zombies head-on. They will only engage in melee combat when cornered (enemy within 200 units) and no ranged weapons are available
-- Bots look around naturally when idle — each bot waits a random delay after stopping before turning, and faces a different direction from its neighbors
+- Bots use improved pathfinding that matches player movement capabilities (larger step height, gap tolerance, and jump distance), so they can navigate the same areas as players and zombies
+- Bots open USE-activatable doors automatically when they encounter one blocking their path
+- Bots look around naturally when idle — each bot waits a random delay after stopping before turning, and faces a different direction from its neighbors. Scanning stays at eye level instead of looking at the ceiling or floor
 - While following, bots periodically scan for nearby zombies (within 600 units) and turn to face threats
 - Bots react to all nearby sounds (gunshots, zombie attacks, combat, footsteps, world sounds, bullet impacts) by looking toward the source when not already in combat
 - Bots can shoot while moving when following a player (run-and-gun) instead of stopping to engage
-- Bots engage enemies at appropriate range and kite backwards when enemies get within 300 units (ranged) or 80 units (melee). If a retreat path is blocked (wall), bots try perpendicular and diagonal escape directions instead of running into the wall repeatedly
-- Bots detect and break out of oscillation loops (running back and forth in a tiny area) by pausing, jumping, and picking a random escape direction
+- Bots engage enemies at appropriate range and kite backwards when enemies get within 300 units (ranged) or 80 units (melee). Melee bots face the enemy while backing up instead of turning their back to run. If a retreat path is blocked (wall), bots try perpendicular and diagonal escape directions instead of running into the wall repeatedly
+- Bots detect and break out of oscillation loops (running back and forth in a tiny area) by stopping and picking a new direction
 - Bots crouch when attacking ammo crates with fists or melee weapons so their strikes actually connect with low objects
 - Bots will shoot explosive barrels when 5 or more zombies are clustered around one, using a ranged weapon to detonate it for area damage
 - Bots play **Alert** voicelines when fleeing from ZM explosions
@@ -82,7 +84,7 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 - **Help** (voice menu) — Nearby bots within `zm_sv_bot_help_range` come to the caller's location
 - **Follow** (voice menu) — The bot the caller is looking at begins following the caller
 - **Hold E on ground** — Bots following you (and explore-mode bots within 1024 units) move to the aimed position and switch to Defend mode. This overrides their current behavior including Explore mode
-- **Hold E on physics object** — The closest bot walks to the object and picks it up. Works for all bots regardless of their current behavior mode
+- **Hold E on physics object** — The closest bot walks to the object, faces it, and picks it up with USE. Only triggers on substantial objects (filters out tiny debris). Works for all bots regardless of their current behavior mode
 
 **ConVars:**
 

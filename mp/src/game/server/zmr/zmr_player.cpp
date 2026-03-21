@@ -2218,11 +2218,13 @@ void CZMPlayer::PlayerUse()
 			CBaseEntity* pHitEnt = tr.m_pEnt;
 			bool bHandled = false;
 
-			// Check if we hit a grabbable physics object on the ground
-			if ( pHitEnt && !pHitEnt->IsWorld() )
+			// Check if we hit a grabbable physics object (must be substantial enough
+			// to be an intentional target - filter out tiny debris/props)
+			if ( pHitEnt && !pHitEnt->IsWorld() && !pHitEnt->IsNPC() && !pHitEnt->IsPlayer() )
 			{
 				IPhysicsObject* pPhys = pHitEnt->VPhysicsGetObject();
-				if ( pPhys && pPhys->IsMoveable() && !pPhys->IsAttachedToConstraint(false) )
+				float flMass = pPhys ? pPhys->GetMass() : 0.0f;
+				if ( pPhys && pPhys->IsMoveable() && !pPhys->IsAttachedToConstraint(false) && flMass >= 2.0f )
 				{
 					// Find the closest bot (any nearby bot, not just followers)
 					CZMPlayerBot* pClosestBot = nullptr;
