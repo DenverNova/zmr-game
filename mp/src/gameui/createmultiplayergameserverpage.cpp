@@ -13,6 +13,8 @@ using namespace vgui;
 #include <vgui_controls/ComboBox.h>
 #include <vgui_controls/RadioButton.h>
 #include <vgui_controls/CheckButton.h>
+#include <vgui_controls/TextEntry.h>
+#include <vgui_controls/Label.h>
 #include "FileSystem.h"
 #include "tier1/convar.h"
 #include "EngineInterface.h"
@@ -41,6 +43,12 @@ CCreateMultiplayerGameServerPage::CCreateMultiplayerGameServerPage(vgui::Panel *
 	m_pEnableBotsCheck = new CheckButton( this, "EnableBotsCheck", "" );
 	m_pEnableBotsCheck->SetVisible( false );
 	m_pEnableBotsCheck->SetEnabled( false );
+
+	m_pEnableMapConfig = new CheckButton( this, "EnableMapConfig", "Enable map-specific config" );
+	m_pMapConfigEditor = new TextEntry( this, "MapConfigEditor" );
+	m_pMapConfigEditor->SetMultiline( true );
+	m_pMapConfigEditor->SetVerticalScrollbar( true );
+	m_pMapConfigEditor->SetCatchEnterKey( false );
 
 	LoadControlSettings("Resource/CreateMultiplayerGameServerPage.res");
 
@@ -128,6 +136,8 @@ void CCreateMultiplayerGameServerPage::OnApplyChanges()
 		ConVarRef bot_difficulty( "bot_difficulty" );
 		bot_difficulty.SetValue( difficulty );
 	}
+
+	SaveMapConfig();
 }
 
 //-----------------------------------------------------------------------------
@@ -286,6 +296,76 @@ void CCreateMultiplayerGameServerPage::SetMap(const char *mapName)
 //-----------------------------------------------------------------------------
 // Purpose: 
 //-----------------------------------------------------------------------------
+void CCreateMultiplayerGameServerPage::LoadMapConfig()
+{
+	const char *szMap = GetMapName();
+	if ( !szMap || !szMap[0] )
+	{
+		m_pMapConfigEditor->SetText( "" );
+		m_pEnableMapConfig->SetSelected( false );
+		return;
+	}
+
+	char cfgPath[256];
+	Q_snprintf( cfgPath, sizeof( cfgPath ), "cfg/%s.cfg", szMap );
+
+	FileHandle_t fh = g_pFullFileSystem->Open( cfgPath, "rb", "GAME" );
+	if ( fh )
+	{
+		int fileSize = g_pFullFileSystem->Size( fh );
+		if ( fileSize > 0 && fileSize < 32768 )
+		{
+			char *pBuf = new char[ fileSize + 1 ];
+			g_pFullFileSystem->Read( pBuf, fileSize, fh );
+			pBuf[ fileSize ] = '\0';
+			m_pMapConfigEditor->SetText( pBuf );
+			delete[] pBuf;
+		}
+		else
+		{
+			m_pMapConfigEditor->SetText( "" );
+		}
+		g_pFullFileSystem->Close( fh );
+		m_pEnableMapConfig->SetSelected( true );
+	}
+	else
+	{
+		char defaultCfg[512];
+		Q_snprintf( defaultCfg, sizeof( defaultCfg ),
+			"// Map config for %s\n"
+			"// Commands here run automatically when this map loads.\n",
+			szMap );
+		m_pMapConfigEditor->SetText( defaultCfg );
+		m_pEnableMapConfig->SetSelected( false );
+	}
+}
+
+void CCreateMultiplayerGameServerPage::SaveMapConfig()
+{
+	const char *szMap = GetMapName();
+	if ( !szMap || !szMap[0] )
+		return;
+
+	char cfgPath[256];
+	Q_snprintf( cfgPath, sizeof( cfgPath ), "cfg/%s.cfg", szMap );
+
+	if ( !m_pEnableMapConfig->IsSelected() )
+	{
+		g_pFullFileSystem->RemoveFile( cfgPath, "GAME" );
+		return;
+	}
+
+	char buf[32768];
+	m_pMapConfigEditor->GetText( buf, sizeof( buf ) );
+
+	FileHandle_t fh = g_pFullFileSystem->Open( cfgPath, "wb", "GAME" );
+	if ( fh )
+	{
+		g_pFullFileSystem->Write( buf, Q_strlen( buf ), fh );
+		g_pFullFileSystem->Close( fh );
+	}
+}
+
 void CCreateMultiplayerGameServerPage::OnCheckButtonChecked()
 {
 	SetControlEnabled("SkillLevel0", m_pEnableBotsCheck->IsSelected());

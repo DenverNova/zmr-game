@@ -57,9 +57,6 @@ CCreateMultiplayerGameDialog::CCreateMultiplayerGameDialog(vgui::Panel *parent) 
 	m_pZMRPage = new CCreateMultiplayerGameZMRPage(this, "ZMRPage");
 	AddPage(m_pZMRPage, "ZMR Settings");
 
-	m_pMapPage = new CCreateMultiplayerGameMapPage(this, "MapPage", m_pServerPage);
-	AddPage(m_pMapPage, "Map Config");
-
 	// create KeyValues object to load/save config options
 	m_pSavedData = new KeyValues( "ServerConfig" );
 

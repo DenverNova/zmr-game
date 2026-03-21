@@ -54,13 +54,10 @@ void CSurvivorFollowSchedule::OnStart()
     m_NextWeaponScan.Start( 1.0f );
 
     // Configure path cost for player-sized movement so bots can traverse
-    // the same navmesh paths as human players and zombies
-    CZMPlayerBot* pOuter = GetOuter();
-    float flStep = pOuter->GetMotor()->GetStepHeight();
-    m_PathCost.SetStepHeight( flStep );
-    m_PathCost.SetMaxHeightChange( flStep + 4.0f );
+    // the same navmesh paths as human players and zombies.
+    // sv_stepsize defaults to 18; set generous gap/height tolerances.
+    m_PathCost.SetStepHeight( 18.0f );
     m_PathCost.SetMaxWalkGap( 48.0f );
-    m_PathCost.SetAbsMaxGap( 200.0f );
 }
 
 void CSurvivorFollowSchedule::OnContinue()
