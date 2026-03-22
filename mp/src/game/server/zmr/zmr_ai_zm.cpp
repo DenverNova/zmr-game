@@ -69,7 +69,7 @@ void CZMAIZombieMaster::Reset()
     m_flNextActionTime = 0.0f;
     m_iReservedResources = 0;
     m_EntityCooldowns.RemoveAll();
-    m_flRoundStartTime = gpGlobals->curtime;
+    m_flRoundStartTime = gpGlobals ? gpGlobals->curtime : 0.0f;
     m_flNextRallyTime = 0.0f;
     m_flLastUpdateTime = 0.0f;
     m_bLoggedSpawners = false;
