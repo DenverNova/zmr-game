@@ -16,8 +16,9 @@
 //
 // Spawn cycle: SPAWN -> HIDDEN_SPAWN -> SPAWN -> HIDDEN_SPAWN -> ...
 //   SPAWN: Find nearest spawners to survivors (spreads across multiple if similar
-//     distance). Spawn 1-10 zombies using weighted type selection (60% shambler,
-//     10% each special). Respects per-zombie-type limits.
+//     distance). Picks a batch size (1-10) but spawns one zombie at a time as
+//     resources become available (no waiting for the full batch cost). Uses
+//     weighted type selection (60% shambler, 10% each special). Respects limits.
 //   HIDDEN_SPAWN: Place one surprise zombie behind survivors. Respects type limits.
 //
 // Camera: Smoothly glides between survivors, panning naturally like a real player.
@@ -91,6 +92,11 @@ private:
     // Trap reserve tracking (always prioritized over spawning)
     int   m_iReservedResources;
 
+    // Spawn burst: spawn one zombie at a time from a chosen batch
+    int m_iSpawnBurstRemaining;
+    ZombieClass_t m_SpawnBurstClass;
+    CHandle<CZMEntZombieSpawn> m_hSpawnBurstSpawner;
+
     // Per-entity cooldown (traps AND barrels share this)
     CUtlMap<int, float> m_EntityCooldowns;
 
@@ -105,6 +111,7 @@ private:
     float m_flNextCullTime;
 
     // Timers
+    float m_flRoundStartTime;
     float m_flNextRallyTime;
     float m_flLastUpdateTime;
     bool  m_bLoggedSpawners;

@@ -232,36 +232,42 @@ void CSurvivorFollowSchedule::OnUpdate()
         pOuter->SetStayPut( false );
     }
 
-    // If we heard something interesting recently, look toward it
+    // If we heard something interesting recently, look toward it (yaw only, keep pitch level)
     if ( m_NextHeardLook.HasStarted() && !m_NextHeardLook.IsElapsed() && m_vecHeardLookAt != vec3_origin )
     {
-        if ( !pOuter->GetMotor()->IsFacing( m_vecHeardLookAt ) )
-            pOuter->GetMotor()->FaceTowards( m_vecHeardLookAt );
-    }
-    else
-    {
-        // No active look target - gradually return pitch to forward (0)
-        // to prevent bots from staring at the floor or ceiling
-        QAngle angCur = pOuter->EyeAngles();
-        if ( fabsf( angCur.x ) > 5.0f )
+        Vector vecToSound = m_vecHeardLookAt - pOuter->EyePosition();
+        vecToSound.z = 0.0f;
+        if ( vecToSound.Length() > 1.0f )
         {
-            float flRate = 30.0f * gpGlobals->frametime;
-            if ( angCur.x > 0.0f )
-                angCur.x = MAX( 0.0f, angCur.x - flRate );
-            else
-                angCur.x = MIN( 0.0f, angCur.x + flRate );
-            pOuter->SetEyeAngles( angCur );
+            QAngle angLook;
+            VectorAngles( vecToSound, angLook );
+            angLook.x = 0.0f;
+            pOuter->SnapEyeAngles( angLook );
         }
     }
 
-    // Position deconfliction: gentle nudge away from other bots to avoid stacking.
-    // Only nudge when very close and only a small amount to prevent circling.
+    // Always force pitch toward level when not in combat or looking at a specific target.
+    // This prevents bots from staring at the ground or sky while running around.
+    {
+        QAngle angCur = pOuter->EyeAngles();
+        if ( fabsf( angCur.x ) > 2.0f )
+        {
+            angCur.x *= 0.5f;
+            if ( fabsf( angCur.x ) < 2.0f )
+                angCur.x = 0.0f;
+            pOuter->SnapEyeAngles( angCur );
+        }
+    }
+
+    // Position deconfliction: snap away from overlapping players once, then hold.
+    // Uses a longer cooldown so bots settle into position instead of constantly fidgeting.
     if ( !m_NextDeconflict.HasStarted() || m_NextDeconflict.IsElapsed() )
     {
-        m_NextDeconflict.Start( 1.0f );
+        m_NextDeconflict.Start( 5.0f );
         Vector myPos = pOuter->GetAbsOrigin();
         Vector nudge = vec3_origin;
         int nTooClose = 0;
+        const float flMinSpacing = 64.0f;
 
         for ( int i = 1; i <= gpGlobals->maxClients; i++ )
         {
@@ -272,9 +278,9 @@ void CSurvivorFollowSchedule::OnUpdate()
             Vector delta = myPos - pOther->GetAbsOrigin();
             delta.z = 0;
             float flDist = delta.Length();
-            if ( flDist < 36.0f && flDist > 1.0f )
+            if ( flDist < flMinSpacing && flDist > 1.0f )
             {
-                nudge += delta.Normalized() * (36.0f - flDist) * 0.5f;
+                nudge += delta.Normalized() * (flMinSpacing - flDist);
                 nTooClose++;
             }
         }
@@ -282,7 +288,7 @@ void CSurvivorFollowSchedule::OnUpdate()
         if ( nTooClose > 0 )
         {
             Vector vecGoal = myPos + nudge;
-            pOuter->GetMotor()->Approach( vecGoal );
+            pOuter->SetAbsOrigin( vecGoal );
         }
     }
 
@@ -573,6 +579,12 @@ void CSurvivorFollowSchedule::OnUpdate()
     {
         m_NextCrateCheck.Start( 5.0f );
 
+        // Determine what loadout slots we're missing
+        bool bNeedMainGun = !pOuter->HasWeaponOfType( BOTWEPRANGE_MAINGUN );
+        bool bNeedSidearm = !pOuter->HasWeaponOfType( BOTWEPRANGE_SECONDARYWEAPON );
+        bool bNeedMelee   = !pOuter->HasWeaponOfType( BOTWEPRANGE_MELEE );
+        bool bNeedGrenade = !pOuter->HasWeaponOfType( BOTWEPRANGE_THROWABLE );
+
         // Check if we're low on ammo (missing at least 1 clip worth for any weapon)
         bool bLowAmmo = false;
         for ( int w = 0; w < MAX_WEAPONS; w++ )
@@ -592,20 +604,60 @@ void CSurvivorFollowSchedule::OnUpdate()
             }
         }
 
-        if ( bLowAmmo )
+        bool bNeedAnything = bNeedMainGun || bNeedSidearm || bNeedMelee || bNeedGrenade || bLowAmmo;
+
+        if ( bNeedAnything )
         {
             CBaseEntity* pBestCrate = nullptr;
-            float flBestDist = 768.0f;
+            float flBestScore = -1.0f;
             CBaseEntity* pEnt = nullptr;
             while ( (pEnt = gEntList.FindEntityByClassname( pEnt, "item_item_crate" )) != nullptr )
             {
-                // Skip crates that can't be damaged
                 if ( pEnt->m_takedamage == DAMAGE_NO )
                     continue;
+
                 float dist = pOuter->GetAbsOrigin().DistTo( pEnt->GetAbsOrigin() );
-                if ( dist < flBestDist )
+                if ( dist > 1024.0f )
+                    continue;
+
+                // Check crate model to determine what's inside
+                // crate_wepin = ranged weapons, crate_melee = melee, crate_throw = throwables, crate_ammo = ammo
+                const char* pszModel = STRING( pEnt->GetModelName() );
+                float flPriority = 0.0f;
+                if ( pszModel )
                 {
-                    flBestDist = dist;
+                    if ( Q_strstr( pszModel, "crate_wepin" ) )
+                    {
+                        if ( bNeedMainGun ) flPriority = 4.0f;
+                        else if ( bNeedSidearm ) flPriority = 3.0f;
+                    }
+                    else if ( Q_strstr( pszModel, "crate_melee" ) )
+                    {
+                        if ( bNeedMelee ) flPriority = 2.0f;
+                    }
+                    else if ( Q_strstr( pszModel, "crate_throw" ) )
+                    {
+                        if ( bNeedGrenade ) flPriority = 1.5f;
+                    }
+                    else if ( Q_strstr( pszModel, "crate_ammo" ) )
+                    {
+                        if ( bLowAmmo ) flPriority = 1.0f;
+                    }
+                    else
+                    {
+                        // Unknown model (old crate model or custom), smash if we need anything
+                        flPriority = 0.5f;
+                    }
+                }
+
+                if ( flPriority <= 0.0f )
+                    continue;
+
+                // Score: higher priority wins, closer wins within same priority
+                float flScore = flPriority * 10000.0f - dist;
+                if ( flScore > flBestScore )
+                {
+                    flBestScore = flScore;
                     pBestCrate = pEnt;
                 }
             }
@@ -615,8 +667,9 @@ void CSurvivorFollowSchedule::OnUpdate()
                 m_hTargetCrate.Set( pBestCrate );
                 m_CrateTimeout.Start( 15.0f );
                 if ( zm_sv_bot_debug.GetBool() )
-                    Msg( "[Bot %s] Low on ammo, heading to smash crate at dist=%.0f\n",
-                        pOuter->GetPlayerName(), flBestDist );
+                    Msg( "[Bot %s] Found useful crate (model: %s) at dist=%.0f\n",
+                        pOuter->GetPlayerName(), STRING( pBestCrate->GetModelName() ),
+                        pOuter->GetAbsOrigin().DistTo( pBestCrate->GetAbsOrigin() ) );
             }
         }
     }
@@ -1073,13 +1126,12 @@ bool CSurvivorFollowSchedule::ShouldMoveCloser( CBasePlayer* pFollow ) const
 
     float flDistSqr = pOuter->GetAbsOrigin().DistToSqr( pFollow->GetAbsOrigin() );
 
-    // Hysteresis: start moving when far, stop when close
-    // If we're already moving (path valid), keep going until 128 units
-    // If we're stopped (no path), don't start until 256 units
+    // Wide hysteresis band so bots settle and stay put near the follow target.
+    // Stop moving once within 150 units; don't start again until 350+ units away.
     if ( m_Path.IsValid() )
-        return ( flDistSqr > (128.0f * 128.0f) );
+        return ( flDistSqr > (150.0f * 150.0f) );
     else
-        return ( flDistSqr > (256.0f * 256.0f) );
+        return ( flDistSqr > (350.0f * 350.0f) );
 }
 
 CBasePlayer* CSurvivorFollowSchedule::FindSurvivorToFollow( CBasePlayer* pIgnore, bool bAllowBot ) const

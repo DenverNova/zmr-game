@@ -117,6 +117,8 @@ private:
     // Inputs
     void InputSetHealth( inputdata_t &inputdata );
 
+public:
+    float GetLastDamageTime() const { return m_flLastDamageTime; }
 private:
     float m_flLastDamageTime;
     float m_flNextLOSOutputs;

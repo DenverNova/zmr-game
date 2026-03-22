@@ -44,8 +44,8 @@ static const int g_ZombieWeights[ZMCLASS_MAX] = { 60, 10, 10, 10, 10 };
 #define SPAWNER_SPREAD_THRESHOLD 512.0f
 
 // Camera smoothing speed (units per second for position, degrees per second for angles)
-#define CAMERA_MOVE_SPEED   800.0f
-#define CAMERA_TURN_SPEED   90.0f
+#define CAMERA_MOVE_SPEED   2000.0f
+#define CAMERA_TURN_SPEED   180.0f
 #define CAMERA_SWITCH_MIN   4.0f
 #define CAMERA_SWITCH_MAX   8.0f
 #define CAMERA_HEIGHT       200.0f
@@ -69,9 +69,14 @@ void CZMAIZombieMaster::Reset()
     m_flNextActionTime = 0.0f;
     m_iReservedResources = 0;
     m_EntityCooldowns.RemoveAll();
+    m_flRoundStartTime = gpGlobals->curtime;
     m_flNextRallyTime = 0.0f;
     m_flLastUpdateTime = 0.0f;
     m_bLoggedSpawners = false;
+
+    m_iSpawnBurstRemaining = 0;
+    m_SpawnBurstClass = ZMCLASS_INVALID;
+    m_hSpawnBurstSpawner = nullptr;
 
     m_vecCameraPos.Init();
     m_angCameraAng.Init();
@@ -437,8 +442,8 @@ int CZMAIZombieMaster::GetHighestTrapCost( CZMPlayer* pZM ) const
         CZMEntManipulate* pTrap = dynamic_cast<CZMEntManipulate*>( pEnt );
         if ( !pTrap || !pTrap->IsActive() )
             continue;
-        if ( !IsEntityInView( pZM, pTrap ) )
-            continue;
+        // Reserve is global — always account for the most expensive trap on the map
+        // regardless of camera position, since the camera moves around.
         int cost = pTrap->GetCost();
         if ( cost > highest )
             highest = cost;
@@ -487,7 +492,8 @@ CZMEntManipulate* CZMAIZombieMaster::FindBestTrap( CZMPlayer* pZM ) const
 }
 
 //
-// Camera system: smoothly glide between survivors like a real player spectating.
+// Camera system: move around the map looking at survivors like a real player.
+// Switches between targets every few seconds and smoothly moves to the new position.
 //
 void CZMAIZombieMaster::UpdateCamera( CZMPlayer* pZM )
 {
@@ -504,11 +510,7 @@ void CZMAIZombieMaster::UpdateCamera( CZMPlayer* pZM )
     if ( gpGlobals->curtime >= m_flCameraNextSwitch || m_iCameraTargetIndex <= 0 )
     {
         int newIdx = humans[ random->RandomInt( 0, humans.Count() - 1 ) ]->entindex();
-        if ( newIdx != m_iCameraTargetIndex )
-        {
-            m_iCameraTargetIndex = newIdx;
-            m_flCameraSwitchLerp = 0.0f;
-        }
+        m_iCameraTargetIndex = newIdx;
         m_flCameraNextSwitch = gpGlobals->curtime + random->RandomFloat( CAMERA_SWITCH_MIN, CAMERA_SWITCH_MAX );
     }
 
@@ -516,7 +518,6 @@ void CZMAIZombieMaster::UpdateCamera( CZMPlayer* pZM )
     CBasePlayer* pTarget = dynamic_cast<CBasePlayer*>( UTIL_EntityByIndex( m_iCameraTargetIndex ) );
     if ( !pTarget || !pTarget->IsAlive() || pTarget->GetTeamNumber() != ZMTEAM_HUMAN )
     {
-        // Target died or left, pick a new one next frame
         m_iCameraTargetIndex = 0;
         return;
     }
@@ -525,7 +526,10 @@ void CZMAIZombieMaster::UpdateCamera( CZMPlayer* pZM )
     Vector fwd;
     AngleVectors( pTarget->EyeAngles(), &fwd );
     fwd.z = 0.0f;
-    fwd.NormalizeInPlace();
+    if ( fwd.Length() > 0.01f )
+        fwd.NormalizeInPlace();
+    else
+        fwd = Vector( 1, 0, 0 );
 
     Vector vecDesired = pTarget->GetAbsOrigin() - fwd * CAMERA_BACK_DIST + Vector( 0, 0, CAMERA_HEIGHT );
 
@@ -534,40 +538,48 @@ void CZMAIZombieMaster::UpdateCamera( CZMPlayer* pZM )
     QAngle angDesired;
     VectorAngles( vecToTarget, angDesired );
 
-    // Smooth interpolation
-    float dt = gpGlobals->frametime;
-    if ( dt <= 0.0f )
-        dt = 0.016f;
-
-    float moveRate = CAMERA_MOVE_SPEED * dt;
-    float turnRate = CAMERA_TURN_SPEED * dt;
-
-    // Lerp position
-    Vector vecDelta = vecDesired - m_vecCameraPos;
-    float flDist = vecDelta.Length();
-    if ( flDist > moveRate )
+    // If camera hasn't been initialized yet, teleport immediately
+    if ( m_vecCameraPos.IsZero() )
     {
-        vecDelta.NormalizeInPlace();
-        m_vecCameraPos += vecDelta * moveRate;
+        m_vecCameraPos = vecDesired;
+        m_angCameraAng = angDesired;
     }
     else
     {
-        m_vecCameraPos = vecDesired;
-    }
+        // Smooth interpolation
+        float dt = gpGlobals->frametime;
+        if ( dt <= 0.0f )
+            dt = 0.016f;
 
-    // Lerp angles
-    for ( int i = 0; i < 3; i++ )
-    {
-        float diff = AngleNormalize( angDesired[i] - m_angCameraAng[i] );
-        if ( fabsf( diff ) > turnRate )
-            m_angCameraAng[i] += ( diff > 0 ? turnRate : -turnRate );
+        float moveRate = CAMERA_MOVE_SPEED * dt;
+        float turnRate = CAMERA_TURN_SPEED * dt;
+
+        // Lerp position
+        Vector vecDelta = vecDesired - m_vecCameraPos;
+        float flDist = vecDelta.Length();
+        if ( flDist > moveRate )
+        {
+            vecDelta.NormalizeInPlace();
+            m_vecCameraPos += vecDelta * moveRate;
+        }
         else
-            m_angCameraAng[i] = angDesired[i];
+        {
+            m_vecCameraPos = vecDesired;
+        }
+
+        // Lerp angles
+        for ( int i = 0; i < 3; i++ )
+        {
+            float diff = AngleNormalize( angDesired[i] - m_angCameraAng[i] );
+            if ( fabsf( diff ) > turnRate )
+                m_angCameraAng[i] += ( diff > 0 ? turnRate : -turnRate );
+            else
+                m_angCameraAng[i] = angDesired[i];
+        }
     }
 
-    // Apply to the ZM bot's position and view angles
-    pZM->SetAbsOrigin( m_vecCameraPos );
-    pZM->SetAbsAngles( m_angCameraAng );
+    // Apply to the ZM bot — use Teleport for reliable position updates
+    pZM->Teleport( &m_vecCameraPos, &m_angCameraAng, nullptr );
     pZM->SnapEyeAngles( m_angCameraAng );
 }
 
@@ -657,23 +669,52 @@ void CZMAIZombieMaster::CullStrandedZombies( CZMPlayer* pZM )
 
 //
 // Cycle phase: SPAWN
-// Find nearest spawners (spread across similar distances), spawn 1-10 zombies.
-// Only spawns when resources exceed trap reserves. If below reserve, just waits.
+// Picks a batch size (1-10) and spawner, then spawns one zombie per tick as
+// resources allow. Does NOT wait for full batch cost up front. After the burst
+// completes (or resources run dry), moves to hidden spawn phase.
 //
 void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
 {
     if ( gpGlobals->curtime < m_flNextActionTime )
         return;
 
-    // Can't spawn if resources are at or below the reserve threshold
-    if ( pZM->GetResources() <= m_iReservedResources )
+    // Continue an active spawn burst — spawn one zombie per tick
+    if ( m_iSpawnBurstRemaining > 0 && m_hSpawnBurstSpawner.Get() )
     {
-        if ( zm_sv_ai_zm_debug.GetBool() )
-            Msg( "[AI ZM] Spawn: waiting for resources (res=%i, reserved=%i)\n",
-                pZM->GetResources(), m_iReservedResources );
-        m_flNextActionTime = gpGlobals->curtime + 1.0f;
+        // Can't spawn if resources are at or below the reserve threshold
+        if ( pZM->GetResources() <= m_iReservedResources )
+        {
+            // Wait briefly, resources will tick up
+            return;
+        }
+
+        if ( !CanAffordClass( m_SpawnBurstClass, pZM, m_iReservedResources ) ||
+             IsClassAtTypeLimit( m_SpawnBurstClass ) ||
+             !CZMBaseZombie::HasEnoughPopToSpawn( m_SpawnBurstClass ) )
+        {
+            // Can't spawn this class anymore — end burst
+            m_iSpawnBurstRemaining = 0;
+        }
+        else
+        {
+            TrySpawnZombies( m_SpawnBurstClass, 1, m_hSpawnBurstSpawner.Get() );
+            m_iSpawnBurstRemaining--;
+        }
+
+        if ( m_iSpawnBurstRemaining <= 0 )
+        {
+            // Burst finished — move to hidden spawn
+            m_Phase = AIZM_PHASE_HIDDEN_SPAWN;
+            m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 0.5f, 2.0f );
+        }
         return;
     }
+
+    // No active burst — start a new one
+
+    // Can't spawn if resources are at or below the reserve threshold
+    if ( pZM->GetResources() <= m_iReservedResources )
+        return;
 
     // Gather spawners near survivors (spreads across multiple if similar distance)
     CUtlVector<CZMEntZombieSpawn*> nearSpawners;
@@ -691,7 +732,7 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
     {
         if ( zm_sv_ai_zm_debug.GetBool() )
             Msg( "[AI ZM] Spawn: no active/visible spawners, retrying\n" );
-        m_flNextActionTime = gpGlobals->curtime + 3.0f;
+        m_flNextActionTime = gpGlobals->curtime + 1.0f;
         return;
     }
 
@@ -702,26 +743,32 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
     if ( zclass == ZMCLASS_INVALID )
     {
         if ( zm_sv_ai_zm_debug.GetBool() )
-            Msg( "[AI ZM] Spawn: can't afford any class (res=%i, reserved=%i), waiting\n",
+            Msg( "[AI ZM] Spawn: can't afford any class (res=%i, reserved=%i)\n",
                 pZM->GetResources(), m_iReservedResources );
-        m_flNextActionTime = gpGlobals->curtime + 2.0f;
         return;
     }
 
-    int count = random->RandomInt( 1, 10 );
+    // Start a burst: pick batch size, spawn first one immediately
+    m_iSpawnBurstRemaining = random->RandomInt( 1, 10 );
+    m_SpawnBurstClass = zclass;
+    m_hSpawnBurstSpawner = pSpawner;
 
     if ( zm_sv_ai_zm_debug.GetBool() )
     {
         Vector spos = pSpawner->GetAbsOrigin();
-        Msg( "[AI ZM] Spawn: %i x %s at (%.0f,%.0f,%.0f) [%i spawners in spread set]\n",
-            count, CZMBaseZombie::ClassToName( zclass ), spos.x, spos.y, spos.z, visibleSpawners.Count() );
+        Msg( "[AI ZM] Spawn burst: %i x %s at (%.0f,%.0f,%.0f) [%i spawners nearby]\n",
+            m_iSpawnBurstRemaining, CZMBaseZombie::ClassToName( zclass ),
+            spos.x, spos.y, spos.z, visibleSpawners.Count() );
     }
 
-    TrySpawnZombies( zclass, count, pSpawner );
+    TrySpawnZombies( zclass, 1, pSpawner );
+    m_iSpawnBurstRemaining--;
 
-    // Move to hidden spawn phase
-    m_Phase = AIZM_PHASE_HIDDEN_SPAWN;
-    m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 2.0f, 5.0f );
+    if ( m_iSpawnBurstRemaining <= 0 )
+    {
+        m_Phase = AIZM_PHASE_HIDDEN_SPAWN;
+        m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 0.5f, 2.0f );
+    }
 }
 
 //
@@ -817,9 +864,9 @@ void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
     if ( !bSuccess && zm_sv_ai_zm_debug.GetBool() )
         Msg( "[AI ZM] Hidden spawn: all attempts failed\n" );
 
-    // Cycle back to spawn phase
+    // Cycle back to spawn phase quickly
     m_Phase = AIZM_PHASE_SPAWN;
-    m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 1.0f, 3.0f );
+    m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 0.3f, 1.0f );
 }
 
 //
@@ -938,16 +985,17 @@ void CZMAIZombieMaster::Update()
     // Camera always updates (even during rush prevention) for smooth movement
     UpdateCamera( pZM );
 
-    if ( gpGlobals->curtime - m_flLastUpdateTime < 0.5f )
+    if ( gpGlobals->curtime - m_flLastUpdateTime < 0.1f )
         return;
     m_flLastUpdateTime = gpGlobals->curtime;
 
     // Rush prevention: only look around (camera runs above), no actions
     float flRushTime = zm_sv_ai_zm_rush_prevention.GetFloat();
-    if ( flRushTime > 0.0f && gpGlobals->curtime < flRushTime )
+    float flTimeSinceRound = gpGlobals->curtime - m_flRoundStartTime;
+    if ( flRushTime > 0.0f && flTimeSinceRound < flRushTime )
     {
         if ( zm_sv_ai_zm_debug.GetBool() && (int)(gpGlobals->curtime * 2) % 10 == 0 )
-            Msg( "[AI ZM] Rush prevention active (%.1f/%.1f)\n", gpGlobals->curtime, flRushTime );
+            Msg( "[AI ZM] Rush prevention active (%.1f/%.1f)\n", flTimeSinceRound, flRushTime );
         return;
     }
 
