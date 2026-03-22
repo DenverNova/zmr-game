@@ -30,7 +30,11 @@ CCreateMultiplayerGameZMRPage::CCreateMultiplayerGameZMRPage( vgui::Panel *paren
     m_pFlashlightInfinite = new CheckButton( this, "FlashlightInfinite", "" );
     m_pAFKTimer = new TextEntry( this, "AFKTimer" );
     m_pAIZMSpawnInterval = new TextEntry( this, "AIZMSpawnInterval" );
-    m_pAIZMAggression = new TextEntry( this, "AIZMAggression" );
+    m_pAIZMDifficulty = new TextEntry( this, "AIZMDifficulty" );
+
+    m_pAIZMViewMode = new ComboBox( this, "AIZMViewMode", 2, false );
+    m_pAIZMViewMode->AddItem( "Global (All Spawners/Traps)", new KeyValues( "data", "value", "0" ) );
+    m_pAIZMViewMode->AddItem( "Within View Only", new KeyValues( "data", "value", "1" ) );
 
     LoadControlSettings( "Resource/CreateMultiplayerGameZMRPage.res" );
 
@@ -83,9 +87,17 @@ void CCreateMultiplayerGameZMRPage::LoadValues()
     if ( spawnInterval.IsValid() )
         m_pAIZMSpawnInterval->SetText( spawnInterval.GetString() );
 
-    ConVarRef aggression( "zm_sv_ai_zm_aggression" );
-    if ( aggression.IsValid() )
-        m_pAIZMAggression->SetText( aggression.GetString() );
+    ConVarRef difficulty( "zm_sv_ai_zm_difficulty" );
+    if ( difficulty.IsValid() )
+        m_pAIZMDifficulty->SetText( difficulty.GetString() );
+
+    ConVarRef viewMode( "zm_sv_ai_zm_view_mode" );
+    if ( viewMode.IsValid() )
+    {
+        int mode = viewMode.GetInt();
+        mode = clamp( mode, 0, 1 );
+        m_pAIZMViewMode->ActivateItemByRow( mode );
+    }
 }
 
 void CCreateMultiplayerGameZMRPage::ApplyConVar( const char *cvarName, const char *controlName, bool isFloat )
@@ -144,5 +156,13 @@ void CCreateMultiplayerGameZMRPage::OnApplyChanges()
     ApplyConVarCheck( "zm_sv_flashlight_infinite", "FlashlightInfinite" );
     ApplyConVar( "zm_sv_antiafk", "AFKTimer" );
     ApplyConVar( "zm_sv_ai_zm_spawn_interval", "AIZMSpawnInterval", true );
-    ApplyConVar( "zm_sv_ai_zm_aggression", "AIZMAggression", true );
+    ApplyConVar( "zm_sv_ai_zm_difficulty", "AIZMDifficulty", true );
+
+    KeyValues *kvView = m_pAIZMViewMode->GetActiveItemUserData();
+    if ( kvView )
+    {
+        ConVarRef viewMode( "zm_sv_ai_zm_view_mode" );
+        if ( viewMode.IsValid() )
+            viewMode.SetValue( kvView->GetInt( "value", 0 ) );
+    }
 }

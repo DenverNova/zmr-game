@@ -15,7 +15,7 @@
 extern ConVar zm_sv_bot_default_behavior;
 extern ConVar zm_sv_bot_weapon_search_range;
 
-ConVar zm_sv_bot_debug( "zm_sv_bot_debug", "0", FCVAR_CHEAT, "Enable AI survivor bot debug logging. 0=off, 1=on." );
+ConVar zm_sv_bot_debug( "zm_sv_bot_debug", "1", FCVAR_NOTIFY, "Enable AI survivor bot debug logging. 0=off, 1=on." );
 
 
 CSurvivorFollowSchedule::CSurvivorFollowSchedule()
@@ -232,10 +232,21 @@ void CSurvivorFollowSchedule::OnUpdate()
         pOuter->SetStayPut( false );
     }
 
-    // If we heard something interesting recently, look toward it
+    bool bIsDefendMode = ( effectiveBehavior == 2 );
+
+    // If we heard something interesting recently, look toward it.
+    // In defend mode, only react to truly immediate threats (< 300u) to avoid
+    // interrupting the steady doorway gaze with distant zombie sightings.
     if ( m_NextHeardLook.HasStarted() && !m_NextHeardLook.IsElapsed() && m_vecHeardLookAt != vec3_origin )
     {
-        if ( !pOuter->GetMotor()->IsFacing( m_vecHeardLookAt ) )
+        bool bShouldReact = true;
+        if ( bIsDefendMode )
+        {
+            float flThreatDist = pOuter->GetAbsOrigin().DistTo( m_vecHeardLookAt );
+            bShouldReact = ( flThreatDist < 300.0f );
+        }
+
+        if ( bShouldReact && !pOuter->GetMotor()->IsFacing( m_vecHeardLookAt ) )
             pOuter->GetMotor()->FaceTowards( m_vecHeardLookAt );
     }
     else
@@ -653,8 +664,10 @@ void CSurvivorFollowSchedule::OnUpdate()
         }
     }
 
-    // Periodically scan for threats in peripheral vision (zombie near follow target or us)
-    if ( !m_NextPeripheralScan.HasStarted() || m_NextPeripheralScan.IsElapsed() )
+    // Periodically scan for threats in peripheral vision (zombie near follow target or us).
+    // Skip in defend mode - UpdateDefendMode handles zombie detection and the scan
+    // was causing constant glancing by repeatedly overriding the defend gaze.
+    if ( !bIsDefendMode && (!m_NextPeripheralScan.HasStarted() || m_NextPeripheralScan.IsElapsed()) )
     {
         m_NextPeripheralScan.Start( random->RandomFloat( 0.8f, 1.5f ) );
 
@@ -1430,13 +1443,14 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
     }
     else
     {
-        // No zombies nearby - scan for chokepoints or look around
+        // No zombies nearby - face a chokepoint and hold that gaze.
+        // Only pick a new direction when the full stare timer expires.
         if ( !m_DefendLookTimer.HasStarted() || m_DefendLookTimer.IsElapsed() )
         {
-            m_DefendLookTimer.Start( random->RandomFloat( 3.0f, 6.0f ) );
+            // Hold each chosen direction for 5-10 seconds so bots don't glance away
+            m_DefendLookTimer.Start( random->RandomFloat( 5.0f, 10.0f ) );
 
             // Chokepoint detection: find narrow nav areas nearby (doorways, corridors)
-            // that zombies would funnel through to reach us
             bool bFoundChokepoint = false;
             CNavArea* pMyArea = pOuter->GetLastKnownArea();
             if ( pMyArea )
@@ -1444,7 +1458,6 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
                 CUtlVector<CNavArea*> chokepoints;
                 float flScanRange = 512.0f;
 
-                // Check adjacent areas within scan range for narrow openings
                 for ( int dir = 0; dir < NUM_DIRECTIONS; dir++ )
                 {
                     const NavConnectVector* pConnections = pMyArea->GetAdjacentAreas( (NavDirType)dir );
@@ -1461,15 +1474,10 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
                         if ( distSqr > flScanRange * flScanRange )
                             continue;
 
-                        // Narrow areas (width or height < 96 units) are likely doorways/corridors
                         float flNarrow = MIN( pAdj->GetSizeX(), pAdj->GetSizeY() );
-
                         if ( flNarrow < 96.0f )
-                        {
                             chokepoints.AddToTail( pAdj );
-                        }
 
-                        // Also check one level deeper for chokepoints behind adjacent areas
                         for ( int dir2 = 0; dir2 < NUM_DIRECTIONS; dir2++ )
                         {
                             const NavConnectVector* pDeep = pAdj->GetAdjacentAreas( (NavDirType)dir2 );
@@ -1493,7 +1501,6 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
 
                 if ( chokepoints.Count() > 0 )
                 {
-                    // Pick a random chokepoint to watch
                     CNavArea* pChoke = chokepoints[ random->RandomInt( 0, chokepoints.Count() - 1 ) ];
                     Vector vecChoke = pChoke->GetCenter();
                     Vector toChoke = vecChoke - pOuter->GetAbsOrigin();
@@ -1505,7 +1512,6 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
                 }
             }
 
-            // Fallback: pick a random direction
             if ( !bFoundChokepoint )
             {
                 QAngle angBase = pOuter->EyeAngles();
@@ -1513,7 +1519,7 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
             }
         }
 
-        // Smoothly face the target direction using a world-space point at eye height
+        // Hold the chosen gaze direction every frame - no random drift
         Vector fwd;
         QAngle lookAng( 0.0f, m_flDefendLookYaw, 0.0f );
         AngleVectors( lookAng, &fwd );

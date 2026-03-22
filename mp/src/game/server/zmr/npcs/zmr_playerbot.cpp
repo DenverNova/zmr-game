@@ -517,10 +517,11 @@ float CZMPlayerBot::GetOptimalAttackDistance() const
 
     // ZMRTODO: Get rid of this hardcoded stuff.
 
-    // HACK: Melee
-    if ( !pWep->UsesPrimaryAmmo() )
-        return 32.0f;
+    ZMBotWeaponTypeRange_t wepType = GetWeaponType( pWep );
 
+    // Melee and fists: must be right next to the zombie
+    if ( wepType == BOTWEPRANGE_MELEE || wepType == BOTWEPRANGE_FISTS )
+        return 32.0f;
 
     // Skip 'weapon_zm_'
     const char* wep = pWep->GetClassname() + sizeof( "weapon_zm_" ) - 1;
@@ -544,10 +545,12 @@ float CZMPlayerBot::GetMaxAttackDistance() const
 
     // ZMRTODO: Get rid of this hardcoded stuff.
 
-    // HACK: Melee
-    if ( !pWep->UsesPrimaryAmmo() )
-        return 50.0f;
+    ZMBotWeaponTypeRange_t wepType2 = GetWeaponType( pWep );
 
+    // Melee and fists: only swing when actually within striking distance.
+    // This prevents bots from swinging at targets 30+ feet away.
+    if ( wepType2 == BOTWEPRANGE_MELEE || wepType2 == BOTWEPRANGE_FISTS )
+        return 64.0f;
 
     // Skip 'weapon_zm_'
     const char* wep = pWep->GetClassname() + sizeof( "weapon_zm_" ) - 1;

@@ -2261,12 +2261,15 @@ void CZMPlayer::PlayerUse()
 				}
 			}
 
-			// If we didn't hit a grabbable object, send bots to defend the exact aim point
+			// If we didn't hit a grabbable object, send bots to defend the aim point.
+			// Each bot gets a unique offset slot around the target so they spread out
+			// naturally instead of piling onto the exact same position.
 			if ( !bHandled )
 			{
 				Vector vecHitPos = tr.endpos;
 
-				int nCommanded = 0;
+				// Collect eligible bots first so we can assign unique slots
+				CUtlVector<CZMPlayerBot*> eligibleBots;
 				for ( int i = 1; i <= gpGlobals->maxClients; i++ )
 				{
 					CBasePlayer* pOther = UTIL_PlayerByIndex( i );
@@ -2279,17 +2282,37 @@ void CZMPlayer::PlayerUse()
 					if ( !pBot )
 						continue;
 
-					// Command bots that are following us, OR bots within range that
-					// are in explore mode / have no follow target (they should also obey)
 					bool bIsFollowing = ( pBot->GetFollowTarget() == this );
 					bool bInRange = ( pBot->GetAbsOrigin().DistTo( GetAbsOrigin() ) < 1024.0f );
 					bool bUnassigned = ( pBot->GetFollowTarget() == nullptr );
 					if ( !bIsFollowing && !(bInRange && bUnassigned) )
 						continue;
 
+					eligibleBots.AddToTail( pBot );
+				}
+
+				// Assign spread positions: first bot goes to center, rest spread in a ring
+				// spaced 52 units apart (just over player hull width of ~32 units)
+				const float flSlotRadius = 52.0f;
+				int nCommanded = 0;
+				for ( int b = 0; b < eligibleBots.Count(); b++ )
+				{
+					CZMPlayerBot* pBot = eligibleBots[b];
+
+					Vector vecSlot = vecHitPos;
+					if ( b > 0 )
+					{
+						// Distribute around a circle, starting from the direction
+						// the bot is currently standing relative to the center
+						float flAngle = ( (float)(b - 1) / (float)MAX( eligibleBots.Count() - 1, 1 ) ) * 360.0f;
+						float flRad = DEG2RAD( flAngle );
+						vecSlot.x += cosf( flRad ) * flSlotRadius;
+						vecSlot.y += sinf( flRad ) * flSlotRadius;
+					}
+
 					pBot->SetFollowTarget( nullptr );
 					pBot->SetStayPut( false );
-					pBot->SetCommandedDefendPos( vecHitPos );
+					pBot->SetCommandedDefendPos( vecSlot );
 					pBot->SetBehaviorOverride( 2 ); // Defend
 					ZMGetVoiceLines()->OnVoiceLine( pBot, 0 );
 					nCommanded++;

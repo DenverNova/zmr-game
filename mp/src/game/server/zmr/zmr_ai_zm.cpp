@@ -18,10 +18,9 @@
 
 extern ConVar zm_sv_ai_zm;
 
-ConVar zm_sv_ai_zm_debug( "zm_sv_ai_zm_debug", "0", FCVAR_CHEAT, "Enable AI ZM debug logging (server console only). 0=off, 1=on." );
+ConVar zm_sv_ai_zm_debug( "zm_sv_ai_zm_debug", "1", FCVAR_NOTIFY, "Enable AI ZM debug logging (server console only). 0=off, 1=on." );
 
 ConVar zm_sv_ai_zm_spawn_interval( "zm_sv_ai_zm_spawn_interval", "8.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Base seconds between AI ZM spawn waves." );
-ConVar zm_sv_ai_zm_aggression( "zm_sv_ai_zm_aggression", "1.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI ZM aggression. Higher = faster spawns, larger groups. (0.1 - 3.0)" );
 ConVar zm_sv_ai_zm_spawn_batch( "zm_sv_ai_zm_spawn_batch", "3", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Base max zombies per wave (scaled by plan type)." );
 ConVar zm_sv_ai_zm_trap_range( "zm_sv_ai_zm_trap_range", "1024", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Distance a survivor must be to a trap for the AI ZM to trigger it." );
 ConVar zm_sv_ai_zm_spawn_range( "zm_sv_ai_zm_spawn_range", "2048", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Max distance from a survivor for AI ZM to use a spawner." );
@@ -34,6 +33,8 @@ ConVar zm_sv_ai_zm_trap_cooldown( "zm_sv_ai_zm_trap_cooldown", "30.0", FCVAR_NOT
 ConVar zm_sv_ai_zm_hidden_max( "zm_sv_ai_zm_hidden_max", "5", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Max hidden spawns per 2-minute window." );
 ConVar zm_sv_ai_zm_plan_pause( "zm_sv_ai_zm_plan_pause", "8.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Seconds to pause between completing one plan and starting the next." );
 ConVar zm_sv_ai_zm_rush_prevention( "zm_sv_ai_zm_rush_prevention", "15.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Seconds at round start before the AI ZM can spawn, trigger traps, or use abilities. Does not affect human ZMs." );
+ConVar zm_sv_ai_zm_view_mode( "zm_sv_ai_zm_view_mode", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI ZM spawner/trap selection mode. 0=Global (use all), 1=Within View (only spawners/traps the AI can currently see)." );
+ConVar zm_sv_ai_zm_roam( "zm_sv_ai_zm_roam", "1", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI ZM roams the map and pans the camera toward active survivors. 1=on, 0=off." );
 
 CZMAIZombieMaster g_ZMAIZombieMaster;
 
@@ -63,6 +64,8 @@ void CZMAIZombieMaster::Reset()
     m_nHiddenSpawnsThisWindow = 0;
     m_flHiddenSpawnWindowStart = 0.0f;
     m_flNextBarrelDetonateTime = 0.0f;
+    m_flNextCameraMove = 0.0f;
+    m_iCameraTargetIdx = 0;
 }
 
 bool CZMAIZombieMaster::IsActive() const
@@ -164,8 +167,52 @@ bool CZMAIZombieMaster::HasSurvivorNearTrap() const
     return false;
 }
 
+bool CZMAIZombieMaster::IsVisibleFromZM( CZMPlayer* pZM, const Vector& pos ) const
+{
+    if ( !pZM )
+        return false;
+
+    trace_t tr;
+    UTIL_TraceLine( pZM->EyePosition(), pos, MASK_OPAQUE, pZM, COLLISION_GROUP_NONE, &tr );
+    return ( tr.fraction >= 0.99f );
+}
+
+void CZMAIZombieMaster::UpdateRoamCamera( CZMPlayer* pZM )
+{
+    if ( !pZM || gpGlobals->curtime < m_flNextCameraMove )
+        return;
+
+    CUtlVector<CBasePlayer*> humans;
+    GatherHumans( humans );
+    if ( humans.Count() == 0 )
+        return;
+
+    // Advance to the next survivor in round-robin order
+    m_iCameraTargetIdx = ( m_iCameraTargetIdx + 1 ) % humans.Count();
+    CBasePlayer* pTarget = humans[ m_iCameraTargetIdx ];
+
+    // Move the ZM player origin to a position near the target so their view
+    // is roughly where the action is (ZM uses a free-roam camera)
+    Vector vecTarget = pTarget->GetAbsOrigin() + Vector( 0, 0, 128.0f );
+    pZM->SetAbsOrigin( vecTarget );
+
+    // Aim the ZM view at the survivor
+    Vector toTarget = pTarget->EyePosition() - pZM->EyePosition();
+    QAngle angLook;
+    VectorAngles( toTarget, angLook );
+    pZM->SnapEyeAngles( angLook );
+
+    // Watch each target for 4-8 seconds before switching
+    m_flNextCameraMove = gpGlobals->curtime + random->RandomFloat( 4.0f, 8.0f );
+
+    if ( zm_sv_ai_zm_debug.GetBool() )
+        Msg( "[AI ZM] Camera moved to survivor '%s'\n", pTarget->GetPlayerName() );
+}
+
 void CZMAIZombieMaster::GatherActiveSpawners( CUtlVector<CZMEntZombieSpawn*>& spawners ) const
 {
+    CZMPlayer* pZM = ( zm_sv_ai_zm_view_mode.GetInt() == 1 ) ? GetZMPlayer() : nullptr;
+
     CBaseEntity* pEnt = nullptr;
     while ( (pEnt = gEntList.FindEntityByClassname( pEnt, "info_zombiespawn" )) != nullptr )
     {
@@ -176,6 +223,11 @@ void CZMAIZombieMaster::GatherActiveSpawners( CUtlVector<CZMEntZombieSpawn*>& sp
         // until map triggers reveal them should stay hidden for the AI too.
         if ( !pSpawn->IsActive() )
             continue;
+
+        // Within-view mode: only include spawners visible from the ZM's current position
+        if ( pZM && !IsVisibleFromZM( pZM, pSpawn->GetAbsOrigin() ) )
+            continue;
+
         spawners.AddToTail( pSpawn );
     }
 }
@@ -267,6 +319,7 @@ CZMEntManipulate* CZMAIZombieMaster::FindBestTrap() const
 {
     float flTrapRange = zm_sv_ai_zm_trap_range.GetFloat();
     float flTrapCooldown = zm_sv_ai_zm_trap_cooldown.GetFloat();
+    CZMPlayer* pZM = ( zm_sv_ai_zm_view_mode.GetInt() == 1 ) ? GetZMPlayer() : nullptr;
 
     CZMEntManipulate* pBest = nullptr;
     float flBestDist = FLT_MAX;
@@ -285,6 +338,10 @@ CZMEntManipulate* CZMAIZombieMaster::FindBestTrap() const
             if ( gpGlobals->curtime < m_TrapCooldowns[idx] + flTrapCooldown )
                 continue;
         }
+
+        // Within-view mode: only consider traps visible from the ZM's current position
+        if ( pZM && !IsVisibleFromZM( pZM, pTrap->GetAbsOrigin() ) )
+            continue;
 
         float dist = 0.0f;
         CBasePlayer* pNearest = FindNearestHuman( pTrap->GetAbsOrigin(), &dist );
@@ -401,12 +458,8 @@ bool CZMAIZombieMaster::TrySpawnZombies( ZombieClass_t zclass, int count, CZMEnt
     if ( !CZMBaseZombie::HasEnoughPopToSpawn( zclass ) )
         return false;
 
-    // Ensure spawner is active so SpawnThink won't abort on IsActive() check
     if ( !pSpawner->IsActive() )
-    {
-        inputdata_t dummy;
-        pSpawner->InputUnhide( dummy );
-    }
+        return false;
 
     pSpawner->QueueUnit( pZM, zclass, toSpawn );
 
@@ -427,7 +480,6 @@ void CZMAIZombieMaster::BuildNewPlan()
     m_iPlanStep = 0;
     m_iSaveTarget = -1;
 
-    float flAggression = clamp( zm_sv_ai_zm_aggression.GetFloat(), 0.1f, 3.0f );
     float minTime = zm_sv_ai_zm_tactic_min_time.GetFloat();
     float maxTime = zm_sv_ai_zm_tactic_max_time.GetFloat();
     m_flPlanExpireTime = gpGlobals->curtime + random->RandomFloat( minTime, maxTime );
@@ -457,7 +509,7 @@ void CZMAIZombieMaster::BuildNewPlan()
         }
     }
 
-    float baseInterval = zm_sv_ai_zm_spawn_interval.GetFloat() / flAggression;
+    float baseInterval = zm_sv_ai_zm_spawn_interval.GetFloat();
 
     // Decide number of waves: 3-6 steps per plan
     int numSteps = random->RandomInt( 3, 6 );
@@ -485,14 +537,10 @@ void CZMAIZombieMaster::BuildNewPlan()
         if ( zc == ZMCLASS_INVALID )
             continue;
 
-        // Cap counts: cheap/shambler types up to 1-25, expensive/special up to 1-5
+        // Cap counts: cheap types up to 1-25, expensive types up to 1-5
         int maxCount = IsClassCheap( zc ) ? 25 : 5;
         int minCount = 1;
         int count = random->RandomInt( minCount, maxCount );
-
-        // Scale by aggression but never exceed caps
-        count = (int)( count * flAggression );
-        count = clamp( count, minCount, maxCount );
 
         AIZMSpawnStep_t step;
         step.zclass = zc;
@@ -574,11 +622,33 @@ void CZMAIZombieMaster::ExecutePlanStep( CZMPlayer* pZM )
         return;
     }
 
-    if ( !CanAffordClass( step.zclass, pZM ) )
+    // Determine what class to actually spawn. If we can't afford the planned class,
+    // fall back to the cheapest class this spawner supports that we can afford.
+    ZombieClass_t spawnClass = step.zclass;
+    if ( !CanAffordClass( spawnClass, pZM ) )
     {
-        // Can't afford yet - wait
-        m_flPlanStepReadyTime = gpGlobals->curtime + 2.0f;
-        return;
+        spawnClass = PickCheapestClass( pSpawner );
+        if ( spawnClass == ZMCLASS_INVALID || !CanAffordClass( spawnClass, pZM ) )
+        {
+            // Can't afford anything at this spawner yet - retry in 2s
+            m_flPlanStepReadyTime = gpGlobals->curtime + 2.0f;
+
+            // Safety: if the plan is completely stalled for too long, skip this step
+            // so maps with expensive-only spawners don't freeze the AI forever.
+            if ( gpGlobals->curtime > m_flPlanExpireTime )
+            {
+                if ( zm_sv_ai_zm_debug.GetBool() )
+                    Msg( "[AI ZM] Step %i stalled past plan expiry, skipping\n", m_iPlanStep );
+                m_iPlanStep++;
+                if ( m_iPlanStep < m_Plan.Count() )
+                    m_flPlanStepReadyTime = gpGlobals->curtime + m_Plan[m_iPlanStep].flDelay;
+            }
+            return;
+        }
+
+        if ( zm_sv_ai_zm_debug.GetBool() )
+            Msg( "[AI ZM] Step %i: can't afford %s, falling back to %s\n",
+                m_iPlanStep, CZMBaseZombie::ClassToName( step.zclass ), CZMBaseZombie::ClassToName( spawnClass ) );
     }
 
     if ( zm_sv_ai_zm_debug.GetBool() )
@@ -586,11 +656,11 @@ void CZMAIZombieMaster::ExecutePlanStep( CZMPlayer* pZM )
         Vector spos = pSpawner->GetAbsOrigin();
         Msg( "[AI ZM] Executing step %i/%i: %i x %s at spawner[%i] pos=(%.0f,%.0f,%.0f)\n",
             m_iPlanStep, m_Plan.Count(), step.count,
-            CZMBaseZombie::ClassToName( step.zclass ),
+            CZMBaseZombie::ClassToName( spawnClass ),
             step.iSpawnerIndex, spos.x, spos.y, spos.z );
     }
 
-    if ( TrySpawnZombies( step.zclass, step.count, pSpawner ) )
+    if ( TrySpawnZombies( spawnClass, step.count, pSpawner ) )
     {
         m_iLastSpawnerUsed = step.iSpawnerIndex;
         m_iPlanStep++;
@@ -741,8 +811,7 @@ void CZMAIZombieMaster::TryHiddenSpawn( CZMPlayer* pZM )
             m_nHiddenSpawnsThisWindow++;
 
             // Longer cooldown after success
-            float flAggression = clamp( zm_sv_ai_zm_aggression.GetFloat(), 0.1f, 3.0f );
-            m_flNextHiddenSpawnTime = gpGlobals->curtime + random->RandomFloat( 15.0f, 30.0f ) / flAggression;
+            m_flNextHiddenSpawnTime = gpGlobals->curtime + random->RandomFloat( 15.0f, 30.0f );
             return;
         }
     }
@@ -863,6 +932,10 @@ void CZMAIZombieMaster::Update()
 
     // Rally idle zombies toward survivors
     RallyZombiesToSurvivors();
+
+    // Roam camera and pan to look at different survivors
+    if ( zm_sv_ai_zm_roam.GetBool() )
+        UpdateRoamCamera( pZM );
 }
 
 //

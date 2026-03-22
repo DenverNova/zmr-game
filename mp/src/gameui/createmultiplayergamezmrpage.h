@@ -43,7 +43,8 @@ private:
     vgui::CheckButton *m_pFlashlightInfinite;
     vgui::TextEntry *m_pAFKTimer;
     vgui::TextEntry *m_pAIZMSpawnInterval;
-    vgui::TextEntry *m_pAIZMAggression;
+    vgui::TextEntry *m_pAIZMDifficulty;
+    vgui::ComboBox  *m_pAIZMViewMode;
 };
 
 #endif // CREATEMULTIPLAYERGAMEZMRPAGE_H

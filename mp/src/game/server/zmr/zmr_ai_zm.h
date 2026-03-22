@@ -104,6 +104,14 @@ private:
 
     // Explosive barrel detonation cooldown
     float m_flNextBarrelDetonateTime;
+
+    // Camera roaming: AI moves the ZM view to follow survivors
+    void UpdateRoamCamera( CZMPlayer* pZM );
+    float m_flNextCameraMove;       // When to move to the next look target
+    int   m_iCameraTargetIdx;       // Index of the current watched survivor
+
+    // Within-view filtering helpers
+    bool IsVisibleFromZM( CZMPlayer* pZM, const Vector& pos ) const;
 };
 
 extern CZMAIZombieMaster g_ZMAIZombieMaster;

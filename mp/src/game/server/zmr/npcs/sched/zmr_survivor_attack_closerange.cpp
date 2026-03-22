@@ -46,12 +46,14 @@ void CSurvivorAttackCloseRangeSchedule::OnStart()
             return;
         }
 
+        // No ranged ammo - fall back to melee weapons and mark as meleeing
         if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_MELEE ) )
         {
+            m_bAllowMelee = true;
             return;
         }
 
-        // Fall back to fists if nothing else is available
+        // Last resort: fists
         if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS ) )
         {
             m_bAllowMelee = true;

@@ -22,7 +22,14 @@ public:
 
     // Melee interface
     void SetMeleeing( bool value ) { m_bAllowMelee = value; }
-    bool IsMeleeing() const { return m_bAllowMelee; }
+    bool IsMeleeing() const
+    {
+        // Prefer the flag if explicitly set; otherwise detect from equipped weapon
+        if ( m_bAllowMelee ) return true;
+        auto* pOuter = GetOuter();
+        return pOuter && ( pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_MELEE ) ||
+                           pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) );
+    }
 
 
     virtual const char* GetName() const OVERRIDE { return "SurvivorAttackCloseRange"; }
