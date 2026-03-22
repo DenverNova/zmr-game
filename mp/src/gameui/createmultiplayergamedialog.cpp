@@ -9,8 +9,6 @@
 #include "CreateMultiplayerGameServerPage.h"
 #include "CreateMultiplayerGameGameplayPage.h"
 #include "CreateMultiplayerGameBotPage.h"
-#include "createmultiplayergamezmrpage.h"
-#include "createmultiplayergamemappage.h"
 
 #include "EngineInterface.h"
 #include "ModInfo.h"
@@ -37,7 +35,7 @@ CCreateMultiplayerGameDialog::CCreateMultiplayerGameDialog(vgui::Panel *parent) 
 	m_bBotsEnabled = false;
 	SetDeleteSelfOnClose(true);
 	SetProportional( false );
-	SetSize( 348, 460 );
+	SetSize( 480, 500 );
 	
 	SetTitle("#GameUI_CreateServer", true);
 	SetOKButtonText("#GameUI_Start");
@@ -53,9 +51,6 @@ CCreateMultiplayerGameDialog::CCreateMultiplayerGameDialog(vgui::Panel *parent) 
 
 	AddPage(m_pServerPage, "#GameUI_Server");
 	AddPage(m_pGameplayPage, "#GameUI_Game");
-
-	m_pZMRPage = new CCreateMultiplayerGameZMRPage(this, "ZMRPage");
-	AddPage(m_pZMRPage, "ZMR Settings");
 
 	// create KeyValues object to load/save config options
 	m_pSavedData = new KeyValues( "ServerConfig" );

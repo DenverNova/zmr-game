@@ -2218,13 +2218,11 @@ void CZMPlayer::PlayerUse()
 			CBaseEntity* pHitEnt = tr.m_pEnt;
 			bool bHandled = false;
 
-			// Check if we hit a grabbable physics object (must be substantial enough
-			// to be an intentional target - filter out tiny debris/props)
+			// Check if we hit a grabbable physics object
 			if ( pHitEnt && !pHitEnt->IsWorld() && !pHitEnt->IsNPC() && !pHitEnt->IsPlayer() )
 			{
 				IPhysicsObject* pPhys = pHitEnt->VPhysicsGetObject();
-				float flMass = pPhys ? pPhys->GetMass() : 0.0f;
-				if ( pPhys && pPhys->IsMoveable() && !pPhys->IsAttachedToConstraint(false) && flMass >= 2.0f )
+				if ( pPhys && pPhys->IsMoveable() && !pPhys->IsAttachedToConstraint(false) )
 				{
 					// Find the closest bot (any nearby bot, not just followers)
 					CZMPlayerBot* pClosestBot = nullptr;
@@ -2262,13 +2260,11 @@ void CZMPlayer::PlayerUse()
 			}
 
 			// If we didn't hit a grabbable object, send bots to defend the aim point.
-			// Each bot gets a unique offset slot around the target so they spread out
-			// naturally instead of piling onto the exact same position.
+			// Only affects bots currently following this player.
 			if ( !bHandled )
 			{
 				Vector vecHitPos = tr.endpos;
 
-				// Collect eligible bots first so we can assign unique slots
 				CUtlVector<CZMPlayerBot*> eligibleBots;
 				for ( int i = 1; i <= gpGlobals->maxClients; i++ )
 				{
@@ -2282,44 +2278,35 @@ void CZMPlayer::PlayerUse()
 					if ( !pBot )
 						continue;
 
-					bool bIsFollowing = ( pBot->GetFollowTarget() == this );
-					bool bInRange = ( pBot->GetAbsOrigin().DistTo( GetAbsOrigin() ) < 1024.0f );
-					bool bUnassigned = ( pBot->GetFollowTarget() == nullptr );
-					if ( !bIsFollowing && !(bInRange && bUnassigned) )
+					// Only bots following me
+					if ( pBot->GetFollowTarget() != this )
 						continue;
 
 					eligibleBots.AddToTail( pBot );
 				}
 
-				// Assign spread positions: first bot goes to center, rest spread in a ring
-				// spaced 52 units apart (just over player hull width of ~32 units)
-				const float flSlotRadius = 52.0f;
-				int nCommanded = 0;
-				for ( int b = 0; b < eligibleBots.Count(); b++ )
+				// Assign spaced positions with 256-unit bubbles around the target
+				int nCount = eligibleBots.Count();
+				for ( int b = 0; b < nCount; b++ )
 				{
-					CZMPlayerBot* pBot = eligibleBots[b];
-
-					Vector vecSlot = vecHitPos;
-					if ( b > 0 )
+					Vector vecPos = vecHitPos;
+					if ( nCount > 1 )
 					{
-						// Distribute around a circle, starting from the direction
-						// the bot is currently standing relative to the center
-						float flAngle = ( (float)(b - 1) / (float)MAX( eligibleBots.Count() - 1, 1 ) ) * 360.0f;
+						float flAngle = ( 360.0f / (float)nCount ) * (float)b;
 						float flRad = DEG2RAD( flAngle );
-						vecSlot.x += cosf( flRad ) * flSlotRadius;
-						vecSlot.y += sinf( flRad ) * flSlotRadius;
+						vecPos.x += cosf( flRad ) * 256.0f;
+						vecPos.y += sinf( flRad ) * 256.0f;
 					}
 
-					pBot->SetFollowTarget( nullptr );
-					pBot->SetStayPut( false );
-					pBot->SetCommandedDefendPos( vecSlot );
-					pBot->SetBehaviorOverride( 2 ); // Defend
-					ZMGetVoiceLines()->OnVoiceLine( pBot, 0 );
-					nCommanded++;
+					eligibleBots[b]->SetFollowTarget( nullptr );
+					eligibleBots[b]->SetStayPut( false );
+					eligibleBots[b]->SetCommandedDefendPos( vecPos );
+					eligibleBots[b]->SetBehaviorOverride( 2 ); // Defend
+					ZMGetVoiceLines()->OnVoiceLine( eligibleBots[b], 0 );
 				}
 
-				if ( nCommanded > 0 )
-					ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%d bot(s): Defending position", nCommanded ) );
+				if ( nCount > 0 )
+					ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%d bot(s): Defending position", nCount ) );
 			}
 		}
 		return;

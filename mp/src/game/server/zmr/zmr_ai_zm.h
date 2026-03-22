@@ -6,23 +6,31 @@
 #include "utlmap.h"
 
 //
-// AI Zombie Master - Server-side tactical controller that manages zombie spawning,
-// trap activation, and zombie rally commands using a dynamic plan system.
+// AI Zombie Master - Server-side tactical controller.
 //
-// The AI builds concrete spawn plans (e.g. "10 banshees", "5 hulks then 5 shamblers")
-// and executes them wave by wave. It continuously monitors trap opportunities and
-// will opportunistically fire traps regardless of the current spawn plan.
-// Plans are replaced once completed or after a timeout, and trap priority is elevated
-// when survivors are in range.
+// Resource priority: The AI always holds back resources equal to the highest-cost
+// trap on the map (the "reserve"). All spending decisions subtract the reserve first.
+// Traps and barrels fire opportunistically every tick when a survivor is in range
+// and the AI has the resources. After spending on a trap, the AI pauses spawning
+// until its resources climb back above the reserve threshold, then resumes.
+//
+// Spawn cycle: SPAWN -> HIDDEN_SPAWN -> SPAWN -> HIDDEN_SPAWN -> ...
+//   SPAWN: Find nearest spawners to survivors (spreads across multiple if similar
+//     distance). Spawn 1-10 zombies using weighted type selection (60% shambler,
+//     10% each special). Respects per-zombie-type limits.
+//   HIDDEN_SPAWN: Place one surprise zombie behind survivors. Respects type limits.
+//
+// Camera: Smoothly glides between survivors, panning naturally like a real player.
+// Culling: Kills stranded zombies too far from survivors when pop cap is stressed.
+// View mode: When "Within View", only uses spawners/traps visible to the ZM camera.
+// Rush prevention: AI only looks around during the configured window at round start.
+// Rally: Continuously pushes idle zombies toward the nearest survivors.
 //
 
-// A single wave step within a plan: spawn N of a specific class at a specific spawner
-struct AIZMSpawnStep_t
+enum AIZMCyclePhase_t
 {
-    ZombieClass_t   zclass;         // Class to spawn
-    int             count;          // How many to queue in this step
-    float           flDelay;        // Seconds to wait before executing this step
-    int             iSpawnerIndex;  // Index into the spawner list at plan-build time (-1 = pick at runtime)
+    AIZM_PHASE_SPAWN = 0,
+    AIZM_PHASE_HIDDEN_SPAWN,
 };
 
 class CZMAIZombieMaster
@@ -36,32 +44,34 @@ public:
     bool IsActive() const;
 
 private:
-    // Plan generation - builds a random multi-step spawn plan distributed across spawners
-    void BuildNewPlan();
-    void ExecutePlanStep( CZMPlayer* pZM );
+    // Cycle phases
+    void DoSpawnPhase( CZMPlayer* pZM );
+    void DoHiddenSpawnPhase( CZMPlayer* pZM );
 
-    // Trap opportunism - always runs independently of plan
-    void UpdateTrapOpportunism( CZMPlayer* pZM );
+    // Camera system
+    void UpdateCamera( CZMPlayer* pZM );
 
-    // Hidden spawn - occasionally place a zombie behind survivors
-    void TryHiddenSpawn( CZMPlayer* pZM );
+    // Zombie culling
+    void CullStrandedZombies( CZMPlayer* pZM );
 
-    // Explosive barrel opportunism - detonate barrels near survivors
-    void TryDetonateBarrel( CZMPlayer* pZM );
+    // Trap and barrel opportunism (checked every update, uses reserves)
+    bool TryFireTrap( CZMPlayer* pZM );
+    bool TryDetonateBarrel( CZMPlayer* pZM );
 
     // Spawning helpers
     bool TrySpawnZombies( ZombieClass_t zclass, int count, CZMEntZombieSpawn* pSpawner );
-    ZombieClass_t PickCheapestClass( CZMEntZombieSpawn* pSpawner ) const;
-    ZombieClass_t PickExpensiveClass( CZMEntZombieSpawn* pSpawner ) const;
-    ZombieClass_t PickRandomAffordableClass( CZMEntZombieSpawn* pSpawner ) const;
-    bool CanAffordClass( ZombieClass_t zclass, CZMPlayer* pZM ) const;
-
-    // Spawner selection helpers
-    ZombieClass_t PickClassForSpawner( CZMEntZombieSpawn* pSpawner, ZombieClass_t avoid ) const;
+    ZombieClass_t PickWeightedClass( CZMEntZombieSpawn* pSpawner, CZMPlayer* pZM ) const;
+    bool CanAffordClass( ZombieClass_t zclass, CZMPlayer* pZM, int reservedResources = 0 ) const;
     bool SpawnerSupportsClass( CZMEntZombieSpawn* pSpawner, ZombieClass_t zclass ) const;
-    bool IsClassCheap( ZombieClass_t zclass ) const;
+    bool IsClassAtTypeLimit( ZombieClass_t zclass ) const;
 
-    // Rally - send zombies toward survivors
+    // Multi-spawner spread: find all spawners near survivors within a threshold
+    void GatherNearestSpawners( CUtlVector<CZMEntZombieSpawn*>& outSpawners ) const;
+
+    // View mode filtering
+    bool IsEntityInView( CZMPlayer* pZM, CBaseEntity* pEnt ) const;
+
+    // Rally idle zombies toward survivors
     void RallyZombiesToSurvivors();
     CBasePlayer* PickRallyTarget( const Vector& zombiePos ) const;
 
@@ -71,47 +81,33 @@ private:
     CBasePlayer* FindNearestHuman( const Vector& pos, float* outDist = nullptr ) const;
     void GatherActiveSpawners( CUtlVector<CZMEntZombieSpawn*>& spawners ) const;
     void LogAllSpawners() const;
-    CZMEntManipulate* FindBestTrap() const;
-    bool HasSurvivorNearTrap() const;
+    CZMEntManipulate* FindBestTrap( CZMPlayer* pZM ) const;
+    int GetHighestTrapCost( CZMPlayer* pZM ) const;
 
-    // Active spawn plan queue
-    CUtlVector<AIZMSpawnStep_t> m_Plan;
-    int     m_iPlanStep;            // Current step index in m_Plan
-    float   m_flPlanStepReadyTime;  // When the current step can execute
-    float   m_flPlanExpireTime;     // Give up on current plan after this time
-    int     m_iSaveTarget;          // Resources we're saving up to before executing current step (-1 = no save)
+    // Cycle state
+    AIZMCyclePhase_t m_Phase;
+    float m_flNextActionTime;
 
-    // Spawner list snapshot taken at plan-build time (indices into this used by plan steps)
-    CUtlVector<CZMEntZombieSpawn*> m_PlanSpawners;
-    int m_iLastSpawnerUsed;         // Tracks last spawner index to distribute across spawners
+    // Trap reserve tracking (always prioritized over spawning)
+    int   m_iReservedResources;
+
+    // Per-entity cooldown (traps AND barrels share this)
+    CUtlMap<int, float> m_EntityCooldowns;
+
+    // Camera state
+    Vector m_vecCameraPos;
+    QAngle m_angCameraAng;
+    int    m_iCameraTargetIndex;    // Player index we're currently looking at
+    float  m_flCameraNextSwitch;    // When to pick a new camera target
+    float  m_flCameraSwitchLerp;    // 0-1 lerp progress for smooth transitions
+
+    // Zombie culling
+    float m_flNextCullTime;
 
     // Timers
-    float m_flNextTrapTime;
     float m_flNextRallyTime;
-    float m_flNextHiddenSpawnTime;
     float m_flLastUpdateTime;
     bool  m_bLoggedSpawners;
-
-    // Post-plan cooldown: pause between finishing one plan and starting the next
-    float m_flPlanCooldownUntil;
-
-    // Per-trap cooldown: tracks last trigger time by entity index
-    CUtlMap<int, float> m_TrapCooldowns;
-
-    // Hidden spawn rate limiting: max N per time window
-    int   m_nHiddenSpawnsThisWindow;
-    float m_flHiddenSpawnWindowStart;
-
-    // Explosive barrel detonation cooldown
-    float m_flNextBarrelDetonateTime;
-
-    // Camera roaming: AI moves the ZM view to follow survivors
-    void UpdateRoamCamera( CZMPlayer* pZM );
-    float m_flNextCameraMove;       // When to move to the next look target
-    int   m_iCameraTargetIdx;       // Index of the current watched survivor
-
-    // Within-view filtering helpers
-    bool IsVisibleFromZM( CZMPlayer* pZM, const Vector& pos ) const;
 };
 
 extern CZMAIZombieMaster g_ZMAIZombieMaster;

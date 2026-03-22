@@ -54,7 +54,7 @@ ConVar zm_sv_zombiemax( "zm_sv_zombiemax", "70", FCVAR_REPLICATED | FCVAR_NOTIFY
 
 #ifndef CLIENT_DLL
 ConVar zm_sv_bot_survivors( "zm_sv_bot_survivors", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Enable AI survivor bots to fill empty player slots. 0 = off, 1 = on." );
-ConVar zm_sv_ai_zm( "zm_sv_ai_zm", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Enable AI Zombie Master. 0 = off, 1 = always on, 2 = only when no human volunteers for ZM." );
+ConVar zm_sv_ai_zm( "zm_sv_ai_zm", "2", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI Zombie Master mode. 0=Disabled, 1=Equal Chance, 2=Fallback, 3=Forced." );
 ConVar zm_sv_bot_replace_player( "zm_sv_bot_replace_player", "1", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Spawn a bot to replace a survivor who disconnects or gets AFK-kicked." );
 #endif
 
@@ -1283,6 +1283,13 @@ CZMPlayer* CZMRules::ChooseZM()
     }
 
 
+    // AI ZM mode 3 = Forced: AI is always ZM, humans cannot be picked
+    if ( zm_sv_ai_zm.GetInt() == 3 )
+    {
+        Msg( "AI Zombie Master forced (zm_sv_ai_zm 3).\n" );
+        return nullptr;
+    }
+
     // AI ZM mode 1 = AI has equal chance as human volunteers
     if ( zm_sv_ai_zm.GetInt() == 1 )
     {
@@ -1312,7 +1319,7 @@ CZMPlayer* CZMRules::ChooseZM()
     }
 
     // AI ZM mode 2 = fallback when no volunteers
-    if ( zm_sv_ai_zm.GetInt() >= 2 )
+    if ( zm_sv_ai_zm.GetInt() == 2 )
     {
         Msg( "No ZM volunteers found. AI Zombie Master will take over.\n" );
         return nullptr;

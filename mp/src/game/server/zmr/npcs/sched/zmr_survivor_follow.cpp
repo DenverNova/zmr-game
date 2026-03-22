@@ -15,7 +15,7 @@
 extern ConVar zm_sv_bot_default_behavior;
 extern ConVar zm_sv_bot_weapon_search_range;
 
-ConVar zm_sv_bot_debug( "zm_sv_bot_debug", "1", FCVAR_NOTIFY, "Enable AI survivor bot debug logging. 0=off, 1=on." );
+ConVar zm_sv_bot_debug( "zm_sv_bot_debug", "0", FCVAR_CHEAT, "Enable AI survivor bot debug logging. 0=off, 1=on." );
 
 
 CSurvivorFollowSchedule::CSurvivorFollowSchedule()
@@ -232,21 +232,10 @@ void CSurvivorFollowSchedule::OnUpdate()
         pOuter->SetStayPut( false );
     }
 
-    bool bIsDefendMode = ( effectiveBehavior == 2 );
-
-    // If we heard something interesting recently, look toward it.
-    // In defend mode, only react to truly immediate threats (< 300u) to avoid
-    // interrupting the steady doorway gaze with distant zombie sightings.
+    // If we heard something interesting recently, look toward it
     if ( m_NextHeardLook.HasStarted() && !m_NextHeardLook.IsElapsed() && m_vecHeardLookAt != vec3_origin )
     {
-        bool bShouldReact = true;
-        if ( bIsDefendMode )
-        {
-            float flThreatDist = pOuter->GetAbsOrigin().DistTo( m_vecHeardLookAt );
-            bShouldReact = ( flThreatDist < 300.0f );
-        }
-
-        if ( bShouldReact && !pOuter->GetMotor()->IsFacing( m_vecHeardLookAt ) )
+        if ( !pOuter->GetMotor()->IsFacing( m_vecHeardLookAt ) )
             pOuter->GetMotor()->FaceTowards( m_vecHeardLookAt );
     }
     else
@@ -349,57 +338,17 @@ void CSurvivorFollowSchedule::OnUpdate()
         }
     }
 
-    // If a player explicitly told this bot to follow (via E key), always obey
-    // regardless of behavior mode. This must be checked BEFORE explore dispatch.
-    auto* pExplicitFollow = pOuter->GetFollowTarget();
-    if ( pExplicitFollow && IsValidFollowTarget( pExplicitFollow, true ) )
-    {
-        // Clear explore mode state so we don't fight with it
-        if ( bIsExploreMode )
-        {
-            m_ExplorePath.Invalidate();
-            m_bExploreIdling = false;
-        }
-
-        if ( !ShouldMoveCloser( pExplicitFollow ) )
-        {
-            m_Path.Invalidate();
-        }
-        else
-        {
-            if ( m_hFollowTarget.Get() != pExplicitFollow || !m_Path.IsValid() )
-                StartFollow( pExplicitFollow );
-
-            bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
-            if ( m_Path.IsValid() && !bBusy )
-            {
-                m_Path.Update( pOuter, pExplicitFollow, m_PathCost );
-            }
-            else if ( !m_Path.IsValid() && !bBusy )
-            {
-                pOuter->GetMotor()->Approach( pExplicitFollow->GetAbsOrigin() );
-            }
-        }
-        return;
-    }
-
-    // Handle commanded grab target for ALL bots (including explore mode)
-    // so explore bots respond when the player holds USE on a physics object
+    // Handle commanded grab target FIRST - this takes priority over following
+    // so bots respond when the player holds USE on a physics object
     {
         CBaseEntity* pGrabTarget = pOuter->GetCommandedGrabTarget();
         if ( pGrabTarget )
         {
-            // Reject explosive props
-            CBreakableProp* pGrabProp = dynamic_cast<CBreakableProp*>( pGrabTarget );
-            if ( pGrabProp && pGrabProp->GetExplosiveDamage() > 0.0f )
-            {
-                pOuter->ClearCommandedGrabTarget();
-            }
-            else
             {
                 // Abort explore mode pathing so the bot focuses on the grab
                 if ( bIsExploreMode )
                     m_ExplorePath.Invalidate();
+                m_Path.Invalidate();
 
                 Vector vecTarget = pGrabTarget->GetAbsOrigin();
                 float flDist = pOuter->GetAbsOrigin().DistTo( vecTarget );
@@ -450,6 +399,40 @@ void CSurvivorFollowSchedule::OnUpdate()
                 return;
             }
         }
+    }
+
+    // If a player explicitly told this bot to follow (via E key), always obey
+    // regardless of behavior mode. This must be checked BEFORE explore dispatch.
+    auto* pExplicitFollow = pOuter->GetFollowTarget();
+    if ( pExplicitFollow && IsValidFollowTarget( pExplicitFollow, true ) )
+    {
+        // Clear explore mode state so we don't fight with it
+        if ( bIsExploreMode )
+        {
+            m_ExplorePath.Invalidate();
+            m_bExploreIdling = false;
+        }
+
+        if ( !ShouldMoveCloser( pExplicitFollow ) )
+        {
+            m_Path.Invalidate();
+        }
+        else
+        {
+            if ( m_hFollowTarget.Get() != pExplicitFollow || !m_Path.IsValid() )
+                StartFollow( pExplicitFollow );
+
+            bool bBusy = pOuter->IsBusy() == NPCR::RES_YES;
+            if ( m_Path.IsValid() && !bBusy )
+            {
+                m_Path.Update( pOuter, pExplicitFollow, m_PathCost );
+            }
+            else if ( !m_Path.IsValid() && !bBusy )
+            {
+                pOuter->GetMotor()->Approach( pExplicitFollow->GetAbsOrigin() );
+            }
+        }
+        return;
     }
 
     // If a player commanded this bot to defend, override explore mode
@@ -664,10 +647,8 @@ void CSurvivorFollowSchedule::OnUpdate()
         }
     }
 
-    // Periodically scan for threats in peripheral vision (zombie near follow target or us).
-    // Skip in defend mode - UpdateDefendMode handles zombie detection and the scan
-    // was causing constant glancing by repeatedly overriding the defend gaze.
-    if ( !bIsDefendMode && (!m_NextPeripheralScan.HasStarted() || m_NextPeripheralScan.IsElapsed()) )
+    // Periodically scan for threats in peripheral vision (zombie near follow target or us)
+    if ( !m_NextPeripheralScan.HasStarted() || m_NextPeripheralScan.IsElapsed() )
     {
         m_NextPeripheralScan.Start( random->RandomFloat( 0.8f, 1.5f ) );
 
@@ -1443,14 +1424,12 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
     }
     else
     {
-        // No zombies nearby - face a chokepoint and hold that gaze.
-        // Only pick a new direction when the full stare timer expires.
+        // No zombies nearby - watch chokepoints or look around
         if ( !m_DefendLookTimer.HasStarted() || m_DefendLookTimer.IsElapsed() )
         {
-            // Hold each chosen direction for 5-10 seconds so bots don't glance away
-            m_DefendLookTimer.Start( random->RandomFloat( 5.0f, 10.0f ) );
 
             // Chokepoint detection: find narrow nav areas nearby (doorways, corridors)
+            // that zombies would funnel through to reach us
             bool bFoundChokepoint = false;
             CNavArea* pMyArea = pOuter->GetLastKnownArea();
             if ( pMyArea )
@@ -1458,6 +1437,7 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
                 CUtlVector<CNavArea*> chokepoints;
                 float flScanRange = 512.0f;
 
+                // Check adjacent areas within scan range for narrow openings
                 for ( int dir = 0; dir < NUM_DIRECTIONS; dir++ )
                 {
                     const NavConnectVector* pConnections = pMyArea->GetAdjacentAreas( (NavDirType)dir );
@@ -1474,10 +1454,15 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
                         if ( distSqr > flScanRange * flScanRange )
                             continue;
 
+                        // Narrow areas (width or height < 96 units) are likely doorways/corridors
                         float flNarrow = MIN( pAdj->GetSizeX(), pAdj->GetSizeY() );
-                        if ( flNarrow < 96.0f )
-                            chokepoints.AddToTail( pAdj );
 
+                        if ( flNarrow < 96.0f )
+                        {
+                            chokepoints.AddToTail( pAdj );
+                        }
+
+                        // Also check one level deeper for chokepoints behind adjacent areas
                         for ( int dir2 = 0; dir2 < NUM_DIRECTIONS; dir2++ )
                         {
                             const NavConnectVector* pDeep = pAdj->GetAdjacentAreas( (NavDirType)dir2 );
@@ -1501,25 +1486,41 @@ void CSurvivorFollowSchedule::UpdateDefendMode()
 
                 if ( chokepoints.Count() > 0 )
                 {
-                    CNavArea* pChoke = chokepoints[ random->RandomInt( 0, chokepoints.Count() - 1 ) ];
-                    Vector vecChoke = pChoke->GetCenter();
+                    // Pick the nearest chokepoint to lock onto
+                    CNavArea* pBestChoke = nullptr;
+                    float flBestDist = FLT_MAX;
+                    for ( int ci = 0; ci < chokepoints.Count(); ci++ )
+                    {
+                        float d = pOuter->GetAbsOrigin().DistToSqr( chokepoints[ci]->GetCenter() );
+                        if ( d < flBestDist )
+                        {
+                            flBestDist = d;
+                            pBestChoke = chokepoints[ci];
+                        }
+                    }
+                    Vector vecChoke = pBestChoke->GetCenter();
                     Vector toChoke = vecChoke - pOuter->GetAbsOrigin();
                     toChoke.z = 0;
                     QAngle angChoke;
                     VectorAngles( toChoke, angChoke );
                     m_flDefendLookYaw = anglemod( angChoke.y );
                     bFoundChokepoint = true;
+
+                    // Lock onto the chokepoint for a long time
+                    m_DefendLookTimer.Start( random->RandomFloat( 15.0f, 30.0f ) );
                 }
             }
 
+            // Fallback: no chokepoints, scan around with shorter timer
             if ( !bFoundChokepoint )
             {
                 QAngle angBase = pOuter->EyeAngles();
                 m_flDefendLookYaw = anglemod( angBase.y + random->RandomFloat( -120.0f, 120.0f ) );
+                m_DefendLookTimer.Start( random->RandomFloat( 4.0f, 8.0f ) );
             }
         }
 
-        // Hold the chosen gaze direction every frame - no random drift
+        // Smoothly face the target direction using a world-space point at eye height
         Vector fwd;
         QAngle lookAng( 0.0f, m_flDefendLookYaw, 0.0f );
         AngleVectors( lookAng, &fwd );

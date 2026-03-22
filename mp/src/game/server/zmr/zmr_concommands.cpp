@@ -242,9 +242,9 @@ static void BotVoiceCommand_Help( CZMPlayer* pCaller )
         if ( !pBot )
             continue;
 
-        // Only affect bots not already following a human player
+        // Don't grab bots already following a different human player
         CBasePlayer* pCurrentFollow = pBot->GetFollowTarget();
-        if ( pCurrentFollow && !pCurrentFollow->IsBot() )
+        if ( pCurrentFollow && pCurrentFollow != pCaller && !pCurrentFollow->IsBot() )
             continue;
 
         float distSqr = pPlayer->GetAbsOrigin().DistToSqr( callerPos );
@@ -271,6 +271,15 @@ static void BotVoiceCommand_Follow( CZMPlayer* pCaller )
         if ( pPlayer->GetTeamNumber() != ZMTEAM_HUMAN )
             continue;
 
+        CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
+        if ( !pBot )
+            continue;
+
+        // Skip bots already following a different human player
+        CBasePlayer* pCurrentFollow = pBot->GetFollowTarget();
+        if ( pCurrentFollow && pCurrentFollow != pCaller && !pCurrentFollow->IsBot() )
+            continue;
+
         float distSqr = pPlayer->GetAbsOrigin().DistToSqr( pCaller->GetAbsOrigin() );
         if ( distSqr > flRangeSqr )
             continue;
@@ -281,11 +290,7 @@ static void BotVoiceCommand_Follow( CZMPlayer* pCaller )
         if ( tr.fraction < 0.9f && tr.m_pEnt != pPlayer )
             continue;
 
-        CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
-        if ( pBot )
-        {
-            pBot->SetFollowTarget( pCaller );
-        }
+        pBot->SetFollowTarget( pCaller );
     }
 }
 

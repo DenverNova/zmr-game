@@ -16,8 +16,6 @@
 class CCreateMultiplayerGameServerPage;
 class CCreateMultiplayerGameGameplayPage;
 class CCreateMultiplayerGameBotPage;
-class CCreateMultiplayerGameZMRPage;
-class CCreateMultiplayerGameMapPage;
 
 //-----------------------------------------------------------------------------
 // Purpose: dialog for launching a listenserver
@@ -37,8 +35,6 @@ private:
 	CCreateMultiplayerGameServerPage *m_pServerPage;
 	CCreateMultiplayerGameGameplayPage *m_pGameplayPage;
 	CCreateMultiplayerGameBotPage *m_pBotPage;
-	CCreateMultiplayerGameZMRPage *m_pZMRPage;
-	CCreateMultiplayerGameMapPage *m_pMapPage;
 
 	bool m_bBotsEnabled;
 

@@ -46,14 +46,12 @@ void CSurvivorAttackCloseRangeSchedule::OnStart()
             return;
         }
 
-        // No ranged ammo - fall back to melee weapons and mark as meleeing
         if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_MELEE ) )
         {
-            m_bAllowMelee = true;
             return;
         }
 
-        // Last resort: fists
+        // Fall back to fists if nothing else is available
         if ( pOuter->EquipWeaponOfType( BOTWEPRANGE_FISTS ) )
         {
             m_bAllowMelee = true;
@@ -95,6 +93,18 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
         return;
     }
 
+    // Melee range bail-out: if we only have melee/fists and the enemy is far away,
+    // end the schedule so the combat scheduler can re-evaluate (flee or close distance)
+    if ( IsMeleeing() )
+    {
+        float flEnemyDistSqr = pEnemy->GetAbsOrigin().DistToSqr( pOuter->GetPosition() );
+        if ( flEnemyDistSqr > ( 200.0f * 200.0f ) )
+        {
+            static_cast<NPCR::CPlayerMotor*>( pOuter->GetMotor() )->SetSuppressYawSnap( false );
+            End( "Enemy too far for melee!" );
+            return;
+        }
+    }
 
     if ( !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_MELEE ) && !pOuter->HasEquippedWeaponOfType( BOTWEPRANGE_FISTS ) && !pOuter->WeaponHasAmmo( pOuter->GetActiveWeapon() ) )
     {

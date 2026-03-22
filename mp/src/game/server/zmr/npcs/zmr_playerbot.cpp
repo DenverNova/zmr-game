@@ -18,7 +18,7 @@
 #include "tier0/memdbgon.h"
 
 
-ConVar zm_sv_debug_bot_lookat( "zm_sv_debug_bot_lookat", "0" );
+ConVar zm_sv_debug_bot_lookat( "zm_sv_debug_bot_lookat", "1" );
 
 
 class CZMPlayerSenses : public NPCR::CBaseSenses
@@ -171,10 +171,11 @@ static const char* g_szBotNamesFemale[] =
     "Kate", "Lena", "Mia", "Eva", "Nina"
 };
 
-ConVar zm_sv_bot_default_behavior( "zm_sv_bot_default_behavior", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI Survivor default behavior. 0=Follow Random, 1=Explore, 2=Defend Spawn, 3=Mixed Mode" );
+ConVar zm_sv_bot_default_behavior( "zm_sv_bot_default_behavior", "3", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI Survivor default behavior. 0=Follow Random, 1=Explore, 2=Defend Spawn, 3=Mixed Mode" );
 ConVar zm_sv_bot_weapon_search_range( "zm_sv_bot_weapon_search_range", "1024", FCVAR_NOTIFY | FCVAR_ARCHIVE, "How far AI survivors search for weapons and ammo (units)." );
 ConVar zm_sv_bot_command_range( "zm_sv_bot_command_range", "1024", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Range for voice commands to affect AI survivors." );
-ConVar zm_sv_bot_taunt_chance( "zm_sv_bot_taunt_chance", "8", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Percent chance for AI survivor to taunt after a kill (0=never)." );
+// Hardcoded taunt chance (percent) for AI survivors after a kill
+#define BOT_TAUNT_CHANCE 8
 
 static int g_nBotNameIndexMale = 0;
 static int g_nBotNameIndexFemale = 0;
@@ -517,11 +518,10 @@ float CZMPlayerBot::GetOptimalAttackDistance() const
 
     // ZMRTODO: Get rid of this hardcoded stuff.
 
-    ZMBotWeaponTypeRange_t wepType = GetWeaponType( pWep );
-
-    // Melee and fists: must be right next to the zombie
-    if ( wepType == BOTWEPRANGE_MELEE || wepType == BOTWEPRANGE_FISTS )
+    // HACK: Melee
+    if ( !pWep->UsesPrimaryAmmo() )
         return 32.0f;
+
 
     // Skip 'weapon_zm_'
     const char* wep = pWep->GetClassname() + sizeof( "weapon_zm_" ) - 1;
@@ -545,12 +545,10 @@ float CZMPlayerBot::GetMaxAttackDistance() const
 
     // ZMRTODO: Get rid of this hardcoded stuff.
 
-    ZMBotWeaponTypeRange_t wepType2 = GetWeaponType( pWep );
+    // HACK: Melee
+    if ( !pWep->UsesPrimaryAmmo() )
+        return 50.0f;
 
-    // Melee and fists: only swing when actually within striking distance.
-    // This prevents bots from swinging at targets 30+ feet away.
-    if ( wepType2 == BOTWEPRANGE_MELEE || wepType2 == BOTWEPRANGE_FISTS )
-        return 64.0f;
 
     // Skip 'weapon_zm_'
     const char* wep = pWep->GetClassname() + sizeof( "weapon_zm_" ) - 1;

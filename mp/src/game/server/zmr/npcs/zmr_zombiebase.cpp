@@ -905,7 +905,7 @@ void CZMBaseZombie::MultiplyBuckshotDamage( CTakeDamageInfo& info ) const
     }
 }
 
-extern ConVar zm_sv_bot_taunt_chance;
+#define BOT_TAUNT_CHANCE 8
 
 void CZMBaseZombie::Event_Killed( const CTakeDamageInfo& info )
 {
@@ -919,8 +919,7 @@ void CZMBaseZombie::Event_Killed( const CTakeDamageInfo& info )
         CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pAttacker );
         if ( pBot )
         {
-            int chance = zm_sv_bot_taunt_chance.GetInt();
-            if ( chance > 0 && RandomInt( 1, 100 ) <= chance && pBot->IsAlive() )
+            if ( BOT_TAUNT_CHANCE > 0 && RandomInt( 1, 100 ) <= BOT_TAUNT_CHANCE && pBot->IsAlive() )
             {
                 engine->ClientCommand( pBot->edict(), "zm_cmd_voicemenu 4" );
             }

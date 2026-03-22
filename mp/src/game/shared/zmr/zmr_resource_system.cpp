@@ -6,6 +6,11 @@
 
 #include "zmr_resource_system.h"
 
+#ifdef GAME_DLL
+#include "zmr_ai_zm.h"
+extern ConVar zm_sv_ai_zm_difficulty;
+#endif
+
 // memdbgon must be the last include file in a .cpp file!!!
 #include "tier0/memdbgon.h"
 
@@ -21,9 +26,6 @@ ConVar zm_sv_resource_refill_usehighest( "zm_sv_resource_refill_usehighest", "1"
 ConVar zm_sv_resource_max( "zm_sv_resource_max", "5000", FCVAR_NOTIFY | FCVAR_REPLICATED );
 ConVar zm_sv_resource_multiplier( "zm_sv_resource_multiplier", "1.0", FCVAR_NOTIFY | FCVAR_REPLICATED, "Global multiplier on ZM resource gain rate. 1.0 = default." );
 ConVar zm_sv_resource_per_player_mult( "zm_sv_resource_per_player_mult", "0.05", FCVAR_NOTIFY | FCVAR_REPLICATED, "Additional resource fraction per survivor beyond the first. 0.05 = +5% per extra survivor, 0.1 = +10%. Includes AI survivors." );
-#ifdef GAME_DLL
-ConVar zm_sv_ai_zm_difficulty( "zm_sv_ai_zm_difficulty", "1.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Multiplier on resource income for the AI Zombie Master only. Values above 1.0 make the AI harder (more resources), below 1.0 make it easier. Applied after all other resource multipliers." );
-#endif
 
 CZMResourceSystem::CZMResourceSystem()
 {
@@ -79,15 +81,6 @@ void CZMResourceSystem::GainResources( CZMPlayer* pPlayer )
 
     
     float rpm = GetResourcesPerMinute();
-
-#ifdef GAME_DLL
-    // Apply AI ZM difficulty multiplier only for the AI-controlled ZM player
-    if ( pPlayer->IsBot() && pPlayer->IsZM() )
-    {
-        rpm *= zm_sv_ai_zm_difficulty.GetFloat();
-    }
-#endif
-
     auto rps = rpm / 60.0f;
     
     float decimals = m_flPlayerResourceDecimals[playerIndex];
@@ -218,6 +211,15 @@ float CZMResourceSystem::GetResourcesPerMinute() const
         int nExtraSurvivors = MAX( 0, GetRealSurvivorCount() - 1 );
         baseRPM *= ( 1.0f + nExtraSurvivors * perPlayerMult );
     }
+
+#ifdef GAME_DLL
+    // When AI ZM is active, apply the difficulty multiplier on top of everything else
+    if ( g_ZMAIZombieMaster.IsActive() )
+    {
+        float flDifficulty = clamp( zm_sv_ai_zm_difficulty.GetFloat(), 0.1f, 5.0f );
+        baseRPM *= flDifficulty;
+    }
+#endif
 
     return baseRPM;
 }

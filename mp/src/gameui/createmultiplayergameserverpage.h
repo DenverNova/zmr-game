@@ -43,16 +43,10 @@ private:
 	void LoadMapList();
 	void LoadMaps( const char *pszPathID );
 
-	void LoadMapConfig();
-	void SaveMapConfig();
-
 	vgui::ComboBox *m_pMapList;
 	vgui::CheckButton *m_pEnableBotsCheck;
 	CCvarToggleCheckButton *m_pEnableTutorCheck;
 	KeyValues *m_pSavedData;
-
-	vgui::CheckButton *m_pEnableMapConfig;
-	vgui::TextEntry *m_pMapConfigEditor;
 
 	enum { DATA_STR_LENGTH = 64 };
 	char m_szMapName[DATA_STR_LENGTH];
