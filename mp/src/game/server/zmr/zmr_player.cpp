@@ -155,6 +155,7 @@ CZMPlayer::CZMPlayer()
     m_hContinuousUseEntity.Set( nullptr );
     m_flHoldUseStartTime = 0.0f;
     m_bHoldUseConsumed = false;
+    m_flLastUseTapTime = 0.0f;
 
 
     BaseClass::ChangeTeam( 0 );
@@ -2317,6 +2318,10 @@ void CZMPlayer::PlayerUse()
 	{
 		m_flHoldUseStartTime = 0.0f;
 
+		bool bDoubleTap = ( m_flLastUseTapTime > 0.0f &&
+							(gpGlobals->curtime - m_flLastUseTapTime) < 0.4f );
+		m_flLastUseTapTime = gpGlobals->curtime;
+
 		Vector eyePos = EyePosition();
 		Vector fwd;
 		AngleVectors( EyeAngles(), &fwd );
@@ -2347,15 +2352,35 @@ void CZMPlayer::PlayerUse()
 
 		if ( pBestBot )
 		{
-			// If the bot is carrying a physics object, make them drop it
+			// If the bot is carrying a physics object:
+			//   Double-tap E: drop it at the raycast point where the player is looking
+			//   Single-tap E: drop it in place
 			CZMBaseWeapon* pBotWep = pBestBot->GetActiveWeapon();
 			if ( pBotWep && Q_stristr( pBotWep->GetClassname(), "fistscarry" ) )
 			{
-				pBestBot->ForceDropOfCarriedPhysObjects( nullptr );
-				pBestBot->EquipBestWeapon();
-				pBestBot->ClearCommandedGrabTarget();
-				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Dropped object", pBestBot->GetPlayerName() ) );
-				ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
+				if ( bDoubleTap )
+				{
+					// Raycast from the player's eyes to find where they're looking
+					trace_t tr;
+					UTIL_TraceLine( eyePos, eyePos + fwd * 2048.0f, MASK_SOLID, this, COLLISION_GROUP_NONE, &tr );
+
+					if ( tr.fraction < 1.0f )
+					{
+						// Command the bot to walk to the hit point and drop the object there
+						pBestBot->SetCommandedDropPos( tr.endpos );
+						ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Placing object there", pBestBot->GetPlayerName() ) );
+						ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
+					}
+				}
+				else
+				{
+					pBestBot->ForceDropOfCarriedPhysObjects( nullptr );
+					pBestBot->EquipBestWeapon();
+					pBestBot->ClearCommandedGrabTarget();
+					ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Dropped object", pBestBot->GetPlayerName() ) );
+					ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
+				}
+				m_flLastUseTapTime = 0.0f;
 				return;
 			}
 

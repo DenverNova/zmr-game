@@ -19,7 +19,7 @@ The server can run a fully automated Zombie Master. Four modes are available:
 
 **Persistence:** The AI ZM persists across rounds automatically. When a human player takes over (via spectator USE or volunteer), the AI ZM bot is kicked and a fresh survivor bot fills the slot.
 
-**Resource priority:** The AI always holds back resources equal to the most expensive active trap on the map, regardless of camera position. All spawning decisions only use resources above this reserve. Traps and barrels fire opportunistically every update — whenever a survivor enters the configured trigger range and the AI has the resources, it fires immediately. After spending on a trap, the AI pauses spawning until its resources climb back above the reserve threshold, then resumes.
+**Resource priority:** The AI holds back resources equal to the most expensive active trap on the map (the "reserve"). Spawning only uses excess resources above the reserve. Traps fire opportunistically when a survivor enters range, but only if the AI can afford the trap cost AND still keep the full reserve intact afterward. This ensures the AI always has enough saved for the biggest trap while continuously spawning zombies with any surplus.
 
 **Spawn cycle:** The AI alternates between two phases continuously:
 
@@ -81,6 +81,7 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 - **Go** (voice menu) — Bots you're looking at switch to Explore mode
 - **Hold E on ground** — Bots **following you** move to the aimed position and switch to Defend mode with 256-unit spacing between positions. Only affects your followers
 - **Hold E on physics object** — The closest bot walks to the object and picks it up. Works on any grabbable physics object
+- **Double-tap E on carrying bot** — The bot carries the object to where you're looking (raycast) and drops it there. Single-tap E on a carrying bot drops the object in place
 
 | ConVar | Default | Description |
 |--------|---------|-------------|

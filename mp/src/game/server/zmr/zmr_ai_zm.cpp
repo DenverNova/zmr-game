@@ -673,6 +673,11 @@ void CZMAIZombieMaster::CullStrandedZombies( CZMPlayer* pZM )
 // resources allow. Does NOT wait for full batch cost up front. After the burst
 // completes (or resources run dry), moves to hidden spawn phase.
 //
+// Spawning only uses EXCESS resources above the trap reserve. If the AI has
+// 608 res and the reserve is 600, it can spawn one 8-cost shambler.
+// TryFireTrap separately requires res >= trapCost + reserve, so firing a trap
+// never eats into the reserve — the AI always has reserve resources available.
+//
 void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
 {
     if ( gpGlobals->curtime < m_flNextActionTime )
@@ -681,13 +686,6 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
     // Continue an active spawn burst — spawn one zombie per tick
     if ( m_iSpawnBurstRemaining > 0 && m_hSpawnBurstSpawner.Get() )
     {
-        // Can't spawn if resources are at or below the reserve threshold
-        if ( pZM->GetResources() <= m_iReservedResources )
-        {
-            // Wait briefly, resources will tick up
-            return;
-        }
-
         if ( !CanAffordClass( m_SpawnBurstClass, pZM, m_iReservedResources ) ||
              IsClassAtTypeLimit( m_SpawnBurstClass ) ||
              !CZMBaseZombie::HasEnoughPopToSpawn( m_SpawnBurstClass ) )
@@ -712,7 +710,7 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
 
     // No active burst — start a new one
 
-    // Can't spawn if resources are at or below the reserve threshold
+    // Only spawn when we have excess resources above the trap reserve
     if ( pZM->GetResources() <= m_iReservedResources )
         return;
 
@@ -743,8 +741,8 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
     if ( zclass == ZMCLASS_INVALID )
     {
         if ( zm_sv_ai_zm_debug.GetBool() )
-            Msg( "[AI ZM] Spawn: can't afford any class (res=%i, reserved=%i)\n",
-                pZM->GetResources(), m_iReservedResources );
+            Msg( "[AI ZM] Spawn: can't afford any class (res=%i)\n",
+                pZM->GetResources() );
         return;
     }
 
@@ -793,7 +791,7 @@ void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
     if ( pZM->GetResources() - m_iReservedResources < minCost )
     {
         if ( zm_sv_ai_zm_debug.GetBool() )
-            Msg( "[AI ZM] Hidden spawn: not enough resources (res=%i, reserved=%i), skipping\n",
+            Msg( "[AI ZM] Hidden spawn: not enough excess resources (res=%i, reserved=%i), skipping\n",
                 pZM->GetResources(), m_iReservedResources );
         m_Phase = AIZM_PHASE_SPAWN;
         m_flNextActionTime = gpGlobals->curtime + 1.0f;
@@ -870,7 +868,8 @@ void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
 }
 
 //
-// Try to fire a trap using reserved resources.
+// Try to fire a trap opportunistically.
+// Only fires if we can afford the trap AND still keep the full reserve intact.
 // Respects view mode filtering.
 //
 bool CZMAIZombieMaster::TryFireTrap( CZMPlayer* pZM )
@@ -880,7 +879,8 @@ bool CZMAIZombieMaster::TryFireTrap( CZMPlayer* pZM )
         return false;
 
     int trapCost = pTrap->GetCost();
-    if ( trapCost > 0 && pZM->GetResources() < trapCost )
+    // Must be able to pay for the trap AND still have the full reserve left over
+    if ( trapCost > 0 && pZM->GetResources() < trapCost + m_iReservedResources )
         return false;
 
     if ( trapCost > 0 )
@@ -1013,19 +1013,14 @@ void CZMAIZombieMaster::Update()
         Msg( "[AI ZM] Update: phase=%i res=%i reserved=%i curtime=%.1f\n",
             (int)m_Phase, pZM->GetResources(), m_iReservedResources, gpGlobals->curtime );
 
-    // Traps and barrels fire opportunistically every tick when a survivor is in
-    // range and we have the resources. This is checked BEFORE spawning so traps
-    // always get priority.
-    if ( pZM->GetResources() >= m_iReservedResources && m_iReservedResources > 0 )
-    {
-        TryFireTrap( pZM );
-        TryDetonateBarrel( pZM );
-    }
+    // Traps and barrels fire opportunistically when a survivor is in range.
+    // TryFireTrap requires res >= trapCost + reserve so the reserve stays intact.
+    TryFireTrap( pZM );
+    TryDetonateBarrel( pZM );
 
     // Run the current spawn cycle phase (SPAWN <-> HIDDEN_SPAWN)
-    // Spawning only happens when resources exceed the reserve threshold.
-    // If a trap just fired and drained resources below the reserve, spawning
-    // pauses automatically until resources climb back above the threshold.
+    // Spawning uses excess resources above the trap reserve.
+    // Traps require res >= trapCost + reserve so they never eat the reserve.
     switch ( m_Phase )
     {
     case AIZM_PHASE_SPAWN:

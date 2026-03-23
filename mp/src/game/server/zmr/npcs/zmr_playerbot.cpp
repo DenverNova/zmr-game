@@ -85,6 +85,8 @@ CZMPlayerBot::CZMPlayerBot()
     m_vecCommandedDefendPos = vec3_origin;
     m_bHasCommandedDefendPos = false;
     m_hCommandedGrabTarget.Set( nullptr );
+    m_vecCommandedDropPos = vec3_origin;
+    m_bHasCommandedDropPos = false;
 }
 
 CZMPlayerBot::~CZMPlayerBot()

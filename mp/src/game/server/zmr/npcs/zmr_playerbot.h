@@ -98,6 +98,12 @@ public:
     CBaseEntity*    GetCommandedGrabTarget() const { return m_hCommandedGrabTarget.Get(); }
     void            ClearCommandedGrabTarget() { m_hCommandedGrabTarget.Set( nullptr ); }
 
+    // Player-commanded drop position (double-tap E on carrying bot)
+    void            SetCommandedDropPos( const Vector& pos ) { m_vecCommandedDropPos = pos; m_bHasCommandedDropPos = true; }
+    void            ClearCommandedDropPos() { m_bHasCommandedDropPos = false; }
+    bool            HasCommandedDropPos() const { return m_bHasCommandedDropPos; }
+    const Vector&   GetCommandedDropPos() const { return m_vecCommandedDropPos; }
+
     void            CheckObstacleJump();
 
 private:
@@ -110,4 +116,6 @@ private:
     Vector          m_vecCommandedDefendPos;
     bool            m_bHasCommandedDefendPos;
     EHANDLE         m_hCommandedGrabTarget;
+    Vector          m_vecCommandedDropPos;
+    bool            m_bHasCommandedDropPos;
 };

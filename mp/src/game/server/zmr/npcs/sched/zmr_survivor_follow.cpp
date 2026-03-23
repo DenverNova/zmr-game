@@ -407,6 +407,45 @@ void CSurvivorFollowSchedule::OnUpdate()
         }
     }
 
+    // Handle commanded drop position: bot carries object to a specific location and drops it
+    if ( pOuter->HasCommandedDropPos() )
+    {
+        CZMBaseWeapon* pCarryWep = pOuter->GetActiveWeapon();
+        bool bCarrying = ( pCarryWep && Q_stristr( pCarryWep->GetClassname(), "fistscarry" ) );
+
+        if ( !bCarrying )
+        {
+            // Not carrying anything anymore, clear the command
+            pOuter->ClearCommandedDropPos();
+        }
+        else
+        {
+            Vector vecDropPos = pOuter->GetCommandedDropPos();
+            float flDist = pOuter->GetAbsOrigin().DistTo( vecDropPos );
+
+            if ( flDist < 96.0f )
+            {
+                // Close enough — drop the object
+                pOuter->ForceDropOfCarriedPhysObjects( nullptr );
+                pOuter->EquipBestWeapon();
+                pOuter->ClearCommandedGrabTarget();
+                pOuter->ClearCommandedDropPos();
+
+                if ( zm_sv_bot_debug.GetBool() )
+                    Msg( "[Bot %s] Dropped object at commanded position\n", pOuter->GetPlayerName() );
+            }
+            else
+            {
+                // Walk to the drop position
+                m_Path.Invalidate();
+                m_ObjPath.Invalidate();
+                m_ExplorePath.Invalidate();
+                pOuter->GetMotor()->Approach( vecDropPos );
+            }
+            return;
+        }
+    }
+
     // If a player explicitly told this bot to follow (via E key), always obey
     // regardless of behavior mode. This must be checked BEFORE explore dispatch.
     auto* pExplicitFollow = pOuter->GetFollowTarget();

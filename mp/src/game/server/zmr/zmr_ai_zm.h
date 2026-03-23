@@ -8,11 +8,12 @@
 //
 // AI Zombie Master - Server-side tactical controller.
 //
-// Resource priority: The AI always holds back resources equal to the highest-cost
-// trap on the map (the "reserve"). All spending decisions subtract the reserve first.
-// Traps and barrels fire opportunistically every tick when a survivor is in range
-// and the AI has the resources. After spending on a trap, the AI pauses spawning
-// until its resources climb back above the reserve threshold, then resumes.
+// Resource priority: The AI holds back resources equal to the highest-cost trap
+// on the map (the "reserve"). Spawning only uses EXCESS resources above the
+// reserve. Traps fire opportunistically but require res >= trapCost + reserve,
+// so firing a trap never eats into the reserve budget. This ensures the AI
+// always has enough saved to trigger the most expensive trap when needed, while
+// continuously spawning zombies with any surplus.
 //
 // Spawn cycle: SPAWN -> HIDDEN_SPAWN -> SPAWN -> HIDDEN_SPAWN -> ...
 //   SPAWN: Find nearest spawners to survivors (spreads across multiple if similar

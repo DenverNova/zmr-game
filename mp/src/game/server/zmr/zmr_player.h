@@ -364,6 +364,7 @@ private:
     // Hold E command system
     float m_flHoldUseStartTime;  // Time when USE was first pressed (0 = not holding)
     bool  m_bHoldUseConsumed;    // True if the hold action was already triggered
+    float m_flLastUseTapTime;    // Time of last quick USE tap (for double-tap detection)
 
 
     friend class CZMGameMovement;
