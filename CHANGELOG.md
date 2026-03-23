@@ -19,16 +19,16 @@ The server can run a fully automated Zombie Master. Four modes are available:
 
 **Persistence:** The AI ZM persists across rounds automatically. When a human player takes over (via spectator USE or volunteer), the AI ZM bot is kicked and a fresh survivor bot fills the slot.
 
-**Resource priority:** The AI always holds back resources equal to the most expensive active trap on the map. All spawning decisions only use resources above this reserve. Traps and barrels fire opportunistically every update — whenever a survivor enters the configured trigger range and the AI has the resources, it fires immediately. After spending on a trap, the AI pauses spawning until its resources climb back above the reserve threshold, then resumes.
+**Resource priority:** The AI always holds back resources equal to the most expensive active trap on the map, regardless of camera position. All spawning decisions only use resources above this reserve. Traps and barrels fire opportunistically every update — whenever a survivor enters the configured trigger range and the AI has the resources, it fires immediately. After spending on a trap, the AI pauses spawning until its resources climb back above the reserve threshold, then resumes.
 
 **Spawn cycle:** The AI alternates between two phases continuously:
 
-1. **Spawn** — Finds active spawners nearest to the survivor group. When multiple spawners are within 512 units of the closest one, the AI randomly spreads spawns across them instead of always using the same spawner. Queues 1–10 zombies per wave using weighted type selection: 60% shambler, 10% each special type (banshee, hulk, drifter, immolator). If a class is blocked by the spawner, at its per-type population limit, or unaffordable, its weight is redistributed equally among the remaining valid classes. Only spawns when resources exceed the trap reserve.
+1. **Spawn** — Finds active spawners nearest to the survivor group (re-evaluated every tick). When multiple spawners are within 512 units of the closest one, the AI randomly spreads spawns across them. Picks a burst of 1–10 zombies using weighted type selection (60% shambler, 10% each special), then spawns them **one at a time** as resources become available — the AI does not wait for the full batch cost before starting. If a class is blocked by the spawner, at its per-type limit, or unaffordable, its weight is redistributed. Only spawns when resources exceed the trap reserve.
 2. **Hidden spawn** — Places one surprise zombie near a random survivor. Respects per-zombie-type limits. If Hidden Spawn All Classes is enabled, picks a random non-limit-capped type; otherwise shamblers only.
 
-**Camera:** The AI ZM camera smoothly glides between survivors, positioning itself behind and above the current target like a real player spectating. It switches targets every 4–8 seconds with smooth position and angle interpolation. When the view mode is set to "Within View Only", only spawners, traps, and barrels visible from the camera position are accessible.
+**Camera:** The AI ZM camera actively moves around the map watching survivors, positioning itself behind and above the current target like a real player. It teleports to the first target immediately on round start, then smoothly tracks and switches between survivors every 4–8 seconds. When the view mode is set to "Within View Only", only spawners, traps, and barrels visible from the camera position are accessible.
 
-**Zombie culling:** When the zombie population exceeds 80% of the cap, the AI checks for stranded zombies — those that have been alive for at least 45 seconds (configurable), have no active rally command, and are more than 6144 units from the nearest survivor. Stranded zombies are killed to free pop cap space. Checks run every 10 seconds.
+**Zombie culling:** When the zombie population exceeds 80% of the cap, the AI checks for stranded zombies — those with no active rally command, no enemy, no recent damage, and more than 6144 units from the nearest survivor. Stranded zombies are killed to free pop cap space. The stranded threshold is configurable. Checks run every 10 seconds.
 
 **Rush prevention:** For a configurable number of seconds at the start of each round, the AI only moves its camera around without spawning, triggering traps, or rallying zombies.
 
@@ -64,6 +64,7 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 - Press **E** while looking at a bot to toggle **Following** / **Staying**
 - If you are **carrying an object** and press **E** on a bot that is carrying one, the bot drops it
 - Bots search for weapons and ammo on the ground (configurable range), prioritizing missing loadout slots and higher-tier weapons. After picking up an item, the bot returns to its original position
+- Bots identify nearby crates by their contents (weapon, melee, throwable, or ammo) and smash open crates that contain items they need. Weapon crates are prioritized over ammo crates. Bots only target crates within 1024 units
 - Bots equip the best weapon for the situation and switch to melee/fists when ranged ammo runs out
 - Bots with only melee weapons prioritize fleeing to find guns rather than rushing zombies
 - Bots use player-matched pathfinding, open USE-doors, jump obstacles, and break out of oscillation loops
@@ -138,10 +139,10 @@ When the **Enable Per-Zombie-Type Limits** option is checked, each special zombi
 | ConVar | Default | Description |
 |--------|---------|-------------|
 | `zm_sv_zombie_type_limits` | `0` | Enable per-type zombie limits |
-| `zm_sv_zombie_max_banshee` | `0` | Max banshees alive at once (0 = none allowed when limits enabled) |
-| `zm_sv_zombie_max_hulk` | `0` | Max hulks alive at once (0 = none allowed when limits enabled) |
-| `zm_sv_zombie_max_drifter` | `0` | Max drifters alive at once (0 = none allowed when limits enabled) |
-| `zm_sv_zombie_max_immolator` | `0` | Max immolators alive at once (0 = none allowed when limits enabled) |
+| `zm_sv_zombie_max_banshee` | `5` | Max banshees alive at once (0 = none allowed when limits enabled) |
+| `zm_sv_zombie_max_hulk` | `5` | Max hulks alive at once (0 = none allowed when limits enabled) |
+| `zm_sv_zombie_max_drifter` | `5` | Max drifters alive at once (0 = none allowed when limits enabled) |
+| `zm_sv_zombie_max_immolator` | `5` | Max immolators alive at once (0 = none allowed when limits enabled) |
 
 ---
 
@@ -163,10 +164,10 @@ All ZMR settings are available in the **Game** tab of the Create Server dialog. 
 - **AI Zombie Master** — Disabled / Equal Chance / Fallback / Forced (`zm_sv_ai_zm`)
 - **Bot Default Behavior** — Follow / Explore / Defend / Mixed Mode (`zm_sv_bot_default_behavior`, default: Mixed Mode)
 - **Random Starting Weapon** — None / Melee / Secondary / Primary / Any (`zm_sv_random_start_weapon`)
-- **AI ZM Spawner Access** — Global / Within View Only (`zm_sv_ai_zm_view_mode`)
+- **AI ZM Spawner Access** — Global / Within View Only (`zm_sv_ai_zm_view_mode`, appears directly below AI Zombie Master)
 
 **Checkboxes:**
-- **Auto-Fill Survivor Bots** (`zm_sv_bot_survivors`)
+- **Auto-Fill Survivor Bots** (`zm_sv_bot_survivors`, appears above Infinite Flashlight)
 - **Infinite Flashlight** (`zm_sv_flashlight_infinite`)
 - **Hidden Spawn All Classes** (`zm_sv_hidden_allclasses`)
 - **Phys Explosion Ignite Barrels** (`zm_sv_physexp_ignite_barrels`)
