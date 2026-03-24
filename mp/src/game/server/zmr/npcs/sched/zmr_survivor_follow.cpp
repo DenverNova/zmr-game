@@ -141,13 +141,13 @@ void CSurvivorFollowSchedule::OnUpdate()
         return;
     }
 
-    // Voice line: 50% chance to yell for help when health falls below 30%
+    // Voice line: 70% chance to yell for help when health falls below 30%
     if ( pOuter->GetHealth() < pOuter->GetMaxHealth() * 0.3f )
     {
         if ( !m_NextHelpVoice.HasStarted() || m_NextHelpVoice.IsElapsed() )
         {
             m_NextHelpVoice.Start( 15.0f );
-            if ( random->RandomFloat( 0.0f, 1.0f ) < 0.5f )
+            if ( random->RandomFloat( 0.0f, 1.0f ) < 0.7f )
                 ZMGetVoiceLines()->OnVoiceLine( pOuter, 2 ); // Help
         }
     }

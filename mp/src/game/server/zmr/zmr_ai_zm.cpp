@@ -37,8 +37,8 @@ ConVar zm_sv_ai_zm_cull_time( "zm_sv_ai_zm_cull_time", "45.0", FCVAR_NOTIFY | FC
 
 CZMAIZombieMaster g_ZMAIZombieMaster;
 
-// Weighted type selection: 60% shambler, 10% each special
-static const int g_ZombieWeights[ZMCLASS_MAX] = { 60, 10, 10, 10, 10 };
+// Weighted type selection: 50% shambler, 10% each special (5 types total)
+static const int g_ZombieWeights[ZMCLASS_MAX] = { 50, 10, 10, 10, 10 };
 
 // Distance threshold for considering two spawners "nearly the same distance"
 #define SPAWNER_SPREAD_THRESHOLD 512.0f
@@ -323,9 +323,9 @@ bool CZMAIZombieMaster::CanAffordClass( ZombieClass_t zclass, CZMPlayer* pZM, in
 }
 
 //
-// Weighted zombie class picker: 60% shambler, 10% each special.
+// Weighted zombie class picker: 50% shambler, 10% each special.
 // Dynamically redistributes weight for classes not supported by the spawner
-// or at their per-type population limit.
+// or at their per-type population limit. Called per-zombie to allow mix-and-match.
 //
 ZombieClass_t CZMAIZombieMaster::PickWeightedClass( CZMEntZombieSpawn* pSpawner, CZMPlayer* pZM, int holdBack ) const
 {
@@ -716,20 +716,20 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
     int holdBack = m_bTrapsUnlocked ? m_iReservedResources : 0;
 
     // Continue an active spawn burst — spawn one zombie per tick
+    // Re-pick class each tick for mix-and-match variety within a wave
     if ( m_iSpawnBurstRemaining > 0 && m_hSpawnBurstSpawner.Get() )
     {
-        if ( !CanAffordClass( m_SpawnBurstClass, pZM, holdBack ) ||
-             IsClassAtTypeLimit( m_SpawnBurstClass ) ||
-             !CZMBaseZombie::HasEnoughPopToSpawn( m_SpawnBurstClass ) )
+        ZombieClass_t zclass = PickWeightedClass( m_hSpawnBurstSpawner.Get(), pZM, holdBack );
+        if ( zclass == ZMCLASS_INVALID )
         {
             if ( zm_sv_ai_zm_debug.GetBool() )
-                Msg( "[AI ZM] Spawn burst: can't continue (res=%i, holdBack=%i), ending burst\n",
+                Msg( "[AI ZM] Spawn burst: can't afford any class (res=%i, holdBack=%i), ending burst\n",
                     pZM->GetResources(), holdBack );
             m_iSpawnBurstRemaining = 0;
         }
         else
         {
-            TrySpawnZombies( m_SpawnBurstClass, 1, m_hSpawnBurstSpawner.Get() );
+            TrySpawnZombies( zclass, 1, m_hSpawnBurstSpawner.Get() );
             m_iSpawnBurstRemaining--;
         }
 
@@ -737,7 +737,7 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
         {
             m_Phase = AIZM_PHASE_HIDDEN_SPAWN;
             m_iHiddenSpawnsRemaining = random->RandomInt( 1, 3 );
-            m_flHiddenSpawnDeadline = gpGlobals->curtime + 30.0f;
+            m_flHiddenSpawnDeadline = gpGlobals->curtime + 15.0f;
             m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 0.5f, 1.5f );
         }
         return;
@@ -776,7 +776,7 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
                 pZM->GetResources(), holdBack );
         m_Phase = AIZM_PHASE_HIDDEN_SPAWN;
         m_iHiddenSpawnsRemaining = random->RandomInt( 1, 3 );
-        m_flHiddenSpawnDeadline = gpGlobals->curtime + 30.0f;
+        m_flHiddenSpawnDeadline = gpGlobals->curtime + 15.0f;
         m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 0.5f, 1.5f );
         return;
     }
@@ -789,8 +789,8 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
     if ( zm_sv_ai_zm_debug.GetBool() )
     {
         Vector spos = pSpawner->GetAbsOrigin();
-        Msg( "[AI ZM] Spawn burst: %i x %s at (%.0f,%.0f,%.0f) [%i spawners nearby]\n",
-            m_iSpawnBurstRemaining, CZMBaseZombie::ClassToName( zclass ),
+        Msg( "[AI ZM] Spawn burst: %i (mixed types) at (%.0f,%.0f,%.0f) [%i spawners nearby]\n",
+            m_iSpawnBurstRemaining,
             spos.x, spos.y, spos.z, visibleSpawners.Count() );
     }
 
@@ -801,7 +801,7 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
     {
         m_Phase = AIZM_PHASE_HIDDEN_SPAWN;
         m_iHiddenSpawnsRemaining = random->RandomInt( 1, 3 );
-        m_flHiddenSpawnDeadline = gpGlobals->curtime + 30.0f;
+        m_flHiddenSpawnDeadline = gpGlobals->curtime + 15.0f;
         m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 0.5f, 1.5f );
     }
 }
@@ -809,9 +809,9 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
 //
 // Cycle phase: HIDDEN SPAWN
 // Place 1-3 surprise zombies near survivors. Spends freely (ignores reserve).
-// Keeps retrying different positions for up to 30 seconds before giving up.
-// Each successful spawn decrements the counter. Once all placed (or timeout),
-// cycles to RESERVE.
+// Keeps retrying different positions for up to 15 seconds before giving up.
+// Each successful spawn picks a fresh weighted class for mix-and-match.
+// Once all placed (or timeout), cycles to RESERVE.
 //
 void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
 {
@@ -826,7 +826,7 @@ void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
             if ( m_iHiddenSpawnsRemaining <= 0 )
                 Msg( "[AI ZM] Hidden spawn: all spawns placed, moving to RESERVE\n" );
             else
-                Msg( "[AI ZM] Hidden spawn: 30s timeout, %i remaining unplaced, moving to RESERVE\n",
+                Msg( "[AI ZM] Hidden spawn: 15s timeout, %i remaining unplaced, moving to RESERVE\n",
                     m_iHiddenSpawnsRemaining );
         }
         m_iHiddenSpawnsRemaining = 0;
@@ -857,27 +857,72 @@ void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
     CBasePlayer* pTarget = humans[ random->RandomInt( 0, humans.Count() - 1 ) ];
     Vector targetPos = pTarget->GetAbsOrigin();
 
-    // Pick class: if hidden_allclasses is on, pick randomly from non-limit-capped types
+    // Pick class using the weighted system (respects type limits, pop caps, affordability).
+    // Hidden spawns spend freely so holdBack = 0.
+    // When hidden_allclasses is off, only shamblers can be hidden-spawned.
     ZombieClass_t zclass = ZMCLASS_SHAMBLER;
     if ( zm_sv_hidden_allclasses.GetBool() )
     {
-        CUtlVector<ZombieClass_t> validClasses;
+        // Use a temporary "all classes" spawner-like check: pass nullptr-safe path
+        // We can't use PickWeightedClass without a spawner, so manually pick with weights
+        int totalWeight = 0;
+        int weights[ZMCLASS_MAX];
+        bool valid[ZMCLASS_MAX];
+
         for ( int i = 0; i < ZMCLASS_MAX; i++ )
         {
             ZombieClass_t zc = (ZombieClass_t)i;
-            if ( CZMBaseZombie::IsValidClass( zc )
-                && CZMBaseZombie::HasEnoughPopToSpawn( zc )
-                && !IsClassAtTypeLimit( zc ) )
+            valid[i] = CZMBaseZombie::IsValidClass( zc )
+                    && CZMBaseZombie::HasEnoughPopToSpawn( zc )
+                    && CanAffordClass( zc, pZM, 0 )
+                    && !IsClassAtTypeLimit( zc );
+            weights[i] = 0;
+        }
+
+        int validCount = 0;
+        for ( int i = 0; i < ZMCLASS_MAX; i++ )
+            if ( valid[i] ) validCount++;
+
+        if ( validCount == 0 )
+        {
+            if ( zm_sv_ai_zm_debug.GetBool() )
+                Msg( "[AI ZM] Hidden spawn: no valid classes available, skipping to RESERVE\n" );
+            m_Phase = AIZM_PHASE_RESERVE;
+            m_flNextActionTime = gpGlobals->curtime + 0.5f;
+            return;
+        }
+
+        // Redistribute weight from invalid classes equally among valid ones
+        int redistributed = 0;
+        for ( int i = 0; i < ZMCLASS_MAX; i++ )
+            if ( !valid[i] ) redistributed += g_ZombieWeights[i];
+
+        int bonusEach = redistributed / validCount;
+        int remainder = redistributed % validCount;
+
+        for ( int i = 0; i < ZMCLASS_MAX; i++ )
+        {
+            if ( valid[i] )
             {
-                validClasses.AddToTail( zc );
+                weights[i] = g_ZombieWeights[i] + bonusEach;
+                if ( remainder > 0 ) { weights[i]++; remainder--; }
+                totalWeight += weights[i];
             }
         }
-        if ( validClasses.Count() > 0 )
-            zclass = validClasses[ random->RandomInt( 0, validClasses.Count() - 1 ) ];
+
+        int roll = random->RandomInt( 1, totalWeight );
+        int cumulative = 0;
+        for ( int i = 0; i < ZMCLASS_MAX; i++ )
+        {
+            if ( !valid[i] ) continue;
+            cumulative += weights[i];
+            if ( roll <= cumulative ) { zclass = (ZombieClass_t)i; break; }
+        }
     }
     else
     {
-        if ( IsClassAtTypeLimit( ZMCLASS_SHAMBLER ) )
+        if ( IsClassAtTypeLimit( ZMCLASS_SHAMBLER ) ||
+             !CZMBaseZombie::HasEnoughPopToSpawn( ZMCLASS_SHAMBLER ) )
         {
             m_Phase = AIZM_PHASE_RESERVE;
             m_flNextActionTime = gpGlobals->curtime + 0.5f;

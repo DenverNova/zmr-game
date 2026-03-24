@@ -146,14 +146,14 @@ void CSurvivorCombatSchedule::OnUpdate()
 
         CBaseEntity* pClosestEnemy = pOuter->GetSenses()->GetClosestEntity();
 
-        // Taunt on kill: if our last target died, 25% chance to taunt (30s cooldown)
+        // Taunt on kill: if our last target died, 45% chance to taunt (30s cooldown)
         CBaseEntity* pLastTarget = m_hLastCombatTarget.Get();
         if ( pLastTarget && !pLastTarget->IsAlive() )
         {
             if ( !m_NextTauntVoice.HasStarted() || m_NextTauntVoice.IsElapsed() )
             {
                 m_NextTauntVoice.Start( 30.0f );
-                if ( random->RandomFloat( 0.0f, 1.0f ) < 0.25f )
+                if ( random->RandomFloat( 0.0f, 1.0f ) < 0.45f )
                     ZMGetVoiceLines()->OnVoiceLine( pOuter, 4 ); // Taunt
             }
             m_hLastCombatTarget.Set( nullptr );

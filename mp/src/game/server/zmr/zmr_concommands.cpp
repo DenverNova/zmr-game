@@ -263,6 +263,7 @@ static void BotVoiceCommand_Follow( CZMPlayer* pCaller )
     Vector fwd;
     AngleVectors( pCaller->EyeAngles(), &fwd );
 
+    int nCommanded = 0;
     for ( int i = 1; i <= gpGlobals->maxClients; i++ )
     {
         CBasePlayer* pPlayer = UTIL_PlayerByIndex( i );
@@ -270,18 +271,29 @@ static void BotVoiceCommand_Follow( CZMPlayer* pCaller )
             continue;
         if ( pPlayer->GetTeamNumber() != ZMTEAM_HUMAN )
             continue;
+        if ( pPlayer == pCaller )
+            continue;
 
         CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pPlayer );
         if ( !pBot )
             continue;
 
-        // Skip bots already following a different human player
+        // Skip bots already following someone (any player)
         CBasePlayer* pCurrentFollow = pBot->GetFollowTarget();
-        if ( pCurrentFollow && pCurrentFollow != pCaller && !pCurrentFollow->IsBot() )
+        if ( pCurrentFollow && pCurrentFollow != pCaller )
             continue;
 
         float distSqr = pPlayer->GetAbsOrigin().DistToSqr( pCaller->GetAbsOrigin() );
         if ( distSqr > flRangeSqr )
+            continue;
+
+        // Must be within the caller's view cone (same check as Go command)
+        Vector toBot = pPlayer->GetAbsOrigin() + Vector( 0, 0, 36 ) - eyePos;
+        float dist = toBot.NormalizeInPlace();
+        if ( dist > flRange )
+            continue;
+        float dot = fwd.Dot( toBot );
+        if ( dot < 0.7f )
             continue;
 
         // Must be visible to the caller (line of sight)
@@ -291,7 +303,14 @@ static void BotVoiceCommand_Follow( CZMPlayer* pCaller )
             continue;
 
         pBot->SetFollowTarget( pCaller );
+        pBot->SetStayPut( false );
+        pBot->ClearCommandedDefendPos();
+        pBot->SetBehaviorOverride( 0 ); // 0 = Follow
+        nCommanded++;
     }
+
+    if ( nCommanded > 0 )
+        ClientPrint( pCaller, HUD_PRINTCENTER, UTIL_VarArgs( "%d bot(s): Following", nCommanded ) );
 }
 
 static void BotVoiceCommand_Go( CZMPlayer* pCaller )

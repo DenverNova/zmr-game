@@ -11,17 +11,17 @@
 // Phase cycle: SPAWN -> HIDDEN_SPAWN -> RESERVE -> SPAWN -> ...
 //
 //   SPAWN (start of round):
-//     Pick a burst of 1-15 zombies using weighted type selection (60% shambler,
-//     10% each special). Spawn one per tick, spending resources as they become
-//     available. Before traps are unlocked, spends ALL resources freely. After
-//     traps are unlocked, spends only excess above the reserve — unless a trap
-//     just fired, in which case it finishes spending remaining resources freely
-//     to keep pressure up. Respects per-type limits.
+//     Pick a burst of 1-15 zombies using weighted type selection (50% shambler,
+//     10% each special). Re-picks class each tick for mix-and-match variety.
+//     Spending: before traps are unlocked, spends ALL resources freely. After
+//     traps are unlocked, spends only excess above the reserve.
+//     Respects per-type limits and global pop cap.
 //
 //   HIDDEN_SPAWN:
 //     Attempt 1-3 surprise spawns near survivors (positions not in line of
-//     sight). Retries different positions for up to 30 seconds before giving
-//     up. Spends freely regardless of reserve. Then -> RESERVE.
+//     sight). Each spawn picks a fresh weighted class for variety. Retries
+//     positions for up to 15 seconds before giving up. Spends freely
+//     regardless of reserve. Then -> RESERVE.
 //
 //   RESERVE:
 //     Save resources until we can cover the most expensive trap on the map.
@@ -114,7 +114,7 @@ private:
 
     // Hidden spawn tracking
     int   m_iHiddenSpawnsRemaining;  // How many hidden spawns left this cycle (1-3)
-    float m_flHiddenSpawnDeadline;   // Give up after this time (30s timeout)
+    float m_flHiddenSpawnDeadline;   // Give up after this time (15s timeout)
 
     // Per-entity cooldown (traps AND barrels share this)
     CUtlMap<int, float> m_EntityCooldowns;
