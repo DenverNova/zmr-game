@@ -19,12 +19,13 @@ The server can run a fully automated Zombie Master. Four modes are available:
 
 **Persistence:** The AI ZM persists across rounds automatically. When a human player takes over (via spectator USE or volunteer), the AI ZM bot is kicked and a fresh survivor bot fills the slot.
 
-**Resource priority:** The AI holds back resources equal to the most expensive active trap on the map (the "reserve"). Spawning only uses excess resources above the reserve. Traps fire opportunistically when a survivor enters range, but only if the AI can afford the trap cost AND still keep the full reserve intact afterward. This ensures the AI always has enough saved for the biggest trap while continuously spawning zombies with any surplus.
+**Resource cycle:** The AI uses a 3-phase cycle — **Reserve → Spawn → Hidden Spawn → Reserve → ...** — to balance trap readiness with constant zombie pressure:
 
-**Spawn cycle:** The AI alternates between two phases continuously:
+1. **Reserve** — The AI accumulates resources until it has enough to cover the most expensive active trap on the map. No zombies are spawned during this phase. If there are no traps on the map, this phase is skipped entirely.
+2. **Spawn** — Once the reserve target is met, the AI spends **all** available resources on zombies. It picks a burst of 1–10 zombies using weighted type selection (60% shambler, 10% each special), then spawns them **one at a time** per tick. If a class is blocked by the spawner, at its per-type limit, or unaffordable, its weight is redistributed. The AI finds active spawners nearest to survivors and randomly spreads spawns across multiple spawners within 512 units. When resources run dry, the burst ends early and the AI moves on.
+3. **Hidden spawn** — Places one surprise zombie near a random survivor. Respects per-zombie-type limits. If Hidden Spawn All Classes is enabled, picks a random non-limit-capped type; otherwise shamblers only. Then cycles back to Reserve.
 
-1. **Spawn** — Finds active spawners nearest to the survivor group (re-evaluated every tick). When multiple spawners are within 512 units of the closest one, the AI randomly spreads spawns across them. Picks a burst of 1–10 zombies using weighted type selection (60% shambler, 10% each special), then spawns them **one at a time** as resources become available — the AI does not wait for the full batch cost before starting. If a class is blocked by the spawner, at its per-type limit, or unaffordable, its weight is redistributed. Only spawns when resources exceed the trap reserve.
-2. **Hidden spawn** — Places one surprise zombie near a random survivor. Respects per-zombie-type limits. If Hidden Spawn All Classes is enabled, picks a random non-limit-capped type; otherwise shamblers only.
+**Traps:** Fire opportunistically in **any** phase whenever a survivor enters the configured trap range and the AI can afford the cost. A trap firing mid-wave will consume resources, potentially ending the spawn burst early, but the AI finishes whatever it can with the remaining resources before moving to the next phase.
 
 **Camera:** The AI ZM camera actively moves around the map watching survivors, positioning itself behind and above the current target like a real player. It teleports to the first target immediately on round start, then smoothly tracks and switches between survivors every 4–8 seconds. When the view mode is set to "Within View Only", only spawners, traps, and barrels visible from the camera position are accessible.
 

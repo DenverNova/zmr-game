@@ -8,19 +8,17 @@
 //
 // AI Zombie Master - Server-side tactical controller.
 //
-// Resource priority: The AI holds back resources equal to the highest-cost trap
-// on the map (the "reserve"). Spawning only uses EXCESS resources above the
-// reserve. Traps fire opportunistically but require res >= trapCost + reserve,
-// so firing a trap never eats into the reserve budget. This ensures the AI
-// always has enough saved to trigger the most expensive trap when needed, while
-// continuously spawning zombies with any surplus.
-//
-// Spawn cycle: SPAWN -> HIDDEN_SPAWN -> SPAWN -> HIDDEN_SPAWN -> ...
-//   SPAWN: Find nearest spawners to survivors (spreads across multiple if similar
-//     distance). Picks a batch size (1-10) but spawns one zombie at a time as
-//     resources become available (no waiting for the full batch cost). Uses
-//     weighted type selection (60% shambler, 10% each special). Respects limits.
-//   HIDDEN_SPAWN: Place one surprise zombie behind survivors. Respects type limits.
+// Resource cycle: RESERVE -> SPAWN -> HIDDEN_SPAWN -> RESERVE -> ...
+//   RESERVE: Accumulate resources until we can afford the most expensive trap
+//     on the map. No zombie spawning during this phase. Traps still fire
+//     opportunistically if a survivor walks into range and the AI can afford
+//     that specific trap.
+//   SPAWN: Plan a wave of 1-10 zombies, spawn one per tick using ALL available
+//     resources (no reserve held back). Traps still fire mid-wave if affordable.
+//     Wave ends when batch complete or resources run dry. Uses weighted type
+//     selection (60% shambler, 10% each special). Respects per-type limits.
+//   HIDDEN_SPAWN: Place one surprise zombie behind survivors. Spends freely.
+//     Respects per-type limits. Then cycles back to RESERVE.
 //
 // Camera: Smoothly glides between survivors, panning naturally like a real player.
 // Culling: Kills stranded zombies too far from survivors when pop cap is stressed.
@@ -31,7 +29,8 @@
 
 enum AIZMCyclePhase_t
 {
-    AIZM_PHASE_SPAWN = 0,
+    AIZM_PHASE_RESERVE = 0,
+    AIZM_PHASE_SPAWN,
     AIZM_PHASE_HIDDEN_SPAWN,
 };
 
@@ -47,6 +46,7 @@ public:
 
 private:
     // Cycle phases
+    void DoReservePhase( CZMPlayer* pZM );
     void DoSpawnPhase( CZMPlayer* pZM );
     void DoHiddenSpawnPhase( CZMPlayer* pZM );
 
@@ -90,7 +90,7 @@ private:
     AIZMCyclePhase_t m_Phase;
     float m_flNextActionTime;
 
-    // Trap reserve tracking (always prioritized over spawning)
+    // Trap reserve: cost of the most expensive trap on the map
     int   m_iReservedResources;
 
     // Spawn burst: spawn one zombie at a time from a chosen batch
