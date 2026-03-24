@@ -8,17 +8,30 @@
 //
 // AI Zombie Master - Server-side tactical controller.
 //
-// Resource cycle: RESERVE -> SPAWN -> HIDDEN_SPAWN -> RESERVE -> ...
-//   RESERVE: Accumulate resources until we can afford the most expensive trap
-//     on the map. No zombie spawning and no trap firing during this phase.
-//   SPAWN: Plan a wave of 1-10 zombies, spawn one per tick using ALL available
-//     resources (no reserve held back). Traps fire mid-wave if a survivor is
-//     in range and the AI can afford it. Wave ends when batch complete or
-//     resources run dry. Uses weighted type selection (60% shambler, 10% each
-//     special). Respects per-type limits.
-//   HIDDEN_SPAWN: Place one surprise zombie behind survivors. Spends freely.
-//     Traps can also fire during this phase. Respects per-type limits.
-//     Then cycles back to RESERVE.
+// Phase cycle: SPAWN -> HIDDEN_SPAWN -> RESERVE -> SPAWN -> ...
+//
+//   SPAWN (start of round):
+//     Pick a burst of 1-15 zombies using weighted type selection (60% shambler,
+//     10% each special). Spawn one per tick, spending resources as they become
+//     available. Before traps are unlocked, spends ALL resources freely. After
+//     traps are unlocked, spends only excess above the reserve — unless a trap
+//     just fired, in which case it finishes spending remaining resources freely
+//     to keep pressure up. Respects per-type limits.
+//
+//   HIDDEN_SPAWN:
+//     Attempt 1-3 surprise spawns near survivors (positions not in line of
+//     sight). Retries different positions for up to 30 seconds before giving
+//     up. Spends freely regardless of reserve. Then -> RESERVE.
+//
+//   RESERVE:
+//     Save resources until we can cover the most expensive trap on the map.
+//     Once met, set m_bTrapsUnlocked = true (permanent for the round) and
+//     immediately -> SPAWN. If reserve is already met on entry, skip straight
+//     to SPAWN.
+//
+// Traps: Once m_bTrapsUnlocked is true, traps fire opportunistically in ANY
+//   phase whenever a survivor enters range and the AI can afford the cost.
+//   Before unlocked, traps never fire.
 //
 // Camera: Smoothly glides between survivors, panning naturally like a real player.
 // Culling: Kills stranded zombies too far from survivors when pop cap is stressed.
@@ -29,9 +42,9 @@
 
 enum AIZMCyclePhase_t
 {
-    AIZM_PHASE_RESERVE = 0,
-    AIZM_PHASE_SPAWN,
+    AIZM_PHASE_SPAWN = 0,
     AIZM_PHASE_HIDDEN_SPAWN,
+    AIZM_PHASE_RESERVE,
 };
 
 class CZMAIZombieMaster
@@ -56,13 +69,13 @@ private:
     // Zombie culling
     void CullStrandedZombies( CZMPlayer* pZM );
 
-    // Trap and barrel opportunism (checked every update, uses reserves)
+    // Trap and barrel opportunism (only after traps are unlocked)
     bool TryFireTrap( CZMPlayer* pZM );
     bool TryDetonateBarrel( CZMPlayer* pZM );
 
     // Spawning helpers
     bool TrySpawnZombies( ZombieClass_t zclass, int count, CZMEntZombieSpawn* pSpawner );
-    ZombieClass_t PickWeightedClass( CZMEntZombieSpawn* pSpawner, CZMPlayer* pZM ) const;
+    ZombieClass_t PickWeightedClass( CZMEntZombieSpawn* pSpawner, CZMPlayer* pZM, int holdBack = 0 ) const;
     bool CanAffordClass( ZombieClass_t zclass, CZMPlayer* pZM, int reservedResources = 0 ) const;
     bool SpawnerSupportsClass( CZMEntZombieSpawn* pSpawner, ZombieClass_t zclass ) const;
     bool IsClassAtTypeLimit( ZombieClass_t zclass ) const;
@@ -92,11 +105,16 @@ private:
 
     // Trap reserve: cost of the most expensive trap on the map
     int   m_iReservedResources;
+    bool  m_bTrapsUnlocked;    // True once first reserve target is met (permanent for round)
 
     // Spawn burst: spawn one zombie at a time from a chosen batch
     int m_iSpawnBurstRemaining;
     ZombieClass_t m_SpawnBurstClass;
     CHandle<CZMEntZombieSpawn> m_hSpawnBurstSpawner;
+
+    // Hidden spawn tracking
+    int   m_iHiddenSpawnsRemaining;  // How many hidden spawns left this cycle (1-3)
+    float m_flHiddenSpawnDeadline;   // Give up after this time (30s timeout)
 
     // Per-entity cooldown (traps AND barrels share this)
     CUtlMap<int, float> m_EntityCooldowns;
