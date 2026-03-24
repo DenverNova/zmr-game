@@ -37,19 +37,16 @@ ConVar zm_sv_ai_zm_cull_time( "zm_sv_ai_zm_cull_time", "45.0", FCVAR_NOTIFY | FC
 
 CZMAIZombieMaster g_ZMAIZombieMaster;
 
-// Weighted type selection: 50% shambler, 10% each special (5 types total)
-static const int g_ZombieWeights[ZMCLASS_MAX] = { 50, 10, 10, 10, 10 };
+// Weighted type selection: 60% shambler, 10% each special (5 types total)
+static const int g_ZombieWeights[ZMCLASS_MAX] = { 60, 10, 10, 10, 10 };
 
 // Distance threshold for considering two spawners "nearly the same distance"
 #define SPAWNER_SPREAD_THRESHOLD 512.0f
 
-// Camera smoothing speed (units per second for position, degrees per second for angles)
-#define CAMERA_MOVE_SPEED   2000.0f
-#define CAMERA_TURN_SPEED   180.0f
-#define CAMERA_SWITCH_MIN   4.0f
-#define CAMERA_SWITCH_MAX   8.0f
-#define CAMERA_HEIGHT       200.0f
-#define CAMERA_BACK_DIST    300.0f
+// Camera smoothing: exponential lerp factor per second (lower = smoother/slower)
+#define CAMERA_SMOOTH_FACTOR  3.0f
+#define CAMERA_HEIGHT         200.0f
+#define CAMERA_BACK_DIST      300.0f
 
 // Culling constants
 #define CULL_CHECK_INTERVAL     10.0f
@@ -84,9 +81,9 @@ void CZMAIZombieMaster::Reset()
 
     m_vecCameraPos.Init();
     m_angCameraAng.Init();
-    m_iCameraTargetIndex = 0;
-    m_flCameraNextSwitch = 0.0f;
-    m_flCameraSwitchLerp = 0.0f;
+    m_iFocusedTargetIndex = 0;
+    m_flFocusedTargetExpiry = 0.0f;
+    m_iLastRoundRobinSlot = -1;
 
     m_flNextCullTime = 0.0f;
 }
@@ -323,7 +320,7 @@ bool CZMAIZombieMaster::CanAffordClass( ZombieClass_t zclass, CZMPlayer* pZM, in
 }
 
 //
-// Weighted zombie class picker: 50% shambler, 10% each special.
+// Weighted zombie class picker: 60% shambler, 10% each special.
 // Dynamically redistributes weight for classes not supported by the spawner
 // or at their per-type population limit. Called per-zombie to allow mix-and-match.
 //
@@ -386,6 +383,20 @@ ZombieClass_t CZMAIZombieMaster::PickWeightedClass( CZMEntZombieSpawn* pSpawner,
             }
             totalWeight += weights[i];
         }
+    }
+
+    if ( zm_sv_ai_zm_debug.GetBool() )
+    {
+        char buf[256] = "";
+        for ( int i = 0; i < ZMCLASS_MAX; i++ )
+        {
+            ZombieClass_t zc = (ZombieClass_t)i;
+            const char* name = CZMBaseZombie::ClassToName( zc );
+            char tmp[64];
+            Q_snprintf( tmp, sizeof(tmp), "%s=%i%s ", name ? name : "?", weights[i], valid[i] ? "" : "(X)" );
+            Q_strncat( buf, tmp, sizeof(buf) );
+        }
+        Msg( "[AI ZM] PickWeightedClass: %s total=%i\n", buf, totalWeight );
     }
 
     int roll = random->RandomInt( 1, totalWeight );
@@ -494,8 +505,59 @@ CZMEntManipulate* CZMAIZombieMaster::FindBestTrap( CZMPlayer* pZM ) const
 }
 
 //
-// Camera system: move around the map looking at survivors like a real player.
-// Switches between targets every few seconds and smoothly moves to the new position.
+// GetFocusedTarget: returns the survivor the AI is currently "picking on".
+// Round-robin through all living survivors, focusing on each for 5-20 seconds.
+//
+CBasePlayer* CZMAIZombieMaster::GetFocusedTarget() const
+{
+    if ( m_iFocusedTargetIndex <= 0 )
+        return nullptr;
+
+    CBasePlayer* pTarget = dynamic_cast<CBasePlayer*>( UTIL_EntityByIndex( m_iFocusedTargetIndex ) );
+    if ( pTarget && pTarget->IsAlive() && pTarget->GetTeamNumber() == ZMTEAM_HUMAN )
+        return pTarget;
+
+    return nullptr;
+}
+
+//
+// GatherNearestSpawnersToTarget: find spawners near a specific player.
+//
+void CZMAIZombieMaster::GatherNearestSpawnersToTarget( CBasePlayer* pTarget, CUtlVector<CZMEntZombieSpawn*>& outSpawners ) const
+{
+    if ( !pTarget )
+        return;
+
+    CUtlVector<CZMEntZombieSpawn*> allSpawners;
+    GatherActiveSpawners( allSpawners );
+
+    if ( allSpawners.Count() == 0 )
+        return;
+
+    Vector targetPos = pTarget->GetAbsOrigin();
+
+    // Find the closest spawner to this target
+    float bestDist = FLT_MAX;
+    for ( int i = 0; i < allSpawners.Count(); i++ )
+    {
+        float dist = allSpawners[i]->GetAbsOrigin().DistTo( targetPos );
+        if ( dist < bestDist )
+            bestDist = dist;
+    }
+
+    // Gather all spawners within the spread threshold of the best one
+    for ( int i = 0; i < allSpawners.Count(); i++ )
+    {
+        float dist = allSpawners[i]->GetAbsOrigin().DistTo( targetPos );
+        if ( dist <= bestDist + SPAWNER_SPREAD_THRESHOLD )
+            outSpawners.AddToTail( allSpawners[i] );
+    }
+}
+
+//
+// Camera system: smoothly glide around the map watching the focused survivor.
+// Uses exponential smoothing for natural deceleration like a real player panning.
+// The focused target is picked by round-robin (5-20s per survivor).
 //
 void CZMAIZombieMaster::UpdateCamera( CZMPlayer* pZM )
 {
@@ -508,19 +570,41 @@ void CZMAIZombieMaster::UpdateCamera( CZMPlayer* pZM )
     if ( humans.Count() == 0 )
         return;
 
-    // Pick a new camera target periodically
-    if ( gpGlobals->curtime >= m_flCameraNextSwitch || m_iCameraTargetIndex <= 0 )
+    // Round-robin target selection: cycle through all living survivors
+    bool bNeedNewTarget = ( gpGlobals->curtime >= m_flFocusedTargetExpiry || m_iFocusedTargetIndex <= 0 );
+
+    // Also switch if the current target died
+    if ( !bNeedNewTarget )
     {
-        int newIdx = humans[ random->RandomInt( 0, humans.Count() - 1 ) ]->entindex();
-        m_iCameraTargetIndex = newIdx;
-        m_flCameraNextSwitch = gpGlobals->curtime + random->RandomFloat( CAMERA_SWITCH_MIN, CAMERA_SWITCH_MAX );
+        CBasePlayer* pCur = dynamic_cast<CBasePlayer*>( UTIL_EntityByIndex( m_iFocusedTargetIndex ) );
+        if ( !pCur || !pCur->IsAlive() || pCur->GetTeamNumber() != ZMTEAM_HUMAN )
+            bNeedNewTarget = true;
+    }
+
+    if ( bNeedNewTarget )
+    {
+        // Advance to the next slot in round-robin order
+        m_iLastRoundRobinSlot++;
+        if ( m_iLastRoundRobinSlot >= humans.Count() )
+            m_iLastRoundRobinSlot = 0;
+
+        m_iFocusedTargetIndex = humans[ m_iLastRoundRobinSlot ]->entindex();
+        m_flFocusedTargetExpiry = gpGlobals->curtime + random->RandomFloat( 5.0f, 20.0f );
+
+        if ( zm_sv_ai_zm_debug.GetBool() )
+        {
+            CBasePlayer* pNew = humans[ m_iLastRoundRobinSlot ];
+            Msg( "[AI ZM] Camera: focusing on %s for %.1fs (slot %i/%i)\n",
+                pNew->GetPlayerName(), m_flFocusedTargetExpiry - gpGlobals->curtime,
+                m_iLastRoundRobinSlot + 1, humans.Count() );
+        }
     }
 
     // Find the current target
-    CBasePlayer* pTarget = dynamic_cast<CBasePlayer*>( UTIL_EntityByIndex( m_iCameraTargetIndex ) );
+    CBasePlayer* pTarget = dynamic_cast<CBasePlayer*>( UTIL_EntityByIndex( m_iFocusedTargetIndex ) );
     if ( !pTarget || !pTarget->IsAlive() || pTarget->GetTeamNumber() != ZMTEAM_HUMAN )
     {
-        m_iCameraTargetIndex = 0;
+        m_iFocusedTargetIndex = 0;
         return;
     }
 
@@ -548,35 +632,22 @@ void CZMAIZombieMaster::UpdateCamera( CZMPlayer* pZM )
     }
     else
     {
-        // Smooth interpolation
+        // Exponential smoothing: camera glides toward the target with natural deceleration.
+        // Factor of ~3.0 means it covers ~95% of the gap in about 1 second.
         float dt = gpGlobals->frametime;
         if ( dt <= 0.0f )
             dt = 0.016f;
 
-        float moveRate = CAMERA_MOVE_SPEED * dt;
-        float turnRate = CAMERA_TURN_SPEED * dt;
+        float t = 1.0f - expf( -CAMERA_SMOOTH_FACTOR * dt );
 
         // Lerp position
-        Vector vecDelta = vecDesired - m_vecCameraPos;
-        float flDist = vecDelta.Length();
-        if ( flDist > moveRate )
-        {
-            vecDelta.NormalizeInPlace();
-            m_vecCameraPos += vecDelta * moveRate;
-        }
-        else
-        {
-            m_vecCameraPos = vecDesired;
-        }
+        m_vecCameraPos += ( vecDesired - m_vecCameraPos ) * t;
 
-        // Lerp angles
+        // Lerp angles (handle wrapping)
         for ( int i = 0; i < 3; i++ )
         {
             float diff = AngleNormalize( angDesired[i] - m_angCameraAng[i] );
-            if ( fabsf( diff ) > turnRate )
-                m_angCameraAng[i] += ( diff > 0 ? turnRate : -turnRate );
-            else
-                m_angCameraAng[i] = angDesired[i];
+            m_angCameraAng[i] += diff * t;
         }
     }
 
@@ -717,8 +788,22 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
 
     // Continue an active spawn burst — spawn one zombie per tick
     // Re-pick class each tick for mix-and-match variety within a wave
+    // Dynamically update spawner as the focused target moves
     if ( m_iSpawnBurstRemaining > 0 && m_hSpawnBurstSpawner.Get() )
     {
+        CBasePlayer* pFocusedMid = GetFocusedTarget();
+        if ( pFocusedMid )
+        {
+            CUtlVector<CZMEntZombieSpawn*> midSpawners;
+            GatherNearestSpawnersToTarget( pFocusedMid, midSpawners );
+            if ( midSpawners.Count() > 0 )
+            {
+                CZMEntZombieSpawn* pBestMid = midSpawners[ random->RandomInt( 0, midSpawners.Count() - 1 ) ];
+                if ( IsEntityInView( pZM, pBestMid ) )
+                    m_hSpawnBurstSpawner = pBestMid;
+            }
+        }
+
         ZombieClass_t zclass = PickWeightedClass( m_hSpawnBurstSpawner.Get(), pZM, holdBack );
         if ( zclass == ZMCLASS_INVALID )
         {
@@ -745,9 +830,13 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
 
     // No active burst — start a new one
 
-    // Gather spawners near survivors (spreads across multiple if similar distance)
+    // Gather spawners near the focused target (or fallback to centroid of all survivors)
     CUtlVector<CZMEntZombieSpawn*> nearSpawners;
-    GatherNearestSpawners( nearSpawners );
+    CBasePlayer* pFocused = GetFocusedTarget();
+    if ( pFocused )
+        GatherNearestSpawnersToTarget( pFocused, nearSpawners );
+    else
+        GatherNearestSpawners( nearSpawners );
 
     // Filter by view mode
     CUtlVector<CZMEntZombieSpawn*> visibleSpawners;

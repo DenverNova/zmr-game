@@ -11,7 +11,7 @@
 // Phase cycle: SPAWN -> HIDDEN_SPAWN -> RESERVE -> SPAWN -> ...
 //
 //   SPAWN (start of round):
-//     Pick a burst of 1-15 zombies using weighted type selection (50% shambler,
+//     Pick a burst of 1-15 zombies using weighted type selection (60% shambler,
 //     10% each special). Re-picks class each tick for mix-and-match variety.
 //     Spending: before traps are unlocked, spends ALL resources freely. After
 //     traps are unlocked, spends only excess above the reserve.
@@ -82,6 +82,10 @@ private:
 
     // Multi-spawner spread: find all spawners near survivors within a threshold
     void GatherNearestSpawners( CUtlVector<CZMEntZombieSpawn*>& outSpawners ) const;
+    void GatherNearestSpawnersToTarget( CBasePlayer* pTarget, CUtlVector<CZMEntZombieSpawn*>& outSpawners ) const;
+
+    // Focused target: the survivor the AI is currently "picking on"
+    CBasePlayer* GetFocusedTarget() const;
 
     // View mode filtering
     bool IsEntityInView( CZMPlayer* pZM, CBaseEntity* pEnt ) const;
@@ -122,9 +126,11 @@ private:
     // Camera state
     Vector m_vecCameraPos;
     QAngle m_angCameraAng;
-    int    m_iCameraTargetIndex;    // Player index we're currently looking at
-    float  m_flCameraNextSwitch;    // When to pick a new camera target
-    float  m_flCameraSwitchLerp;    // 0-1 lerp progress for smooth transitions
+
+    // Focused target: round-robin through survivors, 5-20s each
+    int    m_iFocusedTargetIndex;   // Entity index of the currently focused survivor
+    float  m_flFocusedTargetExpiry; // When to switch to the next survivor
+    int    m_iLastRoundRobinSlot;   // Tracks which survivor slot we visited last (for round-robin)
 
     // Zombie culling
     float m_flNextCullTime;
