@@ -382,11 +382,12 @@ bool CZMPlayerBot::EquipWeaponOfType( ZMBotWeaponTypeRange_t wepType )
 
 bool CZMPlayerBot::EquipBestWeapon()
 {
-    // Priority: main gun (with ammo) > sidearm (with ammo) > melee > fists
+    // Priority: main gun (with ammo) > sidearm (with ammo) > melee > throwable > fists
     static const ZMBotWeaponTypeRange_t s_Priority[] = {
         BOTWEPRANGE_MAINGUN,
         BOTWEPRANGE_SECONDARYWEAPON,
         BOTWEPRANGE_MELEE,
+        BOTWEPRANGE_THROWABLE,
         BOTWEPRANGE_FISTS,
     };
 

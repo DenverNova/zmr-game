@@ -25,7 +25,7 @@ The server can run a fully automated Zombie Master. Four modes are available:
 2. **Spawn** — Once the reserve target is met, the AI spends **all** available resources on zombies. It picks a burst of 1–10 zombies using weighted type selection (60% shambler, 10% each special), then spawns them **one at a time** per tick. If a class is blocked by the spawner, at its per-type limit, or unaffordable, its weight is redistributed. The AI finds active spawners nearest to survivors and randomly spreads spawns across multiple spawners within 512 units. When resources run dry, the burst ends early and the AI moves on.
 3. **Hidden spawn** — Places one surprise zombie near a random survivor. Respects per-zombie-type limits. If Hidden Spawn All Classes is enabled, picks a random non-limit-capped type; otherwise shamblers only. Then cycles back to Reserve.
 
-**Traps:** Fire opportunistically in **any** phase whenever a survivor enters the configured trap range and the AI can afford the cost. A trap firing mid-wave will consume resources, potentially ending the spawn burst early, but the AI finishes whatever it can with the remaining resources before moving to the next phase.
+**Traps and explosive barrels:** Fire opportunistically during the **Spawn** and **Hidden Spawn** phases whenever a survivor enters the configured trap range and the AI can afford the cost. Traps do **not** fire during the Reserve phase so the AI can accumulate resources undisturbed. A trap firing mid-wave will consume resources, potentially ending the spawn burst early, but the AI finishes whatever it can with the remaining resources before moving to the next phase. Explosive barrels are detonated using the same range and cooldown rules as traps.
 
 **Camera:** The AI ZM camera actively moves around the map watching survivors, positioning itself behind and above the current target like a real player. It teleports to the first target immediately on round start, then smoothly tracks and switches between survivors every 4–8 seconds. When the view mode is set to "Within View Only", only spawners, traps, and barrels visible from the camera position are accessible.
 
@@ -64,7 +64,7 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 - Bots follow the nearest **human** player by default, spreading out in a fan formation. Bots never follow other bots. If no human survivors are alive, bots defend the spawn area
 - Press **E** while looking at a bot to toggle **Following** / **Staying**
 - If you are **carrying an object** and press **E** on a bot that is carrying one, the bot drops it
-- Bots search for weapons and ammo on the ground (configurable range), prioritizing missing loadout slots and higher-tier weapons. After picking up an item, the bot returns to its original position
+- Bots search for weapons and ammo on the ground (configurable range) in **all** behavior modes — following, exploring, and defending. If a bot walks within range of a weapon type it doesn't have or ammo it needs, it detours to grab it and returns to its task. Prioritizes missing loadout slots and higher-tier weapons. Bots reassess their best weapon after every pickup (priority: primary gun → sidearm → melee → throwable → fists)
 - Bots identify nearby crates by their contents (weapon, melee, throwable, or ammo) and smash open crates that contain items they need. Weapon crates are prioritized over ammo crates. Bots only target crates within 1024 units
 - Bots equip the best weapon for the situation and switch to melee/fists when ranged ammo runs out
 - Bots with only melee weapons prioritize fleeing to find guns rather than rushing zombies
@@ -82,7 +82,7 @@ The server can automatically fill the survivor team with AI-controlled bots at r
 - **Go** (voice menu) — Bots you're looking at switch to Explore mode
 - **Hold E on ground** — Bots **following you** move to the aimed position and switch to Defend mode with 256-unit spacing between positions. Only affects your followers
 - **Hold E on physics object** — The closest bot walks to the object and picks it up. Works on any grabbable physics object
-- **Double-tap E on carrying bot** — The bot carries the object to where you're looking (raycast) and drops it there. Single-tap E on a carrying bot drops the object in place
+- **Double-tap E** — All bots **following you** that are carrying objects will carry them to where you're looking (raycast) and drop them there. Single-tap E on a carrying bot drops the object in place
 
 | ConVar | Default | Description |
 |--------|---------|-------------|

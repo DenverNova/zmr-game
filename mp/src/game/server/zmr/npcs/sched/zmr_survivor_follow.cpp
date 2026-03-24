@@ -458,6 +458,35 @@ void CSurvivorFollowSchedule::OnUpdate()
             m_bExploreIdling = false;
         }
 
+        // Scavenge weapons/ammo even while following — bots should grab items
+        // they walk near. If actively scavenging (walking to item), let that
+        // finish before resuming follow. Combat aborts scavenging.
+        if ( m_bScavenging || m_ObjPath.IsValid() )
+        {
+            CBaseEntity* pThreat = FindNearestZombie( 400.0f );
+            if ( pThreat )
+            {
+                m_bScavenging = false;
+                m_hScavengeTarget.Set( nullptr );
+                m_ObjPath.Invalidate();
+                m_nScavengeStuckCount = 0;
+                m_flLastScavengeDist = FLT_MAX;
+                pOuter->EquipBestWeapon();
+            }
+            else
+            {
+                TryPickupNearbyWeapons();
+                return;
+            }
+        }
+        else
+        {
+            bool bWasScavenging = m_bScavenging;
+            TryPickupNearbyWeapons();
+            if ( !bWasScavenging && m_bScavenging )
+                return; // Just started walking to an item — let it finish
+        }
+
         if ( !ShouldMoveCloser( pExplicitFollow ) )
         {
             m_Path.Invalidate();
@@ -1697,6 +1726,7 @@ void CSurvivorFollowSchedule::TryPickupNearbyWeapons()
         {
             pOuter->GetMotor()->FaceTowards( pScavTarget->GetAbsOrigin() );
             pOuter->PressUse( 0.15f );
+            pOuter->SetContextThink( &CZMPlayerBot::ThinkEquipBestWeapon, gpGlobals->curtime + 0.3f, "PickupEquipThink" );
             m_bScavenging = false;
             m_hScavengeTarget.Set( nullptr );
             m_nScavengeStuckCount = 0;

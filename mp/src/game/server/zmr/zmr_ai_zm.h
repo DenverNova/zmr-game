@@ -10,15 +10,15 @@
 //
 // Resource cycle: RESERVE -> SPAWN -> HIDDEN_SPAWN -> RESERVE -> ...
 //   RESERVE: Accumulate resources until we can afford the most expensive trap
-//     on the map. No zombie spawning during this phase. Traps still fire
-//     opportunistically if a survivor walks into range and the AI can afford
-//     that specific trap.
+//     on the map. No zombie spawning and no trap firing during this phase.
 //   SPAWN: Plan a wave of 1-10 zombies, spawn one per tick using ALL available
-//     resources (no reserve held back). Traps still fire mid-wave if affordable.
-//     Wave ends when batch complete or resources run dry. Uses weighted type
-//     selection (60% shambler, 10% each special). Respects per-type limits.
+//     resources (no reserve held back). Traps fire mid-wave if a survivor is
+//     in range and the AI can afford it. Wave ends when batch complete or
+//     resources run dry. Uses weighted type selection (60% shambler, 10% each
+//     special). Respects per-type limits.
 //   HIDDEN_SPAWN: Place one surprise zombie behind survivors. Spends freely.
-//     Respects per-type limits. Then cycles back to RESERVE.
+//     Traps can also fire during this phase. Respects per-type limits.
+//     Then cycles back to RESERVE.
 //
 // Camera: Smoothly glides between survivors, panning naturally like a real player.
 // Culling: Kills stranded zombies too far from survivors when pop cap is stressed.

@@ -2326,6 +2326,52 @@ void CZMPlayer::PlayerUse()
 		Vector fwd;
 		AngleVectors( EyeAngles(), &fwd );
 
+		// Double-tap E: ALL followers carrying items drop them at the raycast hit point
+		if ( bDoubleTap )
+		{
+			trace_t tr;
+			UTIL_TraceLine( eyePos, eyePos + fwd * 2048.0f, MASK_SOLID, this, COLLISION_GROUP_NONE, &tr );
+
+			int nDropped = 0;
+			for ( int i = 1; i <= gpGlobals->maxClients; i++ )
+			{
+				CBasePlayer* pOther = UTIL_PlayerByIndex( i );
+				if ( !pOther || !pOther->IsBot() || !pOther->IsAlive() )
+					continue;
+				if ( pOther->GetTeamNumber() != ZMTEAM_HUMAN )
+					continue;
+
+				CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( pOther );
+				if ( !pBot )
+					continue;
+
+				// Only target bots following this player
+				if ( pBot->GetFollowTarget() != this )
+					continue;
+
+				// Only target bots that are carrying something
+				CZMBaseWeapon* pBotWep = pBot->GetActiveWeapon();
+				if ( !pBotWep || !Q_stristr( pBotWep->GetClassname(), "fistscarry" ) )
+					continue;
+
+				if ( tr.fraction < 1.0f )
+				{
+					pBot->SetCommandedDropPos( tr.endpos );
+					ZMGetVoiceLines()->OnVoiceLine( pBot, 0 );
+					nDropped++;
+				}
+			}
+
+			if ( nDropped > 0 )
+			{
+				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%i bot(s): Placing objects there", nDropped ) );
+				m_flLastUseTapTime = 0.0f;
+				return;
+			}
+			// If no followers were carrying anything, fall through to single-tap logic
+		}
+
+		// Single-tap E: target the closest bot you're looking at
 		float flBestDot = 0.95f;
 		CZMPlayerBot* pBestBot = nullptr;
 
@@ -2352,40 +2398,20 @@ void CZMPlayer::PlayerUse()
 
 		if ( pBestBot )
 		{
-			// If the bot is carrying a physics object:
-			//   Double-tap E: drop it at the raycast point where the player is looking
-			//   Single-tap E: drop it in place
+			// If the bot is carrying a physics object, single-tap drops it in place
 			CZMBaseWeapon* pBotWep = pBestBot->GetActiveWeapon();
 			if ( pBotWep && Q_stristr( pBotWep->GetClassname(), "fistscarry" ) )
 			{
-				if ( bDoubleTap )
-				{
-					// Raycast from the player's eyes to find where they're looking
-					trace_t tr;
-					UTIL_TraceLine( eyePos, eyePos + fwd * 2048.0f, MASK_SOLID, this, COLLISION_GROUP_NONE, &tr );
-
-					if ( tr.fraction < 1.0f )
-					{
-						// Command the bot to walk to the hit point and drop the object there
-						pBestBot->SetCommandedDropPos( tr.endpos );
-						ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Placing object there", pBestBot->GetPlayerName() ) );
-						ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
-					}
-				}
-				else
-				{
-					pBestBot->ForceDropOfCarriedPhysObjects( nullptr );
-					pBestBot->EquipBestWeapon();
-					pBestBot->ClearCommandedGrabTarget();
-					ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Dropped object", pBestBot->GetPlayerName() ) );
-					ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
-				}
+				pBestBot->ForceDropOfCarriedPhysObjects( nullptr );
+				pBestBot->EquipBestWeapon();
+				pBestBot->ClearCommandedGrabTarget();
+				ClientPrint( this, HUD_PRINTCENTER, UTIL_VarArgs( "%s: Dropped object", pBestBot->GetPlayerName() ) );
+				ZMGetVoiceLines()->OnVoiceLine( pBestBot, 0 );
 				m_flLastUseTapTime = 0.0f;
 				return;
 			}
 
-			// Bot is "following me" if it has me as explicit follow target,
-			// isn't staying put, and has no behavior override active.
+			// Follow/Stay toggle
 			bool bIsFollowingMe = ( pBestBot->GetFollowTarget() == this &&
 									!pBestBot->IsStayingPut() &&
 									pBestBot->GetBehaviorOverride() < 0 );

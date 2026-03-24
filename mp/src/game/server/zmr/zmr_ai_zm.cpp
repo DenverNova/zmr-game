@@ -670,8 +670,7 @@ void CZMAIZombieMaster::CullStrandedZombies( CZMPlayer* pZM )
 //
 // Cycle phase: RESERVE
 // Accumulate resources until we have enough for the most expensive trap.
-// No zombie spawning during this phase. Traps still fire opportunistically
-// in the Update loop if a survivor walks into range.
+// No zombie spawning and no trap firing during this phase — the AI saves up.
 // When reserves are met (or no traps exist), transition to SPAWN.
 //
 void CZMAIZombieMaster::DoReservePhase( CZMPlayer* pZM )
@@ -1037,21 +1036,22 @@ void CZMAIZombieMaster::Update()
         Msg( "[AI ZM] Update: phase=%i res=%i reserved=%i curtime=%.1f\n",
             (int)m_Phase, pZM->GetResources(), m_iReservedResources, gpGlobals->curtime );
 
-    // Traps and barrels fire opportunistically in ALL phases when a survivor
-    // is within range and the AI can afford the trap cost.
-    TryFireTrap( pZM );
-    TryDetonateBarrel( pZM );
-
     // Run the current cycle phase: RESERVE -> SPAWN -> HIDDEN_SPAWN -> RESERVE
+    // Traps/barrels only fire during SPAWN and HIDDEN_SPAWN so the RESERVE
+    // phase can accumulate resources undisturbed.
     switch ( m_Phase )
     {
     case AIZM_PHASE_RESERVE:
         DoReservePhase( pZM );
         break;
     case AIZM_PHASE_SPAWN:
+        TryFireTrap( pZM );
+        TryDetonateBarrel( pZM );
         DoSpawnPhase( pZM );
         break;
     case AIZM_PHASE_HIDDEN_SPAWN:
+        TryFireTrap( pZM );
+        TryDetonateBarrel( pZM );
         DoHiddenSpawnPhase( pZM );
         break;
     }
