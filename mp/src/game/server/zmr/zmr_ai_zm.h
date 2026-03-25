@@ -11,10 +11,12 @@
 // Phase cycle: SPAWN -> HIDDEN_SPAWN -> RESERVE -> SPAWN -> ...
 //
 //   SPAWN (start of round):
-//     Pick a burst of 1-15 zombies using weighted type selection (60% shambler,
-//     10% each special). Re-picks class each tick for mix-and-match variety.
-//     Spending: before traps are unlocked, spends ALL resources freely. After
-//     traps are unlocked, spends only excess above the reserve.
+//     Pick a burst of 1-15 zombies. For each zombie, roll a weighted class
+//     (60% shambler, 10% each special) based on the nearest spawner's allowed
+//     types — blocked types have their weight redistributed equally among
+//     valid types. Then save up resources until the class is affordable and
+//     spawn it. If the focused survivor moves closer to a different spawner,
+//     re-evaluate the spawner and re-roll the class on the fly.
 //     Respects per-type limits and global pop cap.
 //
 //   HIDDEN_SPAWN:
@@ -111,10 +113,12 @@ private:
     int   m_iReservedResources;
     bool  m_bTrapsUnlocked;    // True once first reserve target is met (permanent for round)
 
-    // Spawn burst: spawn one zombie at a time from a chosen batch
-    int m_iSpawnBurstRemaining;
-    ZombieClass_t m_SpawnBurstClass;
-    CHandle<CZMEntZombieSpawn> m_hSpawnBurstSpawner;
+    // Spawn burst: internal queue of N zombies to spawn one at a time.
+    // Each zombie is rolled independently. The AI saves up resources for
+    // the current class, spawns it, then rolls the next one.
+    int m_iSpawnBurstRemaining;            // How many zombies left in this burst
+    ZombieClass_t m_SpawnBurstClass;       // The class we're currently saving up for
+    CHandle<CZMEntZombieSpawn> m_hSpawnBurstSpawner;  // Current spawner (may change dynamically)
 
     // Hidden spawn tracking
     int   m_iHiddenSpawnsRemaining;  // How many hidden spawns left this cycle (1-3)

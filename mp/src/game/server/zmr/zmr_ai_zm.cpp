@@ -324,8 +324,12 @@ bool CZMAIZombieMaster::CanAffordClass( ZombieClass_t zclass, CZMPlayer* pZM, in
 
 //
 // Weighted zombie class picker: 60% shambler, 10% each special.
-// Dynamically redistributes weight for classes not supported by the spawner
-// or at their per-type population limit. Called per-zombie to allow mix-and-match.
+// Does NOT check affordability — the AI will save up for whatever it rolls.
+// Filters by: spawner support, pop cap, per-type limits.
+// Blocked types have their weight redistributed equally among valid types
+// so the total always sums to 100. e.g. if hulk and banshee are blocked,
+// their 20% redistributes 6-7% each to the remaining 3 valid types.
+// If only one type is valid (e.g. banshee-only spawner), it gets 100%.
 //
 ZombieClass_t CZMAIZombieMaster::PickWeightedClass( CZMEntZombieSpawn* pSpawner, CZMPlayer* pZM, int holdBack ) const
 {
@@ -335,13 +339,13 @@ ZombieClass_t CZMAIZombieMaster::PickWeightedClass( CZMEntZombieSpawn* pSpawner,
     int weights[ZMCLASS_MAX];
     bool valid[ZMCLASS_MAX];
 
+    // Determine which classes are valid (no affordability check — we save up)
     for ( int i = 0; i < ZMCLASS_MAX; i++ )
     {
         ZombieClass_t zc = (ZombieClass_t)i;
         valid[i] = CZMBaseZombie::IsValidClass( zc )
                 && SpawnerSupportsClass( pSpawner, zc )
                 && CZMBaseZombie::HasEnoughPopToSpawn( zc )
-                && CanAffordClass( zc, pZM, holdBack )
                 && !IsClassAtTypeLimit( zc );
         weights[i] = 0;
     }
@@ -363,15 +367,29 @@ ZombieClass_t CZMAIZombieMaster::PickWeightedClass( CZMEntZombieSpawn* pSpawner,
         }
     }
 
-    // Use each valid class's base weight directly — no redistribution.
-    // This preserves the intended ratio between shamblers and specials.
-    // e.g. if only shambler (60) and drifter (10) are valid, drifter gets
-    // 10/70 = 14% instead of the old inflated 25/100 = 25%.
+    // Redistribute weight from blocked classes equally among valid ones.
+    // This ensures the total always sums to 100 and a spawner that only
+    // allows certain types gives them proportionally more weight.
+    int redistributed = 0;
+    for ( int i = 0; i < ZMCLASS_MAX; i++ )
+    {
+        if ( !valid[i] )
+            redistributed += g_ZombieWeights[i];
+    }
+
+    int bonusEach = redistributed / validCount;
+    int remainder = redistributed % validCount;
+
     for ( int i = 0; i < ZMCLASS_MAX; i++ )
     {
         if ( valid[i] )
         {
-            weights[i] = g_ZombieWeights[i];
+            weights[i] = g_ZombieWeights[i] + bonusEach;
+            if ( remainder > 0 )
+            {
+                weights[i]++;
+                remainder--;
+            }
             totalWeight += weights[i];
         }
     }
@@ -791,11 +809,13 @@ void CZMAIZombieMaster::DoReservePhase( CZMPlayer* pZM )
 
 //
 // Cycle phase: SPAWN
-// Picks a batch size (1-15) and spawner, then spawns one zombie per tick.
-// Before traps are unlocked: spends ALL resources freely (no reserve).
-// After traps are unlocked: spends excess above the reserve. If resources
-// drop below a zombie cost (e.g. trap just fired), the burst ends and we
-// move to hidden spawn to keep the cycle going.
+// Internal queue of 1-15 zombies. For each zombie in the burst:
+//   1. Find the best spawner near the focused survivor (dynamic — rechecked every tick).
+//   2. If the spawner changed, re-roll the class using weighted selection for that spawner.
+//   3. If we can afford the current class, spawn it and roll the next one.
+//   4. If we can't afford it, wait for resources to accumulate.
+// Before traps are unlocked: spends ALL resources freely.
+// After traps are unlocked: holds back the reserve amount.
 //
 void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
 {
@@ -805,69 +825,29 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
     // Determine how much to hold back: 0 if traps not yet unlocked, else reserve
     int holdBack = m_bTrapsUnlocked ? m_iReservedResources : 0;
 
-    // Continue an active spawn burst — spawn one zombie per tick
-    // Re-pick class each tick for mix-and-match variety within a wave
-    // Dynamically update spawner as the focused target moves
-    if ( m_iSpawnBurstRemaining > 0 && m_hSpawnBurstSpawner.Get() )
+    // === Find the best spawner near the focused target (checked every tick) ===
+    CZMEntZombieSpawn* pBestSpawner = nullptr;
     {
-        CBasePlayer* pFocusedMid = GetFocusedTarget();
-        if ( pFocusedMid )
-        {
-            CUtlVector<CZMEntZombieSpawn*> midSpawners;
-            GatherNearestSpawnersToTarget( pFocusedMid, midSpawners );
-            if ( midSpawners.Count() > 0 )
-            {
-                CZMEntZombieSpawn* pBestMid = midSpawners[ random->RandomInt( 0, midSpawners.Count() - 1 ) ];
-                if ( IsEntityInView( pZM, pBestMid ) )
-                    m_hSpawnBurstSpawner = pBestMid;
-            }
-        }
-
-        ZombieClass_t zclass = PickWeightedClass( m_hSpawnBurstSpawner.Get(), pZM, holdBack );
-        if ( zclass == ZMCLASS_INVALID )
-        {
-            // Can't afford anything right now — wait for resources to trickle in
-            if ( zm_sv_ai_zm_debug.GetBool() )
-                Msg( "[AI ZM] Spawn burst: waiting for resources (res=%i, holdBack=%i, %i remaining)\n",
-                    pZM->GetResources(), holdBack, m_iSpawnBurstRemaining );
-            m_flNextActionTime = gpGlobals->curtime + 0.5f;
-            return;
-        }
+        CUtlVector<CZMEntZombieSpawn*> nearSpawners;
+        CBasePlayer* pFocused = GetFocusedTarget();
+        if ( pFocused )
+            GatherNearestSpawnersToTarget( pFocused, nearSpawners );
         else
+            GatherNearestSpawners( nearSpawners );
+
+        // Filter by view mode
+        CUtlVector<CZMEntZombieSpawn*> visibleSpawners;
+        for ( int i = 0; i < nearSpawners.Count(); i++ )
         {
-            TrySpawnZombies( zclass, 1, m_hSpawnBurstSpawner.Get() );
-            m_iSpawnBurstRemaining--;
+            if ( IsEntityInView( pZM, nearSpawners[i] ) )
+                visibleSpawners.AddToTail( nearSpawners[i] );
         }
 
-        if ( m_iSpawnBurstRemaining <= 0 )
-        {
-            m_Phase = AIZM_PHASE_HIDDEN_SPAWN;
-            m_iHiddenSpawnsRemaining = random->RandomInt( 1, 3 );
-            m_flHiddenSpawnDeadline = gpGlobals->curtime + 15.0f;
-            m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 0.5f, 1.5f );
-        }
-        return;
+        if ( visibleSpawners.Count() > 0 )
+            pBestSpawner = visibleSpawners[ random->RandomInt( 0, visibleSpawners.Count() - 1 ) ];
     }
 
-    // No active burst — start a new one
-
-    // Gather spawners near the focused target (or fallback to centroid of all survivors)
-    CUtlVector<CZMEntZombieSpawn*> nearSpawners;
-    CBasePlayer* pFocused = GetFocusedTarget();
-    if ( pFocused )
-        GatherNearestSpawnersToTarget( pFocused, nearSpawners );
-    else
-        GatherNearestSpawners( nearSpawners );
-
-    // Filter by view mode
-    CUtlVector<CZMEntZombieSpawn*> visibleSpawners;
-    for ( int i = 0; i < nearSpawners.Count(); i++ )
-    {
-        if ( IsEntityInView( pZM, nearSpawners[i] ) )
-            visibleSpawners.AddToTail( nearSpawners[i] );
-    }
-
-    if ( visibleSpawners.Count() == 0 )
+    if ( !pBestSpawner )
     {
         if ( zm_sv_ai_zm_debug.GetBool() )
             Msg( "[AI ZM] Spawn: no active/visible spawners, retrying\n" );
@@ -875,38 +855,81 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
         return;
     }
 
-    // Pick a random spawner from the nearby set to spread spawns across
-    CZMEntZombieSpawn* pSpawner = visibleSpawners[ random->RandomInt( 0, visibleSpawners.Count() - 1 ) ];
-
-    ZombieClass_t zclass = PickWeightedClass( pSpawner, pZM, holdBack );
-    if ( zclass == ZMCLASS_INVALID )
+    // === No active burst — start a new one ===
+    if ( m_iSpawnBurstRemaining <= 0 )
     {
-        // Can't afford anything right now — wait for resources to come in
+        m_iSpawnBurstRemaining = random->RandomInt( 1, 15 );
+        m_hSpawnBurstSpawner = pBestSpawner;
+        m_SpawnBurstClass = ZMCLASS_INVALID; // Will be rolled below
+
         if ( zm_sv_ai_zm_debug.GetBool() )
-            Msg( "[AI ZM] Spawn: waiting for resources (res=%i, holdBack=%i)\n",
+        {
+            Vector spos = pBestSpawner->GetAbsOrigin();
+            Msg( "[AI ZM] Spawn burst started: %i zombies, spawner at (%.0f,%.0f,%.0f)\n",
+                m_iSpawnBurstRemaining, spos.x, spos.y, spos.z );
+        }
+    }
+
+    // === Dynamic spawner switching ===
+    // If the focused target moved closer to a different spawner, switch and re-roll
+    if ( pBestSpawner != m_hSpawnBurstSpawner.Get() )
+    {
+        if ( zm_sv_ai_zm_debug.GetBool() )
+            Msg( "[AI ZM] Spawn burst: spawner changed, re-rolling class\n" );
+        m_hSpawnBurstSpawner = pBestSpawner;
+        m_SpawnBurstClass = ZMCLASS_INVALID; // Force re-roll for new spawner
+    }
+
+    // === Roll class if we don't have one yet (new burst or spawner changed) ===
+    if ( m_SpawnBurstClass == ZMCLASS_INVALID )
+    {
+        m_SpawnBurstClass = PickWeightedClass( m_hSpawnBurstSpawner.Get(), pZM, holdBack );
+
+        if ( m_SpawnBurstClass == ZMCLASS_INVALID )
+        {
+            // No valid classes at all (all at pop cap or type limit) — end burst
+            if ( zm_sv_ai_zm_debug.GetBool() )
+                Msg( "[AI ZM] Spawn burst: no valid classes, ending burst\n" );
+            m_iSpawnBurstRemaining = 0;
+            m_Phase = AIZM_PHASE_HIDDEN_SPAWN;
+            m_iHiddenSpawnsRemaining = random->RandomInt( 1, 3 );
+            m_flHiddenSpawnDeadline = gpGlobals->curtime + 15.0f;
+            m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 0.5f, 1.5f );
+            return;
+        }
+
+        if ( zm_sv_ai_zm_debug.GetBool() )
+        {
+            int cost = CZMBaseZombie::GetCost( m_SpawnBurstClass );
+            Msg( "[AI ZM] Spawn burst: rolled %s (cost %i), %i remaining in burst\n",
+                CZMBaseZombie::ClassToName( m_SpawnBurstClass ), cost, m_iSpawnBurstRemaining );
+        }
+    }
+
+    // === Save up: can we afford the current class? ===
+    if ( !CanAffordClass( m_SpawnBurstClass, pZM, holdBack ) )
+    {
+        if ( zm_sv_ai_zm_debug.GetBool() )
+        {
+            int cost = CZMBaseZombie::GetCost( m_SpawnBurstClass );
+            Msg( "[AI ZM] Spawn burst: saving up for %s (need %i, have %i, holdBack %i)\n",
+                CZMBaseZombie::ClassToName( m_SpawnBurstClass ), cost,
                 pZM->GetResources(), holdBack );
-        m_flNextActionTime = gpGlobals->curtime + 1.0f;
+        }
+        m_flNextActionTime = gpGlobals->curtime + 0.5f;
         return;
     }
 
-    // Start a burst: pick batch size (1-15), spawn first one immediately
-    m_iSpawnBurstRemaining = random->RandomInt( 1, 15 );
-    m_SpawnBurstClass = zclass;
-    m_hSpawnBurstSpawner = pSpawner;
-
-    if ( zm_sv_ai_zm_debug.GetBool() )
-    {
-        Vector spos = pSpawner->GetAbsOrigin();
-        Msg( "[AI ZM] Spawn burst: %i (mixed types) at (%.0f,%.0f,%.0f) [%i spawners nearby]\n",
-            m_iSpawnBurstRemaining,
-            spos.x, spos.y, spos.z, visibleSpawners.Count() );
-    }
-
-    TrySpawnZombies( zclass, 1, pSpawner );
+    // === Spawn it ===
+    TrySpawnZombies( m_SpawnBurstClass, 1, m_hSpawnBurstSpawner.Get() );
     m_iSpawnBurstRemaining--;
+    m_SpawnBurstClass = ZMCLASS_INVALID; // Roll fresh class for the next zombie
 
+    // === Check if burst is complete ===
     if ( m_iSpawnBurstRemaining <= 0 )
     {
+        if ( zm_sv_ai_zm_debug.GetBool() )
+            Msg( "[AI ZM] Spawn burst complete, moving to HIDDEN_SPAWN\n" );
         m_Phase = AIZM_PHASE_HIDDEN_SPAWN;
         m_iHiddenSpawnsRemaining = random->RandomInt( 1, 3 );
         m_flHiddenSpawnDeadline = gpGlobals->curtime + 15.0f;
@@ -1000,12 +1023,23 @@ void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
             return;
         }
 
-        // Use each valid class's base weight directly — no redistribution.
+        // Redistribute weight from blocked classes equally among valid ones.
+        int redistributed = 0;
+        for ( int i = 0; i < ZMCLASS_MAX; i++ )
+        {
+            if ( !valid[i] )
+                redistributed += g_ZombieWeights[i];
+        }
+
+        int bonusEach = redistributed / validCount;
+        int remainder = redistributed % validCount;
+
         for ( int i = 0; i < ZMCLASS_MAX; i++ )
         {
             if ( valid[i] )
             {
-                weights[i] = g_ZombieWeights[i];
+                weights[i] = g_ZombieWeights[i] + bonusEach;
+                if ( remainder > 0 ) { weights[i]++; remainder--; }
                 totalWeight += weights[i];
             }
         }
