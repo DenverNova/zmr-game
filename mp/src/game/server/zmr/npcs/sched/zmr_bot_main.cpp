@@ -27,6 +27,8 @@ void CPlayerBotMainSchedule::OnStart()
 void CPlayerBotMainSchedule::OnUpdate()
 {
     GetOuter()->CheckObstacleJump();
+    GetOuter()->CheckLadderClimb();
+    GetOuter()->CheckCliffAhead();
 }
     
 void CPlayerBotMainSchedule::ComputePath()

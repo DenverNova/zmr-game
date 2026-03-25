@@ -61,9 +61,16 @@ float NPCR::CPathCostGroundOnly::operator()( CNavArea* area, CNavArea* fromArea,
         return 0.0f;
     }
 
-    // No ladders or elevators for now.
-    if ( ladder || elevator )
+    // Elevators not supported.
+    if ( elevator )
         return PATHCOST_INVALID;
+
+    // Allow ladder traversal with a cost multiplier (slightly more expensive than walking)
+    if ( ladder )
+    {
+        float ladderCost = ladder->m_length * 1.5f;
+        return ladderCost + fromArea->GetCostSoFar();
+    }
 
 
     // ZMRTODO: The updates are very slow. Have to try updating the block status here?

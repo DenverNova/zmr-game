@@ -146,6 +146,15 @@ void CSurvivorCombatSchedule::OnUpdate()
 
         CBaseEntity* pClosestEnemy = pOuter->GetSenses()->GetClosestEntity();
 
+        // Prioritize the zombie that last hurt us (within 5 seconds)
+        CBaseEntity* pLastAttacker = pOuter->GetLastAttacker();
+        if ( pLastAttacker && pLastAttacker->IsAlive() &&
+             ( gpGlobals->curtime - pOuter->GetLastAttackerTime() ) < 5.0f &&
+             pOuter->GetSenses()->HasLOS( pLastAttacker->WorldSpaceCenter() ) )
+        {
+            pClosestEnemy = pLastAttacker;
+        }
+
         // Taunt on kill: if our last target died, 45% chance to taunt (30s cooldown)
         CBaseEntity* pLastTarget = m_hLastCombatTarget.Get();
         if ( pLastTarget && !pLastTarget->IsAlive() )
@@ -185,9 +194,9 @@ void CSurvivorCombatSchedule::OnUpdate()
             // If the enemy is further away, the bot should try to flee and find guns/ammo.
             if ( !IsIntercepted() )
             {
-                // Cornered threshold: if zombie is within 200u, we must fight
+                // Cornered threshold: if zombie is within 120u, we must fight
                 // Otherwise try to kite/flee and let the follow schedule find weapons
-                if ( flDist < 200.0f )
+                if ( flDist < 120.0f )
                 {
                     m_pAttackCloseRangeSched->SetAttackTarget( pClosestEnemy );
                     m_pAttackCloseRangeSched->SetMeleeing( true );
@@ -284,22 +293,54 @@ void CSurvivorCombatSchedule::OnUpdate()
                 float flInterval = random->RandomFloat( 3.0f, 6.0f ) + ( pOuter->entindex() % 5 ) * 0.3f;
                 m_NextLookAround.Start( flInterval );
 
-                CNavArea* pMyArea = pOuter->GetLastKnownArea();
-                if ( pMyArea )
+                // Prefer looking at nearby doors/doorways — that's where zombies come through
+                bool bFoundDoor = false;
+                static const char* s_szDoorClasses[] = {
+                    "func_door", "func_door_rotating", "prop_door_rotating",
+                };
+                CBaseEntity* pBestDoor = nullptr;
+                float flBestDist = 768.0f; // Max scan range for doors
+                for ( int d = 0; d < ARRAYSIZE( s_szDoorClasses ); d++ )
                 {
-                    // Pick a random direction offset by entindex so bots look different ways
-                    int startDir = pOuter->entindex() % NUM_DIRECTIONS;
-                    for ( int i = 0; i < NUM_DIRECTIONS; i++ )
+                    CBaseEntity* pDoor = nullptr;
+                    while ( (pDoor = gEntList.FindEntityByClassname( pDoor, s_szDoorClasses[d] )) != nullptr )
                     {
-                        NavDirType dir = (NavDirType)( (startDir + i) % NUM_DIRECTIONS );
-                        CNavArea* pArea = pMyArea->GetRandomAdjacentArea( dir );
-                        if ( pArea && pArea != m_pLastLookArea )
+                        float flDist = pDoor->GetAbsOrigin().DistTo( pOuter->GetPosition() );
+                        if ( flDist < flBestDist && pOuter->GetSenses()->HasLOS( pDoor->WorldSpaceCenter() ) )
                         {
-                            m_pLastLookArea = pArea;
-                            // Use eye-height offset so bots look forward, not at the floor
-                            Vector vecEyeOfs = pOuter->EyePosition() - pOuter->GetAbsOrigin();
-                            m_vecLookAt = pArea->GetRandomPoint() + vecEyeOfs;
-                            break;
+                            // Pick a random door among the close ones (not always the closest)
+                            if ( !pBestDoor || random->RandomInt( 0, 2 ) == 0 )
+                            {
+                                pBestDoor = pDoor;
+                                flBestDist = flDist;
+                                bFoundDoor = true;
+                            }
+                        }
+                    }
+                }
+
+                if ( bFoundDoor && pBestDoor )
+                {
+                    m_vecLookAt = pBestDoor->WorldSpaceCenter();
+                }
+                else
+                {
+                    // No visible doors nearby — fall back to random nav area look
+                    CNavArea* pMyArea = pOuter->GetLastKnownArea();
+                    if ( pMyArea )
+                    {
+                        int startDir = pOuter->entindex() % NUM_DIRECTIONS;
+                        for ( int i = 0; i < NUM_DIRECTIONS; i++ )
+                        {
+                            NavDirType dir = (NavDirType)( (startDir + i) % NUM_DIRECTIONS );
+                            CNavArea* pArea = pMyArea->GetRandomAdjacentArea( dir );
+                            if ( pArea && pArea != m_pLastLookArea )
+                            {
+                                m_pLastLookArea = pArea;
+                                Vector vecEyeOfs = pOuter->EyePosition() - pOuter->GetAbsOrigin();
+                                m_vecLookAt = pArea->GetRandomPoint() + vecEyeOfs;
+                                break;
+                            }
                         }
                     }
                 }

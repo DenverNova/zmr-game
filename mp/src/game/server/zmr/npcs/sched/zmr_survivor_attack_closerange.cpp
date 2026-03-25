@@ -98,7 +98,7 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
     if ( IsMeleeing() )
     {
         float flEnemyDistSqr = pEnemy->GetAbsOrigin().DistToSqr( pOuter->GetPosition() );
-        if ( flEnemyDistSqr > ( 200.0f * 200.0f ) )
+        if ( flEnemyDistSqr > ( 120.0f * 120.0f ) )
         {
             static_cast<NPCR::CPlayerMotor*>( pOuter->GetMotor() )->SetSuppressYawSnap( false );
             End( "Enemy too far for melee!" );
@@ -174,19 +174,19 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
 
     if ( IsMeleeing() && pOuter->GetMotor()->IsFacing( vecAimTarget, grace ) )
     {
-        // Melee wind-up prediction: start the swing early so the hit lands when in range.
-        // Heavier weapons (sledge ~1.0s fire rate) need to start much earlier than
-        // light weapons (improvised ~0.5s). Use fire rate as a proxy for wind-up time.
+        // Melee attack: only swing when close enough for the hit to actually land.
+        // Use weapon range plus a small wind-up buffer based on fire rate.
+        // Heavier weapons get a slightly larger buffer but it's kept tight to prevent
+        // swinging from too far away.
         CZMBaseWeapon* pWep = pOuter->GetActiveWeapon();
         float flFireRate = pWep ? pWep->GetFireRate() : 0.5f;
-
-        // Estimated approach speed (~250 units/sec for walking bots)
-        float flApproachSpeed = 250.0f;
-        float flWindUpDist = flFireRate * flApproachSpeed * 0.6f;
         float flMeleeRange = pOuter->GetMaxAttackDistance();
-        float flSwingStartDist = flMeleeRange + flWindUpDist;
 
-        if ( flEnemyDist < flSwingStartDist && flEnemyDist > flMeleeRange * 0.4f )
+        // Wind-up buffer: light weapons (~0.5s) get ~10u extra, heavy (~1.0s) get ~20u
+        float flWindUpBuffer = flFireRate * 20.0f;
+        float flSwingDist = flMeleeRange + flWindUpBuffer;
+
+        if ( flEnemyDist <= flSwingDist )
         {
             pOuter->PressFire1( 0.15f );
         }

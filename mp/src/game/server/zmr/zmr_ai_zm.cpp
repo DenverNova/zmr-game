@@ -28,10 +28,10 @@ extern ConVar zm_sv_zombie_max_immolator;
 ConVar zm_sv_ai_zm_debug( "zm_sv_ai_zm_debug", "1", FCVAR_CHEAT, "Enable AI ZM debug logging. 0=off, 1=on." );
 ConVar zm_sv_ai_zm_difficulty( "zm_sv_ai_zm_difficulty", "1.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI ZM difficulty multiplier. Scales AI resource income. 0.1-5.0" );
 ConVar zm_sv_ai_zm_view_mode( "zm_sv_ai_zm_view_mode", "0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "AI ZM spawner access. 0=Global, 1=Within View only." );
-ConVar zm_sv_ai_zm_trap_range( "zm_sv_ai_zm_trap_range", "1024", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Survivor proximity required to trigger a trap or barrel." );
+ConVar zm_sv_ai_zm_trap_range( "zm_sv_ai_zm_trap_range", "512", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Survivor proximity required to trigger a trap or barrel." );
 ConVar zm_sv_ai_zm_trap_cooldown( "zm_sv_ai_zm_trap_cooldown", "30.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Per-entity cooldown in seconds before AI can re-use the same trap or barrel." );
 ConVar zm_sv_ai_zm_rush_prevention( "zm_sv_ai_zm_rush_prevention", "15.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Seconds at round start before AI ZM can act. Does not affect human ZMs." );
-ConVar zm_sv_ai_zm_rally_interval( "zm_sv_ai_zm_rally_interval", "6.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Seconds between idle zombie rally commands." );
+ConVar zm_sv_ai_zm_rally_interval( "zm_sv_ai_zm_rally_interval", "3.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Seconds between idle zombie rally commands." );
 ConVar zm_sv_ai_zm_rally_buffer( "zm_sv_ai_zm_rally_buffer", "256.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Distance buffer for splitting rally targets between survivors." );
 ConVar zm_sv_ai_zm_cull_time( "zm_sv_ai_zm_cull_time", "45.0", FCVAR_NOTIFY | FCVAR_ARCHIVE, "Seconds a zombie must be stranded before being culled. 0=disabled." );
 
@@ -44,9 +44,11 @@ static const int g_ZombieWeights[ZMCLASS_MAX] = { 60, 10, 10, 10, 10 };
 #define SPAWNER_SPREAD_THRESHOLD 512.0f
 
 // Camera smoothing: exponential lerp factor per second (lower = smoother/slower)
-#define CAMERA_SMOOTH_FACTOR  3.0f
-#define CAMERA_HEIGHT         200.0f
-#define CAMERA_BACK_DIST      300.0f
+#define CAMERA_SMOOTH_FACTOR  0.5f   // Very gentle — covers ~39% of gap per second
+#define CAMERA_DESIRED_FACTOR 0.8f   // How fast the intermediate desired position tracks the raw goal
+#define CAMERA_HEIGHT_MIN     200.0f
+#define CAMERA_HEIGHT_MAX     450.0f
+#define CAMERA_BACK_DIST      350.0f
 
 // Culling constants
 #define CULL_CHECK_INTERVAL     10.0f
@@ -80,6 +82,7 @@ void CZMAIZombieMaster::Reset()
     m_flHiddenSpawnDeadline = 0.0f;
 
     m_vecCameraPos.Init();
+    m_vecCameraDesired.Init();
     m_angCameraAng.Init();
     m_iFocusedTargetIndex = 0;
     m_flFocusedTargetExpiry = 0.0f;
@@ -360,27 +363,15 @@ ZombieClass_t CZMAIZombieMaster::PickWeightedClass( CZMEntZombieSpawn* pSpawner,
         }
     }
 
-    // Redistribute weight from invalid classes equally among valid ones
-    int redistributed = 0;
-    for ( int i = 0; i < ZMCLASS_MAX; i++ )
-    {
-        if ( !valid[i] )
-            redistributed += g_ZombieWeights[i];
-    }
-
-    int bonusEach = redistributed / validCount;
-    int remainder = redistributed % validCount;
-
+    // Use each valid class's base weight directly — no redistribution.
+    // This preserves the intended ratio between shamblers and specials.
+    // e.g. if only shambler (60) and drifter (10) are valid, drifter gets
+    // 10/70 = 14% instead of the old inflated 25/100 = 25%.
     for ( int i = 0; i < ZMCLASS_MAX; i++ )
     {
         if ( valid[i] )
         {
-            weights[i] = g_ZombieWeights[i] + bonusEach;
-            if ( remainder > 0 )
-            {
-                weights[i]++;
-                remainder--;
-            }
+            weights[i] = g_ZombieWeights[i];
             totalWeight += weights[i];
         }
     }
@@ -400,6 +391,10 @@ ZombieClass_t CZMAIZombieMaster::PickWeightedClass( CZMEntZombieSpawn* pSpawner,
     }
 
     int roll = random->RandomInt( 1, totalWeight );
+
+    if ( zm_sv_ai_zm_debug.GetBool() )
+        Msg( "[AI ZM] PickWeightedClass: rolled %i/%i\n", roll, totalWeight );
+
     int cumulative = 0;
     for ( int i = 0; i < ZMCLASS_MAX; i++ )
     {
@@ -558,6 +553,8 @@ void CZMAIZombieMaster::GatherNearestSpawnersToTarget( CBasePlayer* pTarget, CUt
 // Camera system: smoothly glide around the map watching the focused survivor.
 // Uses exponential smoothing for natural deceleration like a real player panning.
 // The focused target is picked by round-robin (5-20s per survivor).
+// Never teleports — always interpolates, even on the first frame.
+// Adjusts height dynamically to avoid obstacles blocking the view.
 //
 void CZMAIZombieMaster::UpdateCamera( CZMPlayer* pZM )
 {
@@ -608,50 +605,72 @@ void CZMAIZombieMaster::UpdateCamera( CZMPlayer* pZM )
         return;
     }
 
-    // Calculate desired camera position: behind and above the target
-    Vector fwd;
-    AngleVectors( pTarget->EyeAngles(), &fwd );
-    fwd.z = 0.0f;
-    if ( fwd.Length() > 0.01f )
-        fwd.NormalizeInPlace();
-    else
-        fwd = Vector( 1, 0, 0 );
+    // Calculate raw desired camera position: directly above and offset from target.
+    // Uses a fixed offset direction (not player facing) to prevent constant whipping
+    // when the target looks around.
+    Vector targetPos = pTarget->GetAbsOrigin();
+    Vector targetEye = pTarget->EyePosition();
 
-    Vector vecDesired = pTarget->GetAbsOrigin() - fwd * CAMERA_BACK_DIST + Vector( 0, 0, CAMERA_HEIGHT );
+    // Fixed offset: position camera to the south of the target (negative Y)
+    // This avoids the jerkiness caused by tracking player eye angles.
+    Vector vecOffset = Vector( 0, -1, 0 ) * CAMERA_BACK_DIST;
+    Vector vecRawDesired = targetPos + vecOffset + Vector( 0, 0, CAMERA_HEIGHT_MIN );
 
-    // Calculate desired look angle: look at the target
-    Vector vecToTarget = pTarget->EyePosition() - vecDesired;
+    // Obstacle avoidance: raise camera height until we have a clear view of the target
+    trace_t tr;
+    for ( float h = CAMERA_HEIGHT_MIN; h <= CAMERA_HEIGHT_MAX; h += 50.0f )
+    {
+        Vector testPos = targetPos + vecOffset + Vector( 0, 0, h );
+        UTIL_TraceLine( testPos, targetEye, MASK_VISIBLE, pZM, COLLISION_GROUP_NONE, &tr );
+        if ( tr.fraction >= 0.95f )
+        {
+            vecRawDesired = testPos;
+            break;
+        }
+        vecRawDesired = testPos;
+    }
+
+    // First frame: snap everything to avoid starting from origin
+    if ( m_vecCameraPos.IsZero() )
+    {
+        m_vecCameraPos = vecRawDesired;
+        m_vecCameraDesired = vecRawDesired;
+
+        Vector vecToTarget = targetEye - vecRawDesired;
+        QAngle angInit;
+        VectorAngles( vecToTarget, angInit );
+        m_angCameraAng = angInit;
+
+        pZM->Teleport( &m_vecCameraPos, &m_angCameraAng, nullptr );
+        pZM->SnapEyeAngles( m_angCameraAng );
+        return;
+    }
+
+    float dt = gpGlobals->frametime;
+    if ( dt <= 0.0f )
+        dt = 0.016f;
+
+    // Double-smoothing: first smooth the desired position toward the raw goal,
+    // then smooth the actual camera toward the smoothed desired.
+    // This eliminates jitter from rapid target movement.
+    float tDesired = 1.0f - expf( -CAMERA_DESIRED_FACTOR * dt );
+    m_vecCameraDesired += ( vecRawDesired - m_vecCameraDesired ) * tDesired;
+
+    float tCamera = 1.0f - expf( -CAMERA_SMOOTH_FACTOR * dt );
+    m_vecCameraPos += ( m_vecCameraDesired - m_vecCameraPos ) * tCamera;
+
+    // Look angle: smoothly track the target
+    Vector vecToTarget = targetEye - m_vecCameraPos;
     QAngle angDesired;
     VectorAngles( vecToTarget, angDesired );
 
-    // If camera hasn't been initialized yet, teleport immediately
-    if ( m_vecCameraPos.IsZero() )
+    for ( int i = 0; i < 3; i++ )
     {
-        m_vecCameraPos = vecDesired;
-        m_angCameraAng = angDesired;
-    }
-    else
-    {
-        // Exponential smoothing: camera glides toward the target with natural deceleration.
-        // Factor of ~3.0 means it covers ~95% of the gap in about 1 second.
-        float dt = gpGlobals->frametime;
-        if ( dt <= 0.0f )
-            dt = 0.016f;
-
-        float t = 1.0f - expf( -CAMERA_SMOOTH_FACTOR * dt );
-
-        // Lerp position
-        m_vecCameraPos += ( vecDesired - m_vecCameraPos ) * t;
-
-        // Lerp angles (handle wrapping)
-        for ( int i = 0; i < 3; i++ )
-        {
-            float diff = AngleNormalize( angDesired[i] - m_angCameraAng[i] );
-            m_angCameraAng[i] += diff * t;
-        }
+        float diff = AngleNormalize( angDesired[i] - m_angCameraAng[i] );
+        m_angCameraAng[i] += diff * tCamera;
     }
 
-    // Apply to the ZM bot — use Teleport for reliable position updates
+    // Apply to the ZM bot
     pZM->Teleport( &m_vecCameraPos, &m_angCameraAng, nullptr );
     pZM->SnapEyeAngles( m_angCameraAng );
 }
@@ -807,10 +826,12 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
         ZombieClass_t zclass = PickWeightedClass( m_hSpawnBurstSpawner.Get(), pZM, holdBack );
         if ( zclass == ZMCLASS_INVALID )
         {
+            // Can't afford anything right now — wait for resources to trickle in
             if ( zm_sv_ai_zm_debug.GetBool() )
-                Msg( "[AI ZM] Spawn burst: can't afford any class (res=%i, holdBack=%i), ending burst\n",
-                    pZM->GetResources(), holdBack );
-            m_iSpawnBurstRemaining = 0;
+                Msg( "[AI ZM] Spawn burst: waiting for resources (res=%i, holdBack=%i, %i remaining)\n",
+                    pZM->GetResources(), holdBack, m_iSpawnBurstRemaining );
+            m_flNextActionTime = gpGlobals->curtime + 0.5f;
+            return;
         }
         else
         {
@@ -860,13 +881,11 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
     ZombieClass_t zclass = PickWeightedClass( pSpawner, pZM, holdBack );
     if ( zclass == ZMCLASS_INVALID )
     {
+        // Can't afford anything right now — wait for resources to come in
         if ( zm_sv_ai_zm_debug.GetBool() )
-            Msg( "[AI ZM] Spawn: can't afford any class (res=%i, holdBack=%i), moving to HIDDEN_SPAWN\n",
+            Msg( "[AI ZM] Spawn: waiting for resources (res=%i, holdBack=%i)\n",
                 pZM->GetResources(), holdBack );
-        m_Phase = AIZM_PHASE_HIDDEN_SPAWN;
-        m_iHiddenSpawnsRemaining = random->RandomInt( 1, 3 );
-        m_flHiddenSpawnDeadline = gpGlobals->curtime + 15.0f;
-        m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 0.5f, 1.5f );
+        m_flNextActionTime = gpGlobals->curtime + 1.0f;
         return;
     }
 
@@ -981,20 +1000,12 @@ void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
             return;
         }
 
-        // Redistribute weight from invalid classes equally among valid ones
-        int redistributed = 0;
-        for ( int i = 0; i < ZMCLASS_MAX; i++ )
-            if ( !valid[i] ) redistributed += g_ZombieWeights[i];
-
-        int bonusEach = redistributed / validCount;
-        int remainder = redistributed % validCount;
-
+        // Use each valid class's base weight directly — no redistribution.
         for ( int i = 0; i < ZMCLASS_MAX; i++ )
         {
             if ( valid[i] )
             {
-                weights[i] = g_ZombieWeights[i] + bonusEach;
-                if ( remainder > 0 ) { weights[i]++; remainder--; }
+                weights[i] = g_ZombieWeights[i];
                 totalWeight += weights[i];
             }
         }

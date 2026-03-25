@@ -115,6 +115,7 @@ private:
     CountdownTimer m_NextAlertVoice;       // Cooldown for zombie sight alert (60s)
     CountdownTimer m_NextTauntVoice;       // Cooldown for kill taunt (30s)
     CountdownTimer m_NextHelpVoice;        // Cooldown for low-health help call
+    bool m_bWasHurt;                       // Was below 30% health on last check (for transition detection)
 
     // Ammo crate smashing
     CountdownTimer m_NextCrateCheck;       // Timer for scanning nearby ammo crates

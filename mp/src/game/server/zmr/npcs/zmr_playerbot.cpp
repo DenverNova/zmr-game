@@ -8,6 +8,8 @@
 #include "npcr/npcr_motor.h"
 #include "npcr/npcr_schedule.h"
 #include "npcr/npcr_senses.h"
+#include "nav_mesh.h"
+#include "nav_ladder.h"
 
 #include "zmr_playerbot.h"
 #include "zmr_playermodels.h"
@@ -48,12 +50,14 @@ public:
         }
     }
 
-    // Proximity sense: zombies within 300 units are always detected
+    // Proximity sense: zombies within 500 units are always detected
     // regardless of FOV - only require line of sight.
+    // This ensures ranged zombies (acid/poison) that attack from a distance
+    // are detected even if the bot isn't looking directly at them.
     virtual bool CanSeeCharacter( CBaseEntity* pEnt ) const OVERRIDE
     {
         float flDistSqr = pEnt->GetAbsOrigin().DistToSqr( GetOuter()->GetAbsOrigin() );
-        if ( flDistSqr < (300.0f * 300.0f) )
+        if ( flDistSqr < (500.0f * 500.0f) )
         {
             return HasLOS( pEnt->WorldSpaceCenter() );
         }
@@ -79,6 +83,10 @@ CZMPlayerBot::CZMPlayerBot()
 {
     m_hFollowTarget.Set( nullptr );
     m_flNextObstacleCheck = 0.0f;
+    m_flNextLadderCheck = 0.0f;
+    m_flNextCliffCheck = 0.0f;
+    m_hLastAttacker.Set( nullptr );
+    m_flLastAttackerTime = 0.0f;
     m_bStayPut = false;
     m_iBehaviorOverride = -1;
     m_iMixedBehavior = -1;
@@ -643,6 +651,116 @@ void CZMPlayerBot::CheckObstacleJump()
 
     // Obstacle at knee but clear at head = jumpable
     PressJump( 0.15f );
+}
+
+void CZMPlayerBot::CheckLadderClimb()
+{
+    if ( !IsAlive() )
+        return;
+
+    if ( gpGlobals->curtime < m_flNextLadderCheck )
+        return;
+
+    m_flNextLadderCheck = gpGlobals->curtime + 0.2f;
+
+    // If already on a ladder, press forward to climb up (or back to go down)
+    if ( GetMoveType() == MOVETYPE_LADDER )
+    {
+        // Look up slightly and press forward to climb
+        QAngle ang = EyeAngles();
+        if ( ang.x > -60.0f )
+            ang.x = -45.0f; // Look up to climb
+        SetEyeAngles( ang );
+        return;
+    }
+
+    // Not on a ladder — check for nearby nav ladders we should use
+    CNavArea* pMyArea = GetLastKnownArea();
+    if ( !pMyArea )
+        return;
+
+    // Check all nav ladders connected to our current area
+    for ( int dir = 0; dir < CNavLadder::NUM_LADDER_DIRECTIONS; dir++ )
+    {
+        const NavLadderConnectVector* pLadders = pMyArea->GetLadders( (CNavLadder::LadderDirectionType)dir );
+        if ( !pLadders )
+            continue;
+
+        for ( int i = 0; i < pLadders->Count(); i++ )
+        {
+            CNavLadder* pLadder = (*pLadders)[i].ladder;
+            if ( !pLadder )
+                continue;
+
+            // Only use ladders that are reasonably close
+            Vector ladderBottom = pLadder->m_bottom;
+            float flDist = GetAbsOrigin().DistTo( ladderBottom );
+            if ( flDist > 128.0f )
+                continue;
+
+            // Walk toward the ladder bottom and press USE to attach
+            Vector toLadder = ladderBottom - GetAbsOrigin();
+            toLadder.z = 0.0f;
+            if ( toLadder.Length() > 16.0f )
+            {
+                GetMotor()->FaceTowards( ladderBottom );
+                GetMotor()->Approach( ladderBottom );
+            }
+
+            // Press USE to attach to the ladder entity
+            CBaseEntity* pLadderEnt = pLadder->GetLadderEntity();
+            if ( pLadderEnt )
+            {
+                GetMotor()->FaceTowards( pLadderEnt->WorldSpaceCenter() );
+                PressUse( 0.3f );
+            }
+            return;
+        }
+    }
+}
+
+void CZMPlayerBot::CheckCliffAhead()
+{
+    if ( !IsAlive() || !(GetFlags() & FL_ONGROUND) )
+        return;
+
+    if ( gpGlobals->curtime < m_flNextCliffCheck )
+        return;
+
+    m_flNextCliffCheck = gpGlobals->curtime + 0.3f;
+
+    // Only check while moving
+    if ( !GetMotor()->IsMoving() )
+        return;
+
+    // Trace forward at ground level to find where the floor is ahead of us
+    Vector fwd;
+    AngleVectors( EyeAngles(), &fwd );
+    fwd.z = 0.0f;
+    fwd.NormalizeInPlace();
+
+    Vector origin = GetAbsOrigin();
+    Vector aheadPos = origin + fwd * 64.0f;
+
+    // Trace down from the ahead position to see if there's ground
+    trace_t tr;
+    UTIL_TraceLine( aheadPos + Vector( 0, 0, 16.0f ), aheadPos - Vector( 0, 0, 200.0f ),
+        MASK_PLAYERSOLID, this, COLLISION_GROUP_NONE, &tr );
+
+    if ( tr.fraction >= 1.0f )
+    {
+        // No ground within 200 units below — dangerous drop ahead, stop and jump back
+        PressJump( 0.15f );
+        return;
+    }
+
+    // Check drop height — anything over ~192 units (about 3x player height) would hurt
+    float flDropHeight = (aheadPos.z + 16.0f) - tr.endpos.z;
+    if ( flDropHeight > 192.0f )
+    {
+        // Dangerous drop — press jump to try to stop momentum
+        PressJump( 0.15f );
+    }
 }
 
 CON_COMMAND( bot, "" )

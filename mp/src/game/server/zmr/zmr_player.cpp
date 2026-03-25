@@ -1683,6 +1683,13 @@ int CZMPlayer::OnTakeDamage( const CTakeDamageInfo& inputInfo )
 
     //gamestats->Event_PlayerDamage( this, inputInfo );
 
+    // Notify bot AI about the attacker for combat prioritization
+    CZMPlayerBot* pBot = dynamic_cast<CZMPlayerBot*>( this );
+    if ( pBot && inputInfo.GetAttacker() && inputInfo.GetAttacker()->IsNPC() )
+    {
+        pBot->SetLastAttacker( inputInfo.GetAttacker() );
+    }
+
     return BaseClass::OnTakeDamage( inputInfo );
 }
 

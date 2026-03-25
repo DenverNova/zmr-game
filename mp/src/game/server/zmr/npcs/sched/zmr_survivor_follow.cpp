@@ -38,6 +38,7 @@ CSurvivorFollowSchedule::CSurvivorFollowSchedule()
     m_vecLastExplorePos = vec3_origin;
     m_nExploreStuckCount = 0;
     m_hTargetCrate.Set( nullptr );
+    m_bWasHurt = false;
     m_nPosHistoryIndex = 0;
     m_nOscillationCount = 0;
     for ( int i = 0; i < OSCILLATION_HISTORY; i++ )
@@ -141,15 +142,20 @@ void CSurvivorFollowSchedule::OnUpdate()
         return;
     }
 
-    // Voice line: 70% chance to yell for help when health falls below 30%
-    if ( pOuter->GetHealth() < pOuter->GetMaxHealth() * 0.3f )
+    // Voice line: 70% chance to yell for help when health FIRST drops below 30%
+    // Only triggers on the transition from healthy to hurt, not repeatedly while staying low.
     {
-        if ( !m_NextHelpVoice.HasStarted() || m_NextHelpVoice.IsElapsed() )
+        bool bHurt = pOuter->GetHealth() < pOuter->GetMaxHealth() * 0.3f;
+        if ( bHurt && !m_bWasHurt )
         {
-            m_NextHelpVoice.Start( 15.0f );
-            if ( random->RandomFloat( 0.0f, 1.0f ) < 0.7f )
-                ZMGetVoiceLines()->OnVoiceLine( pOuter, 2 ); // Help
+            if ( !m_NextHelpVoice.HasStarted() || m_NextHelpVoice.IsElapsed() )
+            {
+                m_NextHelpVoice.Start( 30.0f );
+                if ( random->RandomFloat( 0.0f, 1.0f ) < 0.7f )
+                    ZMGetVoiceLines()->OnVoiceLine( pOuter, 2 ); // Help
+            }
         }
+        m_bWasHurt = bHurt;
     }
 
     // Voice line: 25% chance to alert on first zombie sight (60s cooldown)

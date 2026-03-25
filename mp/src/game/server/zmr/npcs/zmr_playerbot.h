@@ -105,10 +105,21 @@ public:
     const Vector&   GetCommandedDropPos() const { return m_vecCommandedDropPos; }
 
     void            CheckObstacleJump();
+    void            CheckLadderClimb();
+    void            CheckCliffAhead();
+
+    // Last attacker tracking for combat prioritization
+    void            SetLastAttacker( CBaseEntity* pAttacker ) { m_hLastAttacker.Set( pAttacker ); m_flLastAttackerTime = gpGlobals->curtime; }
+    CBaseEntity*    GetLastAttacker() const { return m_hLastAttacker.Get(); }
+    float           GetLastAttackerTime() const { return m_flLastAttackerTime; }
 
 private:
     CHandle<CBasePlayer> m_hFollowTarget;
     float           m_flNextObstacleCheck;
+    float           m_flNextLadderCheck;
+    float           m_flNextCliffCheck;
+    EHANDLE         m_hLastAttacker;
+    float           m_flLastAttackerTime;
     bool            m_bStayPut;
     int             m_iBehaviorOverride; // -1 = no override, set by voice commands
     int             m_iMixedBehavior;    // -1 = unassigned, 0=follow, 1=explore, 2=defend (for mixed mode round-robin)

@@ -125,6 +125,7 @@ private:
 
     // Camera state
     Vector m_vecCameraPos;
+    Vector m_vecCameraDesired;  // Smoothed desired position (intermediate target)
     QAngle m_angCameraAng;
 
     // Focused target: round-robin through survivors, 5-20s each
