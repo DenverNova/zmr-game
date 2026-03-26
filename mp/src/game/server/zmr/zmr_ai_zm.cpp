@@ -44,8 +44,8 @@ static const int g_ZombieWeights[ZMCLASS_MAX] = { 60, 10, 10, 10, 10 };
 #define SPAWNER_SPREAD_THRESHOLD 512.0f
 
 // Camera smoothing: exponential lerp factor per second (lower = smoother/slower)
-#define CAMERA_SMOOTH_FACTOR  0.5f   // Very gentle — covers ~39% of gap per second
-#define CAMERA_DESIRED_FACTOR 0.8f   // How fast the intermediate desired position tracks the raw goal
+#define CAMERA_SMOOTH_FACTOR  6.0f   // Exponential lerp rate per second for camera position
+#define CAMERA_DESIRED_FACTOR 10.0f  // How fast the intermediate desired position tracks the raw goal
 #define CAMERA_HEIGHT_MIN     200.0f
 #define CAMERA_HEIGHT_MAX     450.0f
 #define CAMERA_BACK_DIST      350.0f
@@ -672,6 +672,8 @@ void CZMAIZombieMaster::UpdateCamera( CZMPlayer* pZM )
     float dt = gpGlobals->frametime;
     if ( dt <= 0.0f )
         dt = 0.016f;
+    if ( dt > 0.05f )
+        dt = 0.05f; // Clamp to prevent frame-hitch jumps
 
     // Double-smoothing: first smooth the desired position toward the raw goal,
     // then smooth the actual camera toward the smoothed desired.

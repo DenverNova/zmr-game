@@ -57,24 +57,50 @@ void CSurvivorAttackLongRangeSchedule::OnUpdate()
     }
 
 
-    if ( pEnemy->GetAbsOrigin().DistTo( pOuter->GetPosition() ) < 128.0f )
+    float flDist = pEnemy->GetAbsOrigin().DistTo( pOuter->GetPosition() );
+
+    if ( flDist < 128.0f )
     {
         m_pAttackCloseRangeSched->SetAttackTarget( pEnemy );
         Intercept( m_pAttackCloseRangeSched, "Enemy too close!" );
         return;
     }
 
+    // Move toward optimal range if we're too far and not already pathing
+    float flOptimal = pOuter->GetOptimalAttackDistance();
+    if ( flDist > flOptimal * 1.2f && !m_Path.IsValid() )
+    {
+        const Vector vecEnemyPos = pEnemy->GetAbsOrigin();
+        const Vector vecMyPos = pOuter->GetPosition();
+        Vector dir = (vecMyPos - vecEnemyPos).Normalized();
+        Vector vecTarget = vecEnemyPos + dir * flOptimal;
 
-    Vector vecAimTarget;
+        CNavArea* pStart = pOuter->GetLastKnownArea();
+        CNavArea* pGoal = TheNavMesh->GetNearestNavArea( vecTarget, true, 128.0f, false );
+        if ( pGoal )
+            pGoal->GetClosestPointOnArea( vecTarget, &vecTarget );
 
+        m_PathCost.SetStartPos( vecMyPos, pStart );
+        m_PathCost.SetGoalPos( vecTarget, pGoal );
+        m_Path.Compute( vecMyPos, vecTarget, pStart, pGoal, m_PathCost );
+    }
 
-    vecAimTarget = pEnemy->WorldSpaceCenter();
+    if ( m_Path.IsValid() )
+        m_Path.Update( pOuter );
+
+    Vector vecAimTarget = pEnemy->WorldSpaceCenter();
 
     pOuter->GetMotor()->FaceTowards( vecAimTarget );
 
-    if ( pOuter->GetMotor()->IsFacing( vecAimTarget, 1.0f ) && pOuter->GetSenses()->CanSee( vecAimTarget ) )
+    if ( pOuter->GetMotor()->IsFacing( vecAimTarget, 5.0f ) )
     {
-        pOuter->PressFire1( 0.1f );
+        if ( pOuter->GetSenses()->HasLOS( vecAimTarget ) )
+        {
+            if ( !pOuter->MustStopToShoot() || pOuter->GetLocalVelocity().IsLengthLessThan( 10.0f ) )
+            {
+                pOuter->PressFire1( 0.1f );
+            }
+        }
     }
 }
 

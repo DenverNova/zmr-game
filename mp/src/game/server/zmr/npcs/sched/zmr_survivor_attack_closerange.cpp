@@ -93,16 +93,23 @@ void CSurvivorAttackCloseRangeSchedule::OnUpdate()
         return;
     }
 
-    // Melee range bail-out: if we only have melee/fists and the enemy is far away,
-    // end the schedule so the combat scheduler can re-evaluate (flee or close distance)
+    // Melee: if enemy is beyond 512u, bail out so the combat scheduler can re-evaluate.
+    // If within 512u but beyond swing range, actively approach the enemy.
     if ( IsMeleeing() )
     {
-        float flEnemyDistSqr = pEnemy->GetAbsOrigin().DistToSqr( pOuter->GetPosition() );
-        if ( flEnemyDistSqr > ( 120.0f * 120.0f ) )
+        float flEnemyDist = pEnemy->GetAbsOrigin().DistTo( pOuter->GetPosition() );
+        if ( flEnemyDist > 512.0f )
         {
             static_cast<NPCR::CPlayerMotor*>( pOuter->GetMotor() )->SetSuppressYawSnap( false );
             End( "Enemy too far for melee!" );
             return;
+        }
+
+        // Beyond swing range but within engagement range — run toward the enemy
+        float flSwingRange = pOuter->GetMaxAttackDistance() + 20.0f;
+        if ( flEnemyDist > flSwingRange && !m_bMovingToRange )
+        {
+            MoveToShootingRange( pEnemy );
         }
     }
 
@@ -279,7 +286,8 @@ void CSurvivorAttackCloseRangeSchedule::MoveToShootingRange( CBaseEntity* pEnemy
 
     Vector dir = (vecMyPos - vecEnemyPos).Normalized();
 
-    float flDist = pOuter->GetOptimalAttackDistance();
+    // Melee: path close to the enemy (within swing range). Ranged: optimal shooting distance.
+    float flDist = IsMeleeing() ? pOuter->GetMaxAttackDistance() : pOuter->GetOptimalAttackDistance();
 
     Vector vecTarget = vecEnemyPos + dir * flDist;
 
