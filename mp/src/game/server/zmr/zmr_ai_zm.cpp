@@ -68,6 +68,7 @@ void CZMAIZombieMaster::Reset()
     m_flNextActionTime = 0.0f;
     m_iReservedResources = 0;
     m_bTrapsUnlocked = false;
+    m_bTrapFiredDuringCycle = false;
     m_EntityCooldowns.RemoveAll();
     m_flRoundStartTime = gpGlobals ? gpGlobals->curtime : 0.0f;
     m_flNextRallyTime = 0.0f;
@@ -321,16 +322,9 @@ bool CZMAIZombieMaster::CanAffordClass( ZombieClass_t zclass, CZMPlayer* pZM, in
     if ( cost < 0 || !CZMBaseZombie::HasEnoughPopToSpawn( zclass ) )
         return false;
 
-    int resources = pZM->GetResources();
-
-    // If we have excess above the reserve, spend from the excess
-    if ( resources - reservedResources >= cost )
-        return true;
-
-    // Even if below reserve, allow spawning if we can cover the raw cost.
-    // This prevents the AI from getting completely stuck when reserve is high.
-    // The phase system handles long-term resource management.
-    return resources >= cost;
+    // Need enough to cover the zombie cost PLUS maintain the reserve.
+    // If reservedResources is 0 (no traps, or first cycle), just need cost.
+    return pZM->GetResources() >= ( reservedResources + cost );
 }
 
 //
@@ -790,17 +784,19 @@ void CZMAIZombieMaster::CullStrandedZombies( CZMPlayer* pZM )
 
 //
 // Cycle phase: RESERVE
-// Save resources until we can cover the most expensive trap on the map.
-// Once met, permanently unlock traps and move to SPAWN.
-// If no traps exist or reserve is already met, skip straight to SPAWN.
+// Only entered when a trap was fired during SPAWN or HIDDEN_SPAWN and the
+// reserve needs replenishing. Save resources without spawning anything until
+// resources >= highest trap cost. Then -> SPAWN. No traps fire during this
+// phase (the AI is rebuilding its reserve).
 //
 void CZMAIZombieMaster::DoReservePhase( CZMPlayer* pZM )
 {
-    // If there are no traps, skip straight to spawning
+    // If there are no traps on the map, skip to spawning
     if ( m_iReservedResources <= 0 )
     {
         if ( zm_sv_ai_zm_debug.GetBool() )
             Msg( "[AI ZM] Reserve: no traps on map, moving to SPAWN\n" );
+        m_bTrapFiredDuringCycle = false;
         m_Phase = AIZM_PHASE_SPAWN;
         return;
     }
@@ -808,14 +804,15 @@ void CZMAIZombieMaster::DoReservePhase( CZMPlayer* pZM )
     if ( pZM->GetResources() >= m_iReservedResources )
     {
         m_bTrapsUnlocked = true;
+        m_bTrapFiredDuringCycle = false;
         if ( zm_sv_ai_zm_debug.GetBool() )
-            Msg( "[AI ZM] Reserve met (res=%i >= reserved=%i), traps UNLOCKED, moving to SPAWN\n",
+            Msg( "[AI ZM] Reserve replenished (res=%i >= reserved=%i), moving to SPAWN\n",
                 pZM->GetResources(), m_iReservedResources );
         m_Phase = AIZM_PHASE_SPAWN;
         return;
     }
 
-    // Still accumulating — do nothing
+    // Still accumulating — do nothing, no spawning allowed
 }
 
 //
@@ -823,18 +820,23 @@ void CZMAIZombieMaster::DoReservePhase( CZMPlayer* pZM )
 // Internal queue of 1-15 zombies. For each zombie in the burst:
 //   1. Find the best spawner near the focused survivor (dynamic — rechecked every tick).
 //   2. If the spawner changed, re-roll the class using weighted selection for that spawner.
-//   3. If we can afford the current class, spawn it and roll the next one.
+//   3. If we can afford reserve + cost, spawn it and roll the next one.
 //   4. If we can't afford it, wait for resources to accumulate.
-// Before traps are unlocked: spends ALL resources freely.
-// After traps are unlocked: holds back the reserve amount.
+// If a trap fires mid-spawn and drops resources below reserve, the AI continues
+// spawning with just the raw cost (no waiting to re-reserve). The RESERVE phase
+// handles replenishment after the cycle completes.
 //
 void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
 {
     if ( gpGlobals->curtime < m_flNextActionTime )
         return;
 
-    // Determine how much to hold back: 0 if traps not yet unlocked, else reserve
-    int holdBack = m_bTrapsUnlocked ? m_iReservedResources : 0;
+    // Hold back the reserve amount if traps are unlocked AND we still have it.
+    // If a trap fired mid-spawn and we're below reserve, holdBack drops to 0
+    // so remaining resources go directly to finishing the spawn plan.
+    int holdBack = 0;
+    if ( m_bTrapsUnlocked && pZM->GetResources() >= m_iReservedResources )
+        holdBack = m_iReservedResources;
 
     // === Find spawners near the focused target ===
     CUtlVector<CZMEntZombieSpawn*> nearSpawners;
@@ -961,29 +963,46 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
 
 //
 // Cycle phase: HIDDEN SPAWN
-// Place 1-3 surprise zombies near survivors. Spends freely (ignores reserve).
-// Keeps retrying different positions for up to 15 seconds before giving up.
-// Each successful spawn picks a fresh weighted class for mix-and-match.
-// Once all placed (or timeout), cycles to RESERVE.
+// Place 1-3 surprise zombies near survivors. Uses the same save-up logic as
+// SPAWN (reserve + cost when reserve is intact, raw cost when below reserve).
+// Each spawn is placed immediately when affordable. Retries positions for up
+// to 15 seconds before giving up. After completion:
+//   - If a trap was fired during SPAWN or HIDDEN_SPAWN -> RESERVE (replenish)
+//   - Otherwise -> SPAWN (continue cycle)
 //
 void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
 {
     if ( gpGlobals->curtime < m_flNextActionTime )
         return;
 
-    // Timeout: give up and move on
+    // Timeout or done: move to next phase
     if ( gpGlobals->curtime > m_flHiddenSpawnDeadline || m_iHiddenSpawnsRemaining <= 0 )
     {
         if ( zm_sv_ai_zm_debug.GetBool() )
         {
             if ( m_iHiddenSpawnsRemaining <= 0 )
-                Msg( "[AI ZM] Hidden spawn: all spawns placed, moving to RESERVE\n" );
+                Msg( "[AI ZM] Hidden spawn: all spawns placed\n" );
             else
-                Msg( "[AI ZM] Hidden spawn: 15s timeout, %i remaining unplaced, moving to RESERVE\n",
+                Msg( "[AI ZM] Hidden spawn: 15s timeout, %i remaining unplaced\n",
                     m_iHiddenSpawnsRemaining );
         }
         m_iHiddenSpawnsRemaining = 0;
-        m_Phase = AIZM_PHASE_RESERVE;
+
+        // Go to RESERVE only if a trap was fired and reserve needs replenishing
+        if ( m_bTrapFiredDuringCycle && m_iReservedResources > 0 &&
+             pZM->GetResources() < m_iReservedResources )
+        {
+            if ( zm_sv_ai_zm_debug.GetBool() )
+                Msg( "[AI ZM] Trap was fired during cycle, moving to RESERVE to replenish\n" );
+            m_Phase = AIZM_PHASE_RESERVE;
+        }
+        else
+        {
+            if ( zm_sv_ai_zm_debug.GetBool() )
+                Msg( "[AI ZM] Reserve intact, moving to SPAWN\n" );
+            m_bTrapFiredDuringCycle = false;
+            m_Phase = AIZM_PHASE_SPAWN;
+        }
         m_flNextActionTime = gpGlobals->curtime + random->RandomFloat( 0.3f, 1.0f );
         return;
     }
@@ -992,32 +1011,23 @@ void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
     GatherHumans( humans );
     if ( humans.Count() == 0 )
     {
-        m_Phase = AIZM_PHASE_RESERVE;
+        m_Phase = AIZM_PHASE_SPAWN;
         return;
     }
 
-    int minCost = 30;
-    if ( pZM->GetResources() < minCost )
-    {
-        if ( zm_sv_ai_zm_debug.GetBool() )
-            Msg( "[AI ZM] Hidden spawn: not enough resources (res=%i), skipping to RESERVE\n",
-                pZM->GetResources() );
-        m_Phase = AIZM_PHASE_RESERVE;
-        m_flNextActionTime = gpGlobals->curtime + 0.5f;
-        return;
-    }
+    // Same holdBack logic as DoSpawnPhase
+    int holdBack = 0;
+    if ( m_bTrapsUnlocked && pZM->GetResources() >= m_iReservedResources )
+        holdBack = m_iReservedResources;
 
     CBasePlayer* pTarget = humans[ random->RandomInt( 0, humans.Count() - 1 ) ];
     Vector targetPos = pTarget->GetAbsOrigin();
 
-    // Pick class using the weighted system (respects type limits, pop caps, affordability).
-    // Hidden spawns spend freely so holdBack = 0.
+    // Pick class using the weighted system (respects type limits, pop caps).
     // When hidden_allclasses is off, only shamblers can be hidden-spawned.
     ZombieClass_t zclass = ZMCLASS_SHAMBLER;
     if ( zm_sv_hidden_allclasses.GetBool() )
     {
-        // Use a temporary "all classes" spawner-like check: pass nullptr-safe path
-        // We can't use PickWeightedClass without a spawner, so manually pick with weights
         int totalWeight = 0;
         int weights[ZMCLASS_MAX];
         bool valid[ZMCLASS_MAX];
@@ -1027,7 +1037,6 @@ void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
             ZombieClass_t zc = (ZombieClass_t)i;
             valid[i] = CZMBaseZombie::IsValidClass( zc )
                     && CZMBaseZombie::HasEnoughPopToSpawn( zc )
-                    && CanAffordClass( zc, pZM, 0 )
                     && !IsClassAtTypeLimit( zc );
             weights[i] = 0;
         }
@@ -1039,9 +1048,9 @@ void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
         if ( validCount == 0 )
         {
             if ( zm_sv_ai_zm_debug.GetBool() )
-                Msg( "[AI ZM] Hidden spawn: no valid classes available, skipping to RESERVE\n" );
-            m_Phase = AIZM_PHASE_RESERVE;
-            m_flNextActionTime = gpGlobals->curtime + 0.5f;
+                Msg( "[AI ZM] Hidden spawn: no valid classes, ending phase\n" );
+            m_iHiddenSpawnsRemaining = 0;
+            m_flNextActionTime = gpGlobals->curtime + 0.1f;
             return;
         }
 
@@ -1080,10 +1089,23 @@ void CZMAIZombieMaster::DoHiddenSpawnPhase( CZMPlayer* pZM )
         if ( IsClassAtTypeLimit( ZMCLASS_SHAMBLER ) ||
              !CZMBaseZombie::HasEnoughPopToSpawn( ZMCLASS_SHAMBLER ) )
         {
-            m_Phase = AIZM_PHASE_RESERVE;
-            m_flNextActionTime = gpGlobals->curtime + 0.5f;
+            m_iHiddenSpawnsRemaining = 0;
+            m_flNextActionTime = gpGlobals->curtime + 0.1f;
             return;
         }
+    }
+
+    // Check affordability with reserve holdBack
+    if ( !CanAffordClass( zclass, pZM, holdBack ) )
+    {
+        if ( zm_sv_ai_zm_debug.GetBool() )
+        {
+            int cost = CZMBaseZombie::GetCost( zclass );
+            Msg( "[AI ZM] Hidden spawn: saving up for %s (need %i, have %i, holdBack %i)\n",
+                CZMBaseZombie::ClassToName( zclass ), cost, pZM->GetResources(), holdBack );
+        }
+        m_flNextActionTime = gpGlobals->curtime + 0.5f;
+        return;
     }
 
     // Try multiple positions this tick
@@ -1147,6 +1169,8 @@ bool CZMAIZombieMaster::TryFireTrap( CZMPlayer* pZM )
         pZM->IncResources( -trapCost, false );
 
     pTrap->Trigger( pZM );
+
+    m_bTrapFiredDuringCycle = true;
 
     int idx = m_EntityCooldowns.Find( pTrap->entindex() );
     if ( idx != m_EntityCooldowns.InvalidIndex() )
@@ -1274,24 +1298,29 @@ void CZMAIZombieMaster::Update()
             (int)m_Phase, pZM->GetResources(), m_iReservedResources,
             m_bTrapsUnlocked ? 1 : 0, gpGlobals->curtime );
 
-    // Traps and barrels fire in ANY phase once the first reserve target has been met.
-    // Before that, the AI focuses purely on spawning zombies.
-    if ( m_bTrapsUnlocked )
-    {
-        TryFireTrap( pZM );
-        TryDetonateBarrel( pZM );
-    }
-
-    // Run the current cycle phase: SPAWN -> HIDDEN_SPAWN -> RESERVE -> SPAWN -> ...
+    // Run the current cycle phase: SPAWN -> HIDDEN_SPAWN -> RESERVE (if needed) -> SPAWN
     switch ( m_Phase )
     {
     case AIZM_PHASE_SPAWN:
+        // Traps fire opportunistically during spawning phases
+        if ( m_bTrapsUnlocked )
+        {
+            TryFireTrap( pZM );
+            TryDetonateBarrel( pZM );
+        }
         DoSpawnPhase( pZM );
         break;
     case AIZM_PHASE_HIDDEN_SPAWN:
+        // Traps fire opportunistically during spawning phases
+        if ( m_bTrapsUnlocked )
+        {
+            TryFireTrap( pZM );
+            TryDetonateBarrel( pZM );
+        }
         DoHiddenSpawnPhase( pZM );
         break;
     case AIZM_PHASE_RESERVE:
+        // No traps during RESERVE — the AI is rebuilding its reserve
         DoReservePhase( pZM );
         break;
     }

@@ -8,32 +8,36 @@
 //
 // AI Zombie Master - Server-side tactical controller.
 //
-// Phase cycle: SPAWN -> HIDDEN_SPAWN -> RESERVE -> SPAWN -> ...
+// Phase cycle:
+//   Round start -> SPAWN -> HIDDEN_SPAWN -> RESERVE (if trap fired) -> SPAWN -> ...
 //
-//   SPAWN (start of round):
+//   SPAWN:
 //     Pick a burst of 1-15 zombies. For each zombie, roll a weighted class
 //     (60% shambler, 10% each special) based on the nearest spawner's allowed
 //     types — blocked types have their weight redistributed equally among
-//     valid types. Then save up resources until the class is affordable and
-//     spawn it. If the focused survivor moves closer to a different spawner,
-//     re-evaluate the spawner and re-roll the class on the fly.
-//     Respects per-type limits and global pop cap.
+//     valid types. Save up until resources >= reserve + zombieCost, then
+//     spawn it and roll the next one. If the focused survivor moves closer
+//     to a different spawner, re-evaluate and re-roll. Traps fire
+//     opportunistically during this phase. If a trap fires, the AI does NOT
+//     pause spawning — it continues with whatever resources remain (just
+//     needs raw cost). After all zombies are spawned -> HIDDEN_SPAWN.
 //
 //   HIDDEN_SPAWN:
-//     Attempt 1-3 surprise spawns near survivors (positions not in line of
-//     sight). Each spawn picks a fresh weighted class for variety. Retries
-//     positions for up to 15 seconds before giving up. Spends freely
-//     regardless of reserve. Then -> RESERVE.
+//     Attempt 1-3 surprise spawns near survivors. Same save-up logic as
+//     SPAWN (reserve + cost). Each spawn is placed immediately when
+//     affordable. Retries positions for up to 15 seconds. Traps fire
+//     opportunistically here too. After done -> RESERVE (if a trap was
+//     fired during SPAWN or HIDDEN_SPAWN) or -> SPAWN (if reserve intact).
 //
 //   RESERVE:
-//     Save resources until we can cover the most expensive trap on the map.
-//     Once met, set m_bTrapsUnlocked = true (permanent for the round) and
-//     immediately -> SPAWN. If reserve is already met on entry, skip straight
-//     to SPAWN.
+//     Only entered when a trap was fired during SPAWN or HIDDEN_SPAWN and
+//     the reserve needs replenishing. Save resources without spawning any
+//     zombies until resources >= highest trap cost. Then -> SPAWN.
+//     If no traps exist on the map, this phase is skipped.
 //
-// Traps: Once m_bTrapsUnlocked is true, traps fire opportunistically in ANY
-//   phase whenever a survivor enters range and the AI can afford the cost.
-//   Before unlocked, traps never fire.
+// Traps: Once the first reserve target is met, traps fire in SPAWN and
+//   HIDDEN_SPAWN phases whenever a survivor enters range and the AI can
+//   afford it. Traps do NOT fire during RESERVE (saving up).
 //
 // Camera: Smoothly glides between survivors, panning naturally like a real player.
 // Culling: Kills stranded zombies too far from survivors when pop cap is stressed.
@@ -111,7 +115,8 @@ private:
 
     // Trap reserve: cost of the most expensive trap on the map
     int   m_iReservedResources;
-    bool  m_bTrapsUnlocked;    // True once first reserve target is met (permanent for round)
+    bool  m_bTrapsUnlocked;         // True once first reserve target is met
+    bool  m_bTrapFiredDuringCycle;  // True if a trap fired during SPAWN or HIDDEN_SPAWN
 
     // Spawn burst: internal queue of N zombies to spawn one at a time.
     // Each zombie is rolled independently. The AI saves up resources for
