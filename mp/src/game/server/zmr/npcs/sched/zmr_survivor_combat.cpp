@@ -139,6 +139,15 @@ void CSurvivorCombatSchedule::OnUpdate()
         }
     }
 
+    // Weapon swap: if current weapon has no ammo, switch to best available
+    {
+        CZMBaseWeapon* pCurWep = pOuter->GetActiveWeapon();
+        if ( pCurWep && pCurWep->UsesPrimaryAmmo() && !pOuter->WeaponHasAmmo( pCurWep ) )
+        {
+            pOuter->EquipBestWeapon();
+        }
+    }
+
     if ( !m_NextEnemyScan.HasStarted() || m_NextEnemyScan.IsElapsed() )
     {
         m_NextEnemyScan.Start( 0.1f );
@@ -174,6 +183,7 @@ void CSurvivorCombatSchedule::OnUpdate()
 
             float flDist = pClosestEnemy->GetAbsOrigin().DistTo( pOuter->GetPosition() );
 
+            // Ranged weapons: engage at any distance we can see
             if ( pOuter->HasAnyEffectiveRangeWeapons() )
             {
                 if ( flDist > 400.0f )
@@ -190,21 +200,18 @@ void CSurvivorCombatSchedule::OnUpdate()
                 }
             }
 
-            // Melee fallback: only fight with fists/melee when cornered (enemy very close).
-            // If the enemy is further away, the bot should try to flee and find guns/ammo.
+            // Melee engagement: fight any zombie within 512 units.
+            // Bots must not stand idle while being attacked.
             if ( !IsIntercepted() )
             {
-                // Cornered threshold: if zombie is within 120u, we must fight
-                // Otherwise try to kite/flee and let the follow schedule find weapons
-                if ( flDist < 120.0f )
+                if ( flDist < 512.0f )
                 {
                     m_pAttackCloseRangeSched->SetAttackTarget( pClosestEnemy );
                     m_pAttackCloseRangeSched->SetMeleeing( true );
-                    Intercept( m_pAttackCloseRangeSched, "Cornered - fighting with melee!" );
+                    Intercept( m_pAttackCloseRangeSched, "Engaging with melee!" );
                 }
                 else
                 {
-                    // Flee from the zombie - move back and let weapon scavenging happen
                     MoveBackFromThreat( pClosestEnemy );
                 }
             }

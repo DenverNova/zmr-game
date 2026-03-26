@@ -318,8 +318,19 @@ bool CZMAIZombieMaster::CanAffordClass( ZombieClass_t zclass, CZMPlayer* pZM, in
 {
     if ( zclass == ZMCLASS_INVALID || !pZM ) return false;
     int cost = CZMBaseZombie::GetCost( zclass );
-    int available = pZM->GetResources() - reservedResources;
-    return cost >= 0 && available >= cost && CZMBaseZombie::HasEnoughPopToSpawn( zclass );
+    if ( cost < 0 || !CZMBaseZombie::HasEnoughPopToSpawn( zclass ) )
+        return false;
+
+    int resources = pZM->GetResources();
+
+    // If we have excess above the reserve, spend from the excess
+    if ( resources - reservedResources >= cost )
+        return true;
+
+    // Even if below reserve, allow spawning if we can cover the raw cost.
+    // This prevents the AI from getting completely stuck when reserve is high.
+    // The phase system handles long-term resource management.
+    return resources >= cost;
 }
 
 //
@@ -825,35 +836,46 @@ void CZMAIZombieMaster::DoSpawnPhase( CZMPlayer* pZM )
     // Determine how much to hold back: 0 if traps not yet unlocked, else reserve
     int holdBack = m_bTrapsUnlocked ? m_iReservedResources : 0;
 
-    // === Find the best spawner near the focused target (checked every tick) ===
-    CZMEntZombieSpawn* pBestSpawner = nullptr;
+    // === Find spawners near the focused target ===
+    CUtlVector<CZMEntZombieSpawn*> nearSpawners;
+    CBasePlayer* pFocused = GetFocusedTarget();
+    if ( pFocused )
+        GatherNearestSpawnersToTarget( pFocused, nearSpawners );
+    else
+        GatherNearestSpawners( nearSpawners );
+
+    // Filter by view mode
+    CUtlVector<CZMEntZombieSpawn*> visibleSpawners;
+    for ( int i = 0; i < nearSpawners.Count(); i++ )
     {
-        CUtlVector<CZMEntZombieSpawn*> nearSpawners;
-        CBasePlayer* pFocused = GetFocusedTarget();
-        if ( pFocused )
-            GatherNearestSpawnersToTarget( pFocused, nearSpawners );
-        else
-            GatherNearestSpawners( nearSpawners );
-
-        // Filter by view mode
-        CUtlVector<CZMEntZombieSpawn*> visibleSpawners;
-        for ( int i = 0; i < nearSpawners.Count(); i++ )
-        {
-            if ( IsEntityInView( pZM, nearSpawners[i] ) )
-                visibleSpawners.AddToTail( nearSpawners[i] );
-        }
-
-        if ( visibleSpawners.Count() > 0 )
-            pBestSpawner = visibleSpawners[ random->RandomInt( 0, visibleSpawners.Count() - 1 ) ];
+        if ( IsEntityInView( pZM, nearSpawners[i] ) )
+            visibleSpawners.AddToTail( nearSpawners[i] );
     }
 
-    if ( !pBestSpawner )
+    if ( visibleSpawners.Count() == 0 )
     {
         if ( zm_sv_ai_zm_debug.GetBool() )
             Msg( "[AI ZM] Spawn: no active/visible spawners, retrying\n" );
         m_flNextActionTime = gpGlobals->curtime + 1.0f;
         return;
     }
+
+    // Keep the current spawner if it's still in the nearby visible set.
+    // Only pick a new one if the current spawner dropped out (survivor moved away).
+    CZMEntZombieSpawn* pBestSpawner = nullptr;
+    if ( m_hSpawnBurstSpawner.Get() )
+    {
+        for ( int i = 0; i < visibleSpawners.Count(); i++ )
+        {
+            if ( visibleSpawners[i] == m_hSpawnBurstSpawner.Get() )
+            {
+                pBestSpawner = m_hSpawnBurstSpawner.Get();
+                break;
+            }
+        }
+    }
+    if ( !pBestSpawner )
+        pBestSpawner = visibleSpawners[ random->RandomInt( 0, visibleSpawners.Count() - 1 ) ];
 
     // === No active burst — start a new one ===
     if ( m_iSpawnBurstRemaining <= 0 )
